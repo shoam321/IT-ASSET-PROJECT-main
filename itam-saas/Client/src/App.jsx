@@ -461,7 +461,13 @@ export default function App() {
 
   const handleEditContract = (contract) => {
     setEditingId(contract.id);
-    setContractFormData(contract);
+    // Format dates to yyyy-MM-dd for date inputs
+    const formattedContract = {
+      ...contract,
+      start_date: contract.start_date ? contract.start_date.split('T')[0] : '',
+      end_date: contract.end_date ? contract.end_date.split('T')[0] : ''
+    };
+    setContractFormData(formattedContract);
     setShowForm(true);
   };
 
