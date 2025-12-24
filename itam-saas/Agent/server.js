@@ -175,10 +175,10 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
-// ===== ASSET ROUTES =====
+// ===== ASSET ROUTES (Protected) =====
 
 // Get all assets
-app.get('/api/assets', async (req, res) => {
+app.get('/api/assets', authenticateToken, async (req, res) => {
   try {
     const assets = await db.getAllAssets();
     res.json(assets);
@@ -188,7 +188,7 @@ app.get('/api/assets', async (req, res) => {
 });
 
 // Get asset by ID
-app.get('/api/assets/:id', async (req, res) => {
+app.get('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
     const asset = await db.getAssetById(req.params.id);
     if (!asset) {
@@ -201,7 +201,7 @@ app.get('/api/assets/:id', async (req, res) => {
 });
 
 // Search assets
-app.get('/api/assets/search/:query', async (req, res) => {
+app.get('/api/assets/search/:query', authenticateToken, async (req, res) => {
   try {
     const assets = await db.searchAssets(req.params.query);
     res.json(assets);
@@ -221,7 +221,7 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // Create new asset
-app.post('/api/assets', async (req, res) => {
+app.post('/api/assets', authenticateToken, async (req, res) => {
   try {
     const asset = await db.createAsset(req.body);
     res.status(201).json(asset);
@@ -231,7 +231,7 @@ app.post('/api/assets', async (req, res) => {
 });
 
 // Update asset
-app.put('/api/assets/:id', async (req, res) => {
+app.put('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
     const asset = await db.updateAsset(req.params.id, req.body);
     if (!asset) {
@@ -244,7 +244,7 @@ app.put('/api/assets/:id', async (req, res) => {
 });
 
 // Delete asset
-app.delete('/api/assets/:id', async (req, res) => {
+app.delete('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
     const asset = await db.deleteAsset(req.params.id);
     if (!asset) {
@@ -259,7 +259,7 @@ app.delete('/api/assets/:id', async (req, res) => {
 // --- LICENSES ROUTES ---
 
 // Get all licenses
-app.get('/api/licenses', async (req, res) => {
+app.get('/api/licenses', authenticateToken, async (req, res) => {
   try {
     const licenses = await db.getAllLicenses();
     res.json(licenses);
@@ -269,7 +269,7 @@ app.get('/api/licenses', async (req, res) => {
 });
 
 // Search licenses
-app.get('/api/licenses/search/:query', async (req, res) => {
+app.get('/api/licenses/search/:query', authenticateToken, async (req, res) => {
   try {
     const licenses = await db.searchLicenses(req.params.query);
     res.json(licenses);
@@ -279,7 +279,7 @@ app.get('/api/licenses/search/:query', async (req, res) => {
 });
 
 // Create new license
-app.post('/api/licenses', async (req, res) => {
+app.post('/api/licenses', authenticateToken, async (req, res) => {
   try {
     console.log('📝 Creating license with data:', req.body);
     const license = await db.createLicense(req.body);
@@ -292,7 +292,7 @@ app.post('/api/licenses', async (req, res) => {
 });
 
 // Update license
-app.put('/api/licenses/:id', async (req, res) => {
+app.put('/api/licenses/:id', authenticateToken, async (req, res) => {
   try {
     console.log('📝 Updating license', req.params.id, 'with data:', req.body);
     const license = await db.updateLicense(req.params.id, req.body);
@@ -308,7 +308,7 @@ app.put('/api/licenses/:id', async (req, res) => {
 });
 
 // Delete license
-app.delete('/api/licenses/:id', async (req, res) => {
+app.delete('/api/licenses/:id', authenticateToken, async (req, res) => {
   try {
     const license = await db.deleteLicense(req.params.id);
     if (!license) {
@@ -323,7 +323,7 @@ app.delete('/api/licenses/:id', async (req, res) => {
 // --- USERS ROUTES ---
 
 // Get all users
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', authenticateToken, async (req, res) => {
   try {
     const users = await db.getAllUsers();
     res.json(users);
@@ -333,7 +333,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 // Search users
-app.get('/api/users/search/:query', async (req, res) => {
+app.get('/api/users/search/:query', authenticateToken, async (req, res) => {
   try {
     const users = await db.searchUsers(req.params.query);
     res.json(users);
@@ -343,7 +343,7 @@ app.get('/api/users/search/:query', async (req, res) => {
 });
 
 // Create new user
-app.post('/api/users', async (req, res) => {
+app.post('/api/users', authenticateToken, async (req, res) => {
   try {
     const user = await db.createUser(req.body);
     res.status(201).json(user);
@@ -353,7 +353,7 @@ app.post('/api/users', async (req, res) => {
 });
 
 // Update user
-app.put('/api/users/:id', async (req, res) => {
+app.put('/api/users/:id', authenticateToken, async (req, res) => {
   try {
     const user = await db.updateUser(req.params.id, req.body);
     if (!user) {
@@ -366,7 +366,7 @@ app.put('/api/users/:id', async (req, res) => {
 });
 
 // Delete user
-app.delete('/api/users/:id', async (req, res) => {
+app.delete('/api/users/:id', authenticateToken, async (req, res) => {
   try {
     const user = await db.deleteUser(req.params.id);
     if (!user) {
@@ -381,7 +381,7 @@ app.delete('/api/users/:id', async (req, res) => {
 // --- CONTRACTS ROUTES ---
 
 // Get all contracts
-app.get('/api/contracts', async (req, res) => {
+app.get('/api/contracts', authenticateToken, async (req, res) => {
   try {
     const contracts = await db.getAllContracts();
     res.json(contracts);
@@ -391,7 +391,7 @@ app.get('/api/contracts', async (req, res) => {
 });
 
 // Search contracts
-app.get('/api/contracts/search/:query', async (req, res) => {
+app.get('/api/contracts/search/:query', authenticateToken, async (req, res) => {
   try {
     const contracts = await db.searchContracts(req.params.query);
     res.json(contracts);
@@ -401,7 +401,7 @@ app.get('/api/contracts/search/:query', async (req, res) => {
 });
 
 // Create new contract
-app.post('/api/contracts', async (req, res) => {
+app.post('/api/contracts', authenticateToken, async (req, res) => {
   try {
     const contract = await db.createContract(req.body);
     res.status(201).json(contract);
@@ -411,7 +411,7 @@ app.post('/api/contracts', async (req, res) => {
 });
 
 // Update contract
-app.put('/api/contracts/:id', async (req, res) => {
+app.put('/api/contracts/:id', authenticateToken, async (req, res) => {
   try {
     const contract = await db.updateContract(req.params.id, req.body);
     if (!contract) {
@@ -424,7 +424,7 @@ app.put('/api/contracts/:id', async (req, res) => {
 });
 
 // Delete contract
-app.delete('/api/contracts/:id', async (req, res) => {
+app.delete('/api/contracts/:id', authenticateToken, async (req, res) => {
   try {
     const contract = await db.deleteContract(req.params.id);
     if (!contract) {
