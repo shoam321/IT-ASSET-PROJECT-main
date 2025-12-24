@@ -1,0 +1,31 @@
+{
+  "name": "itam-tracker-saas",
+  "version": "1.0.0",
+  "description": "IT Asset Tracker SaaS built with React and Node.js",
+  "main": "Index.js",
+  "private": true,
+  "scripts": {
+    "install": "cd itam-saas/Client && npm install",
+    "start": "cd itam-saas/Client && npm start",
+    "build": "cd itam-saas/Client && npm run build",
+    "test": "cd itam-saas/Client && npm test",
+    "eject": "cd itam-saas/Client && npm run eject"
+  },
+  "dependencies": {
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-scripts": "5.0.1"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

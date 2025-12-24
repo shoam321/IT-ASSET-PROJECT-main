@@ -1,0 +1,70 @@
+-- IT Asset Management Database Schema
+
+-- Assets Table
+CREATE TABLE IF NOT EXISTS assets (
+  id SERIAL PRIMARY KEY,
+  asset_tag VARCHAR(255) UNIQUE NOT NULL,
+  asset_type VARCHAR(255) NOT NULL,
+  manufacturer VARCHAR(255),
+  model VARCHAR(255),
+  serial_number VARCHAR(255),
+  assigned_user_name VARCHAR(255),
+  status VARCHAR(50) DEFAULT 'In Use',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Licenses Table
+CREATE TABLE IF NOT EXISTS licenses (
+  id SERIAL PRIMARY KEY,
+  license_name VARCHAR(255) NOT NULL,
+  license_type VARCHAR(255),
+  license_key TEXT,
+  software_name VARCHAR(255),
+  vendor VARCHAR(255),
+  expiration_date DATE,
+  quantity INTEGER DEFAULT 1,
+  status VARCHAR(50) DEFAULT 'Active',
+  cost DECIMAL(10, 2) DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users Table
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  user_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) UNIQUE,
+  department VARCHAR(255),
+  phone VARCHAR(50),
+  role VARCHAR(255),
+  status VARCHAR(50) DEFAULT 'Active',
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Contracts Table
+CREATE TABLE IF NOT EXISTS contracts (
+  id SERIAL PRIMARY KEY,
+  contract_name VARCHAR(255) NOT NULL,
+  vendor VARCHAR(255),
+  contract_type VARCHAR(255),
+  start_date DATE,
+  end_date DATE,
+  value DECIMAL(10, 2) DEFAULT 0,
+  status VARCHAR(50) DEFAULT 'Active',
+  renewal_terms TEXT,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_assets_status ON assets(status);
+CREATE INDEX IF NOT EXISTS idx_assets_asset_tag ON assets(asset_tag);
+CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
+CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status);
