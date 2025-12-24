@@ -346,11 +346,10 @@ export async function createContract(contractData) {
   try {
     const response = await fetch(`${API_URL}/contracts`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(contractData),
     });
-    if (!response.ok) throw new Error('Failed to create contract');
-    return await response.json();
+    return await handleResponse(response);
   } catch (error) {
     console.error('Error creating contract:', error);
     throw error;
@@ -364,11 +363,10 @@ export async function updateContract(id, contractData) {
   try {
     const response = await fetch(`${API_URL}/contracts/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(contractData),
     });
-    if (!response.ok) throw new Error('Failed to update contract');
-    return await response.json();
+    return await handleResponse(response);
   } catch (error) {
     console.error('Error updating contract:', error);
     throw error;
@@ -382,9 +380,9 @@ export async function deleteContract(id) {
   try {
     const response = await fetch(`${API_URL}/contracts/${id}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
-    if (!response.ok) throw new Error('Failed to delete contract');
-    return await response.json();
+    return await handleResponse(response);
   } catch (error) {
     console.error('Error deleting contract:', error);
     throw error;
