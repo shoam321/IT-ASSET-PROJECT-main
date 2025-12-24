@@ -6,7 +6,7 @@ import { useAuth } from './context/AuthContext';
 export default function App() {
   const { user, logout } = useAuth();
   const [currentScreen, setCurrentScreen] = useState('assets');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
   const [assets, setAssets] = useState([]);
   const [licenses, setLicenses] = useState([]);
   const [users, setUsers] = useState([]);
@@ -1350,15 +1350,15 @@ export default function App() {
       )}
 
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-slate-800 border-r border-slate-700 transition-all duration-300 overflow-hidden flex flex-col`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} lg:w-64 bg-slate-800 border-r border-slate-700 transition-all duration-300 overflow-hidden flex flex-col absolute lg:relative h-full z-20 lg:z-auto`}>
         <div className="p-6 border-b border-slate-700">
           <div className="flex items-center gap-2">
             <Package className="w-8 h-8 text-blue-500" />
-            <span className="text-xl font-bold text-white">IT ASSET</span>
+            <span className="text-xl font-bold text-white whitespace-nowrap">IT ASSET</span>
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <button
             onClick={() => { setCurrentScreen('assets'); setShowForm(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
@@ -1425,15 +1425,24 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col relative">
+        {/* Mobile overlay when sidebar is open */}
+        {sidebarOpen && (
+          <div 
+            className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-10"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        
         {/* Header */}
-        <header className="bg-slate-800 border-b border-slate-700 shadow-lg">
+        <header className="bg-slate-800 border-b border-slate-700 shadow-lg relative z-5">
           <div className="px-6 py-4 flex items-center justify-between">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 hover:bg-slate-700 rounded-lg transition text-slate-300"
+              className="lg:hidden p-2 hover:bg-slate-700 rounded-lg transition text-slate-300"
             >
               {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
             </button>
             
             {currentScreen === 'assets' && (
