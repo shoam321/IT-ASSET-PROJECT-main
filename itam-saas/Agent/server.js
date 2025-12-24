@@ -13,12 +13,24 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // CORS configuration
-const allowedOrigin = process.env.REACT_APP_URL || 'https://it-asset-project.vercel.app';
-console.log('🔧 CORS Origin:', allowedOrigin);
+const allowedOrigins = process.env.REACT_APP_URL 
+  ? process.env.REACT_APP_URL.split(',').map(origin => origin.trim())
+  : ['https://it-asset-project.vercel.app'];
+console.log('🔧 CORS Origins:', allowedOrigins);
 
 // Middleware
 app.use(cors({
-  origin: allowedOrigin,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin is allowed or is a vercel.app domain
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(bodyParser.json());
