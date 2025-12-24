@@ -1,7 +1,6 @@
 {
-  "version": 2,
-  "scope": "shoam321",
-  "buildCommand": "cd itam-saas/Client && npm install && npm run build",
-  "installCommand": "cd itam-saas/Client && npm install",
-  "outputDirectory": "itam-saas/Client/build"
+  "buildCommand": "npm run build --prefix itam-saas/Client",
+  "installCommand": "npm install --prefix itam-saas/Client",
+  "outputDirectory": "itam-saas/Client/build",
+  "framework": "create-react-app"
 }
