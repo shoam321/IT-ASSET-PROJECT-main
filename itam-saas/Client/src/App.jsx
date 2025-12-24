@@ -3,6 +3,17 @@ import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Use
 import * as dbService from './services/db';
 import { useAuth } from './context/AuthContext';
 
+// Helper function to format dates in a user-friendly way
+const formatDate = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric' 
+  });
+};
+
 export default function App() {
   const { user, logout } = useAuth();
   const [currentScreen, setCurrentScreen] = useState('assets');
@@ -841,7 +852,7 @@ export default function App() {
                     <td className="px-6 py-4 text-white font-medium">{license.license_name}</td>
                     <td className="px-6 py-4 text-slate-300">{license.software_name}</td>
                     <td className="px-6 py-4 text-slate-300">{license.vendor}</td>
-                    <td className="px-6 py-4 text-slate-300">{license.expiration_date}</td>
+                    <td className="px-6 py-4 text-slate-300">{formatDate(license.expiration_date)}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         license.status === 'Active' ? 'bg-green-900 text-green-200' : license.status === 'Expired' ? 'bg-red-900 text-red-200' : 'bg-yellow-900 text-yellow-200'
@@ -1266,8 +1277,8 @@ export default function App() {
                         {contract.contract_type}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-300">{contract.start_date}</td>
-                    <td className="px-6 py-4 text-slate-300">{contract.end_date}</td>
+                    <td className="px-6 py-4 text-slate-300">{formatDate(contract.start_date)}</td>
+                    <td className="px-6 py-4 text-slate-300">{formatDate(contract.end_date)}</td>
                     <td className="px-6 py-4 text-slate-300">{contract.value} {contract.currency}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
