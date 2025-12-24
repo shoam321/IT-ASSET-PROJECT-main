@@ -16,7 +16,7 @@ const UsageMonitor = () => {
   const fetchDevices = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/agent/devices`, {
+      const response = await fetch(`${API_BASE_URL}/agent/devices`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -46,7 +46,7 @@ const UsageMonitor = () => {
     
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/agent/devices/${deviceId}/usage`, {
+      const response = await fetch(`${API_BASE_URL}/agent/devices/${deviceId}/usage`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -68,7 +68,7 @@ const UsageMonitor = () => {
   const fetchAppUsageSummary = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/agent/apps/usage`, {
+      const response = await fetch(`${API_BASE_URL}/agent/apps/usage`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
