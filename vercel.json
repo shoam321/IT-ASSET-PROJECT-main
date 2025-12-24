@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm run build --prefix itam-saas/Client",
-  "installCommand": "npm install --prefix itam-saas/Client",
+  "buildCommand": "cd itam-saas/Client && npm run build",
+  "installCommand": "cd itam-saas/Client && npm install",
   "outputDirectory": "itam-saas/Client/build",
   "framework": "create-react-app"
 }
