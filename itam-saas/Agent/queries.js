@@ -278,7 +278,8 @@ export async function createLicense(licenseData) {
     return result.rows[0];
   } catch (error) {
     console.error('Error creating license:', error);
-    throw error;
+    console.error('Error details:', error.message, error.code, error.detail);
+    throw new Error(`Failed to create license: ${error.message}`);
   }
 }
 
