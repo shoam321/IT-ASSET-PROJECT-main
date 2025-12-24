@@ -16,6 +16,6 @@
   </g>
   
   <!-- Text -->
-  <text x="55" y="25" font-family="Arial, sans-serif" font-size="18" font-weight="800" fill="#FFFFFF" letter-spacing="1">ASSET</text>
-  <text x="55" y="42" font-family="Arial, sans-serif" font-size="12" font-weight="400" fill="#94A3B8" letter-spacing="2">TRACKER</text>
+  <text x="55" y="28" font-family="Arial, sans-serif" font-size="22" font-weight="800" fill="#FFFFFF" letter-spacing="1">ASSET</text>
+  <text x="55" y="46" font-family="Arial, sans-serif" font-size="14" font-weight="400" fill="#94A3B8" letter-spacing="2">TRACKER</text>
 </svg>
