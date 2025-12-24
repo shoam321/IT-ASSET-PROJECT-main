@@ -1443,7 +1443,6 @@ export default function App() {
             >
               {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
-            </button>
             
             {currentScreen === 'assets' && (
               <button
