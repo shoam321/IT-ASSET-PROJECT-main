@@ -67,10 +67,9 @@ export async function searchAssets(query) {
  */
 export async function getAssetById(id) {
   try {
-    const response = await fetch(`${API_URL}/assets/${id}`, {
-      headers: getAuthHeaders()
-    });
-    return await handleResponse(response);
+    const response = await fetch(`${API_URL}/assets/${id}`);
+    if (!response.ok) throw new Error('Asset not found');
+    return await response.json();
   } catch (error) {
     console.error('Error fetching asset:', error);
     throw error;
@@ -84,10 +83,11 @@ export async function createAsset(assetData) {
   try {
     const response = await fetch(`${API_URL}/assets`, {
       method: 'POST',
-      headers: getAuthHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(assetData),
     });
-    return await handleResponse(response);
+    if (!response.ok) throw new Error('Failed to create asset');
+    return await response.json();
   } catch (error) {
     console.error('Error creating asset:', error);
     throw error;
@@ -101,10 +101,11 @@ export async function updateAsset(id, assetData) {
   try {
     const response = await fetch(`${API_URL}/assets/${id}`, {
       method: 'PUT',
-      headers: getAuthHeaders(),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(assetData),
     });
-    return await handleResponse(response);
+    if (!response.ok) throw new Error('Failed to update asset');
+    return await response.json();
   } catch (error) {
     console.error('Error updating asset:', error);
     throw error;
@@ -118,9 +119,9 @@ export async function deleteAsset(id) {
   try {
     const response = await fetch(`${API_URL}/assets/${id}`, {
       method: 'DELETE',
-      headers: getAuthHeaders()
     });
-    return await handleResponse(response);
+    if (!response.ok) throw new Error('Failed to delete asset');
+    return await response.json();
   } catch (error) {
     console.error('Error deleting asset:', error);
     throw error;
@@ -149,10 +150,9 @@ export async function getAssetStats() {
  */
 export async function fetchLicenses() {
   try {
-    const response = await fetch(`${API_URL}/licenses`, {
-      headers: getAuthHeaders()
-    });
-    return await handleResponse(response);
+    const response = await fetch(`${API_URL}/licenses`);
+    if (!response.ok) throw new Error('Failed to fetch licenses');
+    return await response.json();
   } catch (error) {
     console.error('Error fetching licenses:', error);
     throw error;
@@ -232,10 +232,9 @@ export async function deleteLicense(id) {
  */
 export async function fetchUsers() {
   try {
-    const response = await fetch(`${API_URL}/users`, {
-      headers: getAuthHeaders()
-    });
-    return await handleResponse(response);
+    const response = await fetch(`${API_URL}/users`);
+    if (!response.ok) throw new Error('Failed to fetch users');
+    return await response.json();
   } catch (error) {
     console.error('Error fetching users:', error);
     throw error;
@@ -315,10 +314,9 @@ export async function deleteUser(id) {
  */
 export async function fetchContracts() {
   try {
-    const response = await fetch(`${API_URL}/contracts`, {
-      headers: getAuthHeaders()
-    });
-    return await handleResponse(response);
+    const response = await fetch(`${API_URL}/contracts`);
+    if (!response.ok) throw new Error('Failed to fetch contracts');
+    return await response.json();
   } catch (error) {
     console.error('Error fetching contracts:', error);
     throw error;

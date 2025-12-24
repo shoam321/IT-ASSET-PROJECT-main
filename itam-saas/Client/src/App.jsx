@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut } from 'lucide-react';
 import * as dbService from './services/db';
+import { useAuth } from './context/AuthContext';
 
 export default function App() {
+  const { user, logout } = useAuth();
   const [currentScreen, setCurrentScreen] = useState('assets');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [assets, setAssets] = useState([]);
@@ -1405,6 +1407,21 @@ export default function App() {
             <span>Contracts</span>
           </button>
         </nav>
+
+        {/* User Info & Logout */}
+        <div className="p-4 border-t border-slate-700">
+          <div className="text-slate-400 text-sm mb-3">
+            <div className="font-medium text-white">{user?.username || 'User'}</div>
+            <div className="text-xs">{user?.email || ''}</div>
+          </div>
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Logout</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
