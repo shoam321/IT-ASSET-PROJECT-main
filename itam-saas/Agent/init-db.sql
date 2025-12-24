@@ -25,16 +25,22 @@ CREATE TABLE IF NOT EXISTS assets (
   assigned_user_name VARCHAR(255),
   status VARCHAR(50) DEFAULT 'In Use',
   cost DECIMAL(10, 2) DEFAULT 0,
+  discovered BOOLEAN DEFAULT false,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Add cost column to existing assets table if it doesn't exist
+-- Add missing columns to existing assets table if they don't exist
 DO $$ 
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
                  WHERE table_name='assets' AND column_name='cost') THEN
     ALTER TABLE assets ADD COLUMN cost DECIMAL(10, 2) DEFAULT 0;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name='assets' AND column_name='discovered') THEN
+    ALTER TABLE assets ADD COLUMN discovered BOOLEAN DEFAULT false;
   END IF;
 END $$;
 
