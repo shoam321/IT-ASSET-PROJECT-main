@@ -503,13 +503,13 @@ export async function getAllContracts() {
  * Create contract
  */
 export async function createContract(contractData) {
-  const { contract_name, vendor, contract_type, start_date, end_date, contract_value, status, renewal_date, contact_person, contact_email, notes } = contractData;
+  const { contract_name, vendor, contract_type, start_date, end_date, value, status, notes } = contractData;
   try {
     const result = await pool.query(
-      `INSERT INTO contracts (contract_name, vendor, contract_type, start_date, end_date, contract_value, status, renewal_date, contact_person, contact_email, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO contracts (contract_name, vendor, contract_type, start_date, end_date, value, status, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [contract_name, vendor, contract_type, start_date, end_date, contract_value || 0, status || 'Active', renewal_date, contact_person, contact_email, notes]
+      [contract_name, vendor, contract_type, start_date || null, end_date || null, value || 0, status || 'Active', notes || null]
     );
     return result.rows[0];
   } catch (error) {

@@ -58,9 +58,8 @@ export default function App() {
     start_date: '',
     end_date: '',
     value: 0,
-    currency: 'USD',
     status: 'Active',
-    description: ''
+    notes: ''
   });
 
   useEffect(() => {
@@ -411,9 +410,8 @@ export default function App() {
         start_date: '',
         end_date: '',
         value: 0,
-        currency: 'USD',
         status: 'Active',
-        description: ''
+        notes: ''
       });
       setShowForm(false);
       await loadContracts();
@@ -1161,30 +1159,18 @@ export default function App() {
               onChange={(e) => setContractFormData({...contractFormData, end_date: e.target.value})}
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
-            <div className="flex gap-2">
-              <input
-                id="contract_value"
-                name="contract_value"
-                type="number"
-                placeholder="Value"
-                value={contractFormData.value}
-                onChange={(e) => setContractFormData({...contractFormData, value: parseFloat(e.target.value)})}
-                className="flex-1 px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
-              />
-              <select
-                id="currency"
-                name="currency"
-                value={contractFormData.currency}
-                onChange={(e) => setContractFormData({...contractFormData, currency: e.target.value})}
-                className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white w-24"
-              >
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="ILS">ILS</option>
-              </select>
-            </div>
+            <input
+              id="contract_value"
+              name="contract_value"
+              type="number"
+              placeholder="Value"
+              value={contractFormData.value}
+              onChange={(e) => setContractFormData({...contractFormData, value: e.target.value === '' ? 0 : parseFloat(e.target.value)})}
+              className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
+            />
             <select
+              id="contract_status"
+              name="contract_status"
               value={contractFormData.status}
               onChange={(e) => setContractFormData({...contractFormData, status: e.target.value})}
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white"
@@ -1195,9 +1181,9 @@ export default function App() {
               <option value="Inactive">Inactive</option>
             </select>
             <textarea
-              placeholder="Description"
-              value={contractFormData.description}
-              onChange={(e) => setContractFormData({...contractFormData, description: e.target.value})}
+              placeholder="Notes"
+              value={contractFormData.notes}
+              onChange={(e) => setContractFormData({...contractFormData, notes: e.target.value})}
               className="col-span-2 px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400 h-20"
             />
           </div>
@@ -1219,9 +1205,8 @@ export default function App() {
                   start_date: '',
                   end_date: '',
                   value: 0,
-                  currency: 'USD',
                   status: 'Active',
-                  description: ''
+                  notes: ''
                 });
               }}
               className="bg-slate-600 hover:bg-slate-500 text-white px-6 py-2 rounded-lg transition"
