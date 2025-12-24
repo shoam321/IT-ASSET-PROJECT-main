@@ -594,3 +594,229 @@ export async function searchContracts(query) {
     throw error;
   }
 }
+
+// ============ AGENT / DEVICE MONITORING FUNCTIONS ============
+
+/**
+ * Upsert device (insert or update)
+ */
+export async function upsertDevice(deviceData) {
+  const { device_id, hostname, os_name, os_version } = deviceData;
+  
+  try {
+    const result = await pool.query(
+      `INSERT INTO devices (device_id, hostname, os_name, os_version, last_seen, status)
+       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, 'Active')
+       ON CONFLICT (device_id) 
+       DO UPDATE SET 
+         hostname = COALESCE($2, devices.hostname),
+         os_name = COALESCE($3, devices.os_name),
+         os_version = COALESCE($4, devices.os_version),
+         last_seen = CURRENT_TIMESTAMP,
+         status = 'Active',
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [device_id, hostname, os_name, os_version]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error upserting device:', error);
+    throw new Error(`Failed to upsert device: ${error.message}`);
+  }
+}
+
+/**
+ * Insert usage data
+ */
+export async function insertUsageData(usageData) {
+  const { device_id, app_name, window_title, duration, timestamp } = usageData;
+  
+  try {
+    const result = await pool.query(
+      `INSERT INTO device_usage (device_id, app_name, window_title, duration, timestamp)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [device_id, app_name, window_title || '', duration || 0, timestamp || Date.now()]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error inserting usage data:', error);
+    throw new Error(`Failed to insert usage data: ${error.message}`);
+  }
+}
+
+/**
+ * Insert heartbeat
+ */
+export async function insertHeartbeat(heartbeatData) {
+  const { device_id, timestamp } = heartbeatData;
+  
+  try {
+    const result = await pool.query(
+      `INSERT INTO device_heartbeats (device_id, timestamp)
+       VALUES ($1, $2)
+       RETURNING *`,
+      [device_id, timestamp || Date.now()]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error inserting heartbeat:', error);
+    throw new Error(`Failed to insert heartbeat: ${error.message}`);
+  }
+}
+
+/**
+ * Upsert installed apps for a device
+ */
+export async function upsertInstalledApps(device_id, apps) {
+  try {
+    const insertPromises = apps.map(app => {
+      const { app_name, app_version, install_date } = app;
+      return pool.query(
+        `INSERT INTO installed_apps (device_id, app_name, app_version, install_date)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (device_id, app_name) 
+         DO UPDATE SET 
+           app_version = COALESCE($2, installed_apps.app_version),
+           install_date = COALESCE($3, installed_apps.install_date),
+           last_updated = CURRENT_TIMESTAMP
+         RETURNING *`,
+        [device_id, app_name, app_version || null, install_date || null]
+      );
+    });
+    
+    const results = await Promise.all(insertPromises);
+    return results.map(r => r.rows[0]);
+  } catch (error) {
+    console.error('Error upserting installed apps:', error);
+    throw new Error(`Failed to upsert installed apps: ${error.message}`);
+  }
+}
+
+/**
+ * Get all devices
+ */
+export async function getAllDevices() {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        d.*,
+        COUNT(DISTINCT du.app_name) as app_count,
+        COUNT(du.id) as usage_records,
+        MAX(du.timestamp) as last_activity
+       FROM devices d
+       LEFT JOIN device_usage du ON d.device_id = du.device_id
+       GROUP BY d.id
+       ORDER BY d.last_seen DESC`
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching devices:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get device usage statistics
+ */
+export async function getDeviceUsageStats(device_id, startDate, endDate) {
+  try {
+    let query = `
+      SELECT 
+        app_name,
+        COUNT(*) as usage_count,
+        SUM(duration) as total_duration,
+        AVG(duration) as avg_duration,
+        MAX(timestamp) as last_used
+      FROM device_usage
+      WHERE device_id = $1
+    `;
+    
+    const params = [device_id];
+    let paramCount = 2;
+    
+    if (startDate) {
+      query += ` AND created_at >= $${paramCount}`;
+      params.push(new Date(startDate));
+      paramCount++;
+    }
+    
+    if (endDate) {
+      query += ` AND created_at <= $${paramCount}`;
+      params.push(new Date(endDate));
+    }
+    
+    query += `
+      GROUP BY app_name
+      ORDER BY total_duration DESC
+    `;
+    
+    const result = await pool.query(query, params);
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching device usage stats:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get app usage summary across all devices
+ */
+export async function getAppUsageSummary(startDate, endDate) {
+  try {
+    let query = `
+      SELECT 
+        app_name,
+        COUNT(DISTINCT device_id) as device_count,
+        COUNT(*) as total_usage_count,
+        SUM(duration) as total_duration,
+        AVG(duration) as avg_duration
+      FROM device_usage
+      WHERE 1=1
+    `;
+    
+    const params = [];
+    let paramCount = 1;
+    
+    if (startDate) {
+      query += ` AND created_at >= $${paramCount}`;
+      params.push(new Date(startDate));
+      paramCount++;
+    }
+    
+    if (endDate) {
+      query += ` AND created_at <= $${paramCount}`;
+      params.push(new Date(endDate));
+    }
+    
+    query += `
+      GROUP BY app_name
+      ORDER BY total_duration DESC
+      LIMIT 50
+    `;
+    
+    const result = await pool.query(query, params);
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching app usage summary:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get installed apps for a device
+ */
+export async function getInstalledApps(device_id) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM installed_apps 
+       WHERE device_id = $1 
+       ORDER BY app_name ASC`,
+      [device_id]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching installed apps:', error);
+    throw error;
+  }
+}

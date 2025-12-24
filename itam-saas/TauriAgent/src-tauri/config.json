@@ -1,0 +1,32 @@
+{
+  "api": {
+    "url": "http://localhost:5000",
+    "timeout": 30000
+  },
+  "device": {
+    "auto_generate_id": true,
+    "hostname_override": null
+  },
+  "monitoring": {
+    "poll_interval_seconds": 5,
+    "send_data_interval_seconds": 60,
+    "heartbeat_interval_seconds": 30
+  },
+  "data": {
+    "retention_days": 90,
+    "batch_size": 50
+  },
+  "auth": {
+    "token_storage": "local",
+    "auto_login": false
+  },
+  "ui": {
+    "show_on_startup": false,
+    "minimize_to_tray": true,
+    "theme": "light"
+  },
+  "startup": {
+    "auto_start": false,
+    "start_minimized": true
+  }
+}

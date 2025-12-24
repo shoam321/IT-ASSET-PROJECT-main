@@ -448,6 +448,124 @@ app.delete('/api/contracts/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ===== AGENT ROUTES =====
+
+// Receive usage data from agent
+app.post('/api/agent/usage', authenticateToken, async (req, res) => {
+  try {
+    const { device_id, app_name, window_title, duration, timestamp } = req.body;
+    
+    if (!device_id || !app_name) {
+      return res.status(400).json({ error: 'device_id and app_name are required' });
+    }
+
+    const usageData = await db.insertUsageData({
+      device_id,
+      app_name,
+      window_title: window_title || '',
+      duration: duration || 0,
+      timestamp: timestamp || Date.now()
+    });
+
+    res.status(201).json({ 
+      message: 'Usage data recorded',
+      data: usageData
+    });
+  } catch (error) {
+    console.error('Error recording usage data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Receive heartbeat from agent
+app.post('/api/agent/heartbeat', authenticateToken, async (req, res) => {
+  try {
+    const { device_id, timestamp, hostname, os_name, os_version } = req.body;
+    
+    if (!device_id) {
+      return res.status(400).json({ error: 'device_id is required' });
+    }
+
+    // Update or create device
+    await db.upsertDevice({
+      device_id,
+      hostname,
+      os_name,
+      os_version
+    });
+
+    // Record heartbeat
+    await db.insertHeartbeat({
+      device_id,
+      timestamp: timestamp || Date.now()
+    });
+
+    res.json({ 
+      message: 'Heartbeat received',
+      device_id,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error recording heartbeat:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Receive installed apps list from agent
+app.post('/api/agent/apps', authenticateToken, async (req, res) => {
+  try {
+    const { device_id, apps } = req.body;
+    
+    if (!device_id || !Array.isArray(apps)) {
+      return res.status(400).json({ error: 'device_id and apps array are required' });
+    }
+
+    await db.upsertInstalledApps(device_id, apps);
+
+    res.json({ 
+      message: 'Installed apps updated',
+      count: apps.length
+    });
+  } catch (error) {
+    console.error('Error updating installed apps:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get device usage statistics
+app.get('/api/agent/devices', authenticateToken, async (req, res) => {
+  try {
+    const devices = await db.getAllDevices();
+    res.json(devices);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get specific device usage stats
+app.get('/api/agent/devices/:deviceId/usage', authenticateToken, async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    const usage = await db.getDeviceUsageStats(deviceId, startDate, endDate);
+    res.json(usage);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get app usage summary across all devices
+app.get('/api/agent/apps/usage', authenticateToken, async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const appUsage = await db.getAppUsageSummary(startDate, endDate);
+    res.json(appUsage);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Initialize and start server
 startServer();
 
