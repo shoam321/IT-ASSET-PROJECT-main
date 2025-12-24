@@ -526,8 +526,11 @@ export async function updateContract(id, contractData) {
   const values = [];
   let paramCount = 1;
 
+  // Exclude system fields that shouldn't be manually updated
+  const excludeFields = ['id', 'created_at', 'updated_at'];
+
   for (const [key, value] of Object.entries(contractData)) {
-    if (value !== undefined && value !== null) {
+    if (value !== undefined && value !== null && !excludeFields.includes(key)) {
       fields.push(`${key} = $${paramCount}`);
       values.push(value);
       paramCount++;
@@ -538,6 +541,7 @@ export async function updateContract(id, contractData) {
     throw new Error('No fields to update');
   }
 
+  // Always update the updated_at timestamp
   fields.push(`updated_at = $${paramCount}`);
   values.push(new Date());
   values.push(id);
