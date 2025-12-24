@@ -1454,9 +1454,8 @@ export default function App() {
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} lg:w-64 bg-slate-800 border-r border-slate-700 transition-all duration-300 overflow-hidden flex flex-col absolute lg:relative h-full z-20 lg:z-auto`}>
         <div className="p-6 border-b border-slate-700">
-          <div className="flex items-center gap-2">
-            <Package className="w-8 h-8 text-blue-500" />
-            <span className="text-xl font-bold text-white whitespace-nowrap">IT ASSET</span>
+          <div className="flex items-center justify-center">
+            <img src="/logo.svg" alt="AssetStream IT" className="h-16 w-auto" />
           </div>
         </div>
 

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <!-- Main logo design -->
+  <g transform="translate(150, 100)">
+    <!-- Circuit nodes -->
+    <circle cx="50" cy="200" r="25" fill="#4FD1C5" opacity="0.8"/>
+    <circle cx="150" cy="120" r="25" fill="#4FD1C5" opacity="0.8"/>
+    <circle cx="200" cy="50" r="25" fill="#4FD1C5" opacity="0.8"/>
+    <circle cx="400" cy="100" r="30" fill="#4FD1C5" opacity="0.8"/>
+    <circle cx="250" cy="300" r="25" fill="#4FD1C5" opacity="0.8"/>
+    
+    <!-- Circuit lines -->
+    <line x1="50" y1="200" x2="150" y2="150" stroke="#4FD1C5" stroke-width="8" opacity="0.6"/>
+    <line x1="150" y1="120" x2="200" y2="70" stroke="#4FD1C5" stroke-width="8" opacity="0.6"/>
+    <line x1="150" y1="120" x2="250" y2="180" stroke="#4FD1C5" stroke-width="8" opacity="0.6"/>
+    <line x1="200" y1="50" x2="300" y2="150" stroke="#4FD1C5" stroke-width="8" opacity="0.6"/>
+    <line x1="250" y1="300" x2="300" y2="250" stroke="#4FD1C5" stroke-width="8" opacity="0.6"/>
+    <line x1="300" y1="200" x2="400" y2="120" stroke="#4FD1C5" stroke-width="8" opacity="0.6"/>
+    
+    <!-- Letter A - stylized -->
+    <path d="M 150 120 L 300 300 L 320 300 L 280 200 L 350 200 L 380 300 L 400 300 L 250 80 Z" fill="url(#gradA)" opacity="0.95"/>
+    <path d="M 260 160 L 300 250 L 330 250 L 290 160 Z" fill="#1E40AF" opacity="0.3"/>
+    
+    <!-- IT text accent -->
+    <text x="380" y="240" font-family="Arial, sans-serif" font-size="80" font-weight="bold" fill="#9AE6B4">IT</text>
+  </g>
+  
+  <!-- ASSETSTREAM text -->
+  <text x="130" y="550" font-family="Arial, sans-serif" font-size="72" font-weight="900" letter-spacing="8" fill="#4A5568">ASSETSTREAM</text>
+  <text x="180" y="610" font-family="Arial, sans-serif" font-size="32" font-weight="300" letter-spacing="12" fill="#718096">IT ASSET MANAGEMENT</text>
+  
+  <!-- Gradient definition -->
+  <defs>
+    <linearGradient id="gradA" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4FD1C5;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#3182CE;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+</svg>
