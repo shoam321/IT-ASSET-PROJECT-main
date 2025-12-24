@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle } from 'lucide-react';
 import * as dbService from './services/db';
 
 export default function App() {
@@ -14,6 +14,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showWelcome, setShowWelcome] = useState(true);
   
   // Prevent duplicate submissions
   const isSubmittingRef = useRef(false);
@@ -64,7 +66,23 @@ export default function App() {
     loadLicenses();
     loadUsers();
     loadContracts();
+    
+    // Check if user has visited before
+    const hasVisited = localStorage.getItem('hasVisited');
+    if (hasVisited) {
+      setShowWelcome(false);
+    }
   }, []);
+
+  const dismissWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem('hasVisited', 'true');
+  };
+
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(''), 3000);
+  };
 
   const loadAssets = async () => {
     try {
@@ -122,7 +140,8 @@ export default function App() {
     }
     
     if (!formData.asset_tag.trim()) {
-      alert('Please enter an asset tag');
+      setError('Please enter an asset tag');
+      setTimeout(() => setError(null), 3000);
       return;
     }
 
@@ -131,9 +150,11 @@ export default function App() {
       setLoading(true);
       if (editingId) {
         await dbService.updateAsset(editingId, formData);
+        showSuccess('✅ Asset updated successfully!');
         setEditingId(null);
       } else {
         await dbService.createAsset(formData);
+        showSuccess('✅ Asset added successfully!');
       }
       setFormData({
         asset_tag: '',
@@ -148,6 +169,7 @@ export default function App() {
       await loadAssets();
     } catch (err) {
       setError(`Failed to ${editingId ? 'update' : 'add'} asset: ${err.message}`);
+      setTimeout(() => setError(null), 5000);
     } finally {
       isSubmittingRef.current = false;
       setLoading(false);
@@ -183,12 +205,17 @@ export default function App() {
   };
 
   const handleDeleteAsset = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
+      return;
+    }
     try {
       setLoading(true);
       await dbService.deleteAsset(id);
+      showSuccess('✅ Asset deleted successfully!');
       await loadAssets();
     } catch (err) {
       setError(`Failed to delete asset: ${err.message}`);
+      setTimeout(() => setError(null), 5000);
     } finally {
       setLoading(false);
     }
@@ -544,8 +571,21 @@ export default function App() {
             <tbody>
               {filteredAssets.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-slate-400">
-                    No assets found
+                  <td colSpan="7" className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <HardDrive className="w-16 h-16 text-slate-600" />
+                      <div>
+                        <p className="text-slate-300 text-lg font-medium">No assets yet</p>
+                        <p className="text-slate-500 text-sm mt-1">Click "Add Asset" to start tracking your IT equipment</p>
+                      </div>
+                      <button
+                        onClick={() => setShowForm(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition mt-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Your First Asset
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -1237,6 +1277,76 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex">
+      {/* Welcome Guide - First Time Users */}
+      {showWelcome && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl p-8 max-w-2xl shadow-2xl border border-slate-700">
+            <div className="flex items-center gap-3 mb-4">
+              <HelpCircle className="w-8 h-8 text-blue-500" />
+              <h2 className="text-2xl font-bold text-white">Welcome to IT Asset Tracker! 👋</h2>
+            </div>
+            <div className="space-y-4 text-slate-300">
+              <p className="text-lg">Here's how to get started:</p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
+                  <div>
+                    <p className="font-semibold text-white">Add Your First Asset</p>
+                    <p className="text-sm">Click the "Add Asset" button to track laptops, desktops, and equipment</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
+                  <div>
+                    <p className="font-semibold text-white">Manage Software Licenses</p>
+                    <p className="text-sm">Use the Licenses tab to track software licenses and subscriptions</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
+                  <div>
+                    <p className="font-semibold text-white">Track Users & Contracts</p>
+                    <p className="text-sm">Keep records of team members and vendor contracts in one place</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-blue-900 bg-opacity-30 border border-blue-700 rounded-lg p-4 mt-6">
+                <p className="text-sm"><strong>💡 Tip:</strong> Use the search bar to quickly find any item across all categories!</p>
+              </div>
+            </div>
+            <button
+              onClick={dismissWelcome}
+              className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold transition"
+            >
+              Got it, let's start!
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Success Notification */}
+      {successMessage && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in">
+          <div className="bg-green-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3">
+            <CheckCircle className="w-5 h-5" />
+            <span className="font-medium">{successMessage}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error Notification */}
+      {error && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-in">
+          <div className="bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3">
+            <X className="w-5 h-5" />
+            <div>
+              <p className="font-medium">Error</p>
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} bg-slate-800 border-r border-slate-700 transition-all duration-300 overflow-hidden flex flex-col`}>
         <div className="p-6 border-b border-slate-700">
