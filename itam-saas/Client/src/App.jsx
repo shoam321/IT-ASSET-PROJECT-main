@@ -528,6 +528,7 @@ export default function App() {
               name="assigned_user_name"
               type="email"
               placeholder="Assigned User"
+              autoComplete="email"
               value={formData.assigned_user_name}
               onChange={(e) => setFormData({...formData, assigned_user_name: e.target.value})}
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
@@ -926,6 +927,7 @@ export default function App() {
               name="user_email"
               type="email"
               placeholder="Email"
+              autoComplete="email"
               value={userFormData.email}
               onChange={(e) => setUserFormData({...userFormData, email: e.target.value})}
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
@@ -1181,6 +1183,8 @@ export default function App() {
               <option value="Inactive">Inactive</option>
             </select>
             <textarea
+              id="contract_notes"
+              name="contract_notes"
               placeholder="Notes"
               value={contractFormData.notes}
               onChange={(e) => setContractFormData({...contractFormData, notes: e.target.value})}
