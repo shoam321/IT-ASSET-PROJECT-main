@@ -12,8 +12,8 @@ function App() {
 
   // Configuration - in production, load from config file
   const config = {
-    api_url: "http://localhost:5000",
-    auth_token: "", // Will be set after authentication
+    api_url: "https://it-asset-project-production.up.railway.app/api",
+    auth_token: "", // TODO: Set this with your login token from localStorage.getItem('token')
     device_id: "device_" + Math.random().toString(36).substr(2, 9),
     poll_interval: 5,
   };
