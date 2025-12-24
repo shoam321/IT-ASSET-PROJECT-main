@@ -396,6 +396,31 @@ export default function App() {
       return;
     }
 
+    // Validate dates
+    if (contractFormData.start_date) {
+      const startYear = new Date(contractFormData.start_date).getFullYear();
+      if (startYear < 2000 || startYear > 2100) {
+        setError('Start date year must be between 2000 and 2100');
+        return;
+      }
+    }
+
+    if (contractFormData.end_date) {
+      const endYear = new Date(contractFormData.end_date).getFullYear();
+      if (endYear < 2000 || endYear > 2100) {
+        setError('End date year must be between 2000 and 2100');
+        return;
+      }
+      
+      // Check that end date is after start date
+      if (contractFormData.start_date && contractFormData.end_date) {
+        if (new Date(contractFormData.end_date) < new Date(contractFormData.start_date)) {
+          setError('End date must be after start date');
+          return;
+        }
+      }
+    }
+
     try {
       isSubmittingRef.current = true;
       setLoading(true);
@@ -758,6 +783,8 @@ export default function App() {
               placeholder="Expiration Date"
               value={licenseFormData.expiration_date}
               onChange={(e) => setLicenseFormData({...licenseFormData, expiration_date: e.target.value})}
+              min="2000-01-01"
+              max="2100-12-31"
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
@@ -1161,6 +1188,8 @@ export default function App() {
               placeholder="Start Date"
               value={contractFormData.start_date}
               onChange={(e) => setContractFormData({...contractFormData, start_date: e.target.value})}
+              min="2000-01-01"
+              max="2100-12-31"
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
@@ -1170,6 +1199,8 @@ export default function App() {
               placeholder="End Date"
               value={contractFormData.end_date}
               onChange={(e) => setContractFormData({...contractFormData, end_date: e.target.value})}
+              min="2000-01-01"
+              max="2100-12-31"
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
