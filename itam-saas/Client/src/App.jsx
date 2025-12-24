@@ -23,6 +23,7 @@ export default function App() {
   const [users, setUsers] = useState([]);
   const [contracts, setContracts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [universalSearch, setUniversalSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -569,6 +570,263 @@ export default function App() {
       </div>
     </>
   );
+
+  const renderSearchResults = () => {
+    const query = universalSearch.toLowerCase().trim();
+    
+    if (!query) {
+      return (
+        <div className="text-center py-12">
+          <Search className="w-16 h-16 text-slate-600 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white mb-2">Universal Search</h2>
+          <p className="text-slate-400">Search across all assets, licenses, users, and contracts</p>
+        </div>
+      );
+    }
+
+    const searchAssets = assets.filter(a => 
+      a.asset_tag?.toLowerCase().includes(query) ||
+      a.manufacturer?.toLowerCase().includes(query) ||
+      a.model?.toLowerCase().includes(query) ||
+      a.asset_type?.toLowerCase().includes(query) ||
+      a.assigned_user_name?.toLowerCase().includes(query)
+    );
+
+    const searchLicenses = licenses.filter(l =>
+      l.license_name?.toLowerCase().includes(query) ||
+      l.software_name?.toLowerCase().includes(query) ||
+      l.vendor?.toLowerCase().includes(query) ||
+      l.license_type?.toLowerCase().includes(query)
+    );
+
+    const searchUsers = users.filter(u =>
+      u.user_name?.toLowerCase().includes(query) ||
+      u.email?.toLowerCase().includes(query) ||
+      u.department?.toLowerCase().includes(query) ||
+      u.role?.toLowerCase().includes(query)
+    );
+
+    const searchContracts = contracts.filter(c =>
+      c.contract_name?.toLowerCase().includes(query) ||
+      c.vendor?.toLowerCase().includes(query) ||
+      c.contract_type?.toLowerCase().includes(query)
+    );
+
+    const totalResults = searchAssets.length + searchLicenses.length + searchUsers.length + searchContracts.length;
+
+    return (
+      <>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-white mb-2">Search Results</h1>
+          <p className="text-slate-400">Found {totalResults} result{totalResults !== 1 ? 's' : ''} for "{universalSearch}"</p>
+        </div>
+
+        {totalResults === 0 && (
+          <div className="bg-slate-800 border border-slate-700 rounded-xl p-8 text-center">
+            <p className="text-slate-400">No results found. Try a different search term.</p>
+          </div>
+        )}
+
+        {searchAssets.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <HardDrive className="w-5 h-5 text-blue-500" />
+              <h2 className="text-xl font-bold text-white">Assets ({searchAssets.length})</h2>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Asset Tag</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Manufacturer</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Model</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {searchAssets.map((asset) => (
+                      <tr key={asset.id} className="hover:bg-slate-700/50 transition">
+                        <td className="px-6 py-4 text-white font-medium">{asset.asset_tag}</td>
+                        <td className="px-6 py-4">
+                          <span className="px-3 py-1 text-xs rounded-full bg-blue-900 text-blue-200">{asset.asset_type}</span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-300">{asset.manufacturer}</td>
+                        <td className="px-6 py-4 text-slate-300">{asset.model}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 text-xs rounded-full ${
+                            asset.status === 'In Use' ? 'bg-green-900 text-green-200' : 'bg-slate-600 text-slate-300'
+                          }`}>
+                            {asset.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => { setCurrentScreen('assets'); setSearchTerm(asset.asset_tag); setUniversalSearch(''); }}
+                            className="text-blue-400 hover:text-blue-300"
+                          >
+                            View in Assets
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {searchLicenses.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="w-5 h-5 text-purple-500" />
+              <h2 className="text-xl font-bold text-white">Licenses ({searchLicenses.length})</h2>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">License Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Software</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Vendor</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {searchLicenses.map((license) => (
+                      <tr key={license.id} className="hover:bg-slate-700/50 transition">
+                        <td className="px-6 py-4 text-white font-medium">{license.license_name}</td>
+                        <td className="px-6 py-4 text-slate-300">{license.software_name}</td>
+                        <td className="px-6 py-4 text-slate-300">{license.vendor}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 text-xs rounded-full ${
+                            license.status === 'Active' ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'
+                          }`}>
+                            {license.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => { setCurrentScreen('licenses'); setUniversalSearch(''); }}
+                            className="text-purple-400 hover:text-purple-300"
+                          >
+                            View in Licenses
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {searchUsers.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="w-5 h-5 text-green-500" />
+              <h2 className="text-xl font-bold text-white">Users ({searchUsers.length})</h2>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Department</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {searchUsers.map((user) => (
+                      <tr key={user.id} className="hover:bg-slate-700/50 transition">
+                        <td className="px-6 py-4 text-white font-medium">{user.user_name}</td>
+                        <td className="px-6 py-4 text-slate-300">{user.email}</td>
+                        <td className="px-6 py-4 text-slate-300">{user.department}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 text-xs rounded-full ${
+                            user.status === 'Active' ? 'bg-green-900 text-green-200' : 'bg-slate-600 text-slate-300'
+                          }`}>
+                            {user.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => { setCurrentScreen('users'); setUniversalSearch(''); }}
+                            className="text-green-400 hover:text-green-300"
+                          >
+                            View in Users
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {searchContracts.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FileCheck className="w-5 h-5 text-orange-500" />
+              <h2 className="text-xl font-bold text-white">Contracts ({searchContracts.length})</h2>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Contract Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Vendor</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700">
+                    {searchContracts.map((contract) => (
+                      <tr key={contract.id} className="hover:bg-slate-700/50 transition">
+                        <td className="px-6 py-4 text-white font-medium">{contract.contract_name}</td>
+                        <td className="px-6 py-4 text-slate-300">{contract.vendor}</td>
+                        <td className="px-6 py-4">
+                          <span className="px-3 py-1 text-xs rounded-full bg-orange-900 text-orange-200">{contract.contract_type}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 text-xs rounded-full ${
+                            contract.status === 'Active' ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'
+                          }`}>
+                            {contract.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => { setCurrentScreen('contracts'); setUniversalSearch(''); }}
+                            className="text-orange-400 hover:text-orange-300"
+                          >
+                            View in Contracts
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
 
   const renderAssetsScreen = () => (
     <>
@@ -1443,6 +1701,10 @@ export default function App() {
   );
 
   const renderScreen = () => {
+    if (universalSearch.trim()) {
+      return renderSearchResults();
+    }
+    
     switch(currentScreen) {
       case 'home':
         return renderHomeScreen();
@@ -1620,48 +1882,70 @@ export default function App() {
         
         {/* Header */}
         <header className="bg-slate-800 border-b border-slate-700 shadow-lg relative z-5">
-          <div className="px-6 py-4 flex items-center justify-between">
+          <div className="px-6 py-4 flex items-center justify-between gap-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="lg:hidden p-2 hover:bg-slate-700 rounded-lg transition text-slate-300"
             >
               {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
+
+            {/* Universal Search */}
+            <div className="flex-1 max-w-2xl">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search across all assets, licenses, users, and contracts..."
+                  value={universalSearch}
+                  onChange={(e) => setUniversalSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {universalSearch && (
+                  <button
+                    onClick={() => setUniversalSearch('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
             
-            {currentScreen === 'assets' && (
+            {currentScreen === 'assets' && !universalSearch && (
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap"
               >
                 <Plus className="w-5 h-5" />
                 Add Asset
               </button>
             )}
             
-            {currentScreen === 'licenses' && (
+            {currentScreen === 'licenses' && !universalSearch && (
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap"
               >
                 <Plus className="w-5 h-5" />
                 Add License
               </button>
             )}
             
-            {currentScreen === 'users' && (
+            {currentScreen === 'users' && !universalSearch && (
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap"
               >
                 <Plus className="w-5 h-5" />
                 Add User
               </button>
             )}
             
-            {currentScreen === 'contracts' && (
+            {currentScreen === 'contracts' && !universalSearch && (
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap"
               >
                 <Plus className="w-5 h-5" />
                 Add Contract
