@@ -115,7 +115,8 @@ export async function createAsset(assetData) {
     return result.rows[0];
   } catch (error) {
     console.error('Error creating asset:', error);
-    throw error;
+    console.error('Error details:', error.message, error.code, error.detail);
+    throw new Error(`Failed to create asset: ${error.message}`);
   }
 }
 
@@ -412,7 +413,8 @@ export async function createUser(userData) {
     return result.rows[0];
   } catch (error) {
     console.error('Error creating user:', error);
-    throw error;
+    console.error('Error details:', error.message, error.code, error.detail);
+    throw new Error(`Failed to create user: ${error.message}`);
   }
 }
 
@@ -515,7 +517,8 @@ export async function createContract(contractData) {
     return result.rows[0];
   } catch (error) {
     console.error('Error creating contract:', error);
-    throw error;
+    console.error('Error details:', error.message, error.code, error.detail);
+    throw new Error(`Failed to create contract: ${error.message}`);
   }
 }
 
