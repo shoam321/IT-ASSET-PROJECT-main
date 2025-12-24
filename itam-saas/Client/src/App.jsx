@@ -389,11 +389,20 @@ export default function App() {
     try {
       isSubmittingRef.current = true;
       setLoading(true);
+      
+      // Ensure value is a valid number
+      const contractData = {
+        ...contractFormData,
+        value: isNaN(contractFormData.value) || contractFormData.value === '' ? 0 : parseFloat(contractFormData.value)
+      };
+      
       if (editingId) {
-        await dbService.updateContract(editingId, contractFormData);
+        await dbService.updateContract(editingId, contractData);
+        showSuccess('✅ Contract updated successfully!');
         setEditingId(null);
       } else {
-        await dbService.createContract(contractFormData);
+        await dbService.createContract(contractData);
+        showSuccess('✅ Contract added successfully!');
       }
       setContractFormData({
         contract_name: '',
