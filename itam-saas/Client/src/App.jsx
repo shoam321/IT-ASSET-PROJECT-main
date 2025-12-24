@@ -16,7 +16,7 @@ const formatDate = (dateString) => {
 
 export default function App() {
   const { user, logout } = useAuth();
-  const [currentScreen, setCurrentScreen] = useState('assets');
+  const [currentScreen, setCurrentScreen] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
   const [assets, setAssets] = useState([]);
   const [licenses, setLicenses] = useState([]);
@@ -492,6 +492,84 @@ export default function App() {
     : assets;
 
   // Screen rendering functions
+  const renderHomeScreen = () => (
+    <>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
+        <p className="text-slate-400">Quick access to all your IT assets</p>
+      </div>
+
+      {/* Quick Access Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <button
+          onClick={() => { setCurrentScreen('assets'); setShowForm(false); }}
+          className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-xl"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <HardDrive className="w-12 h-12 text-white opacity-80" />
+            <span className="text-4xl font-bold text-white">{assets.length}</span>
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-1">Assets</h3>
+          <p className="text-blue-100 text-sm">Manage hardware & equipment</p>
+        </button>
+
+        <button
+          onClick={() => { setCurrentScreen('licenses'); setShowForm(false); }}
+          className="bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-xl"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <FileText className="w-12 h-12 text-white opacity-80" />
+            <span className="text-4xl font-bold text-white">{licenses.length}</span>
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-1">Licenses</h3>
+          <p className="text-purple-100 text-sm">Track software licenses</p>
+        </button>
+
+        <button
+          onClick={() => { setCurrentScreen('users'); setShowForm(false); }}
+          className="bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-xl"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <Users className="w-12 h-12 text-white opacity-80" />
+            <span className="text-4xl font-bold text-white">{users.length}</span>
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-1">Users</h3>
+          <p className="text-green-100 text-sm">Manage team members</p>
+        </button>
+
+        <button
+          onClick={() => { setCurrentScreen('contracts'); setShowForm(false); }}
+          className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-xl"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <FileCheck className="w-12 h-12 text-white opacity-80" />
+            <span className="text-4xl font-bold text-white">{contracts.length}</span>
+          </div>
+          <h3 className="text-xl font-semibold text-white mb-1">Contracts</h3>
+          <p className="text-orange-100 text-sm">View agreements</p>
+        </button>
+      </div>
+
+      {/* Statistics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <p className="text-slate-400 text-sm mb-2">Total Assets Value</p>
+          <p className="text-3xl font-bold text-blue-400">${assets.reduce((sum, a) => sum + (a.cost || 0), 0).toLocaleString()}</p>
+        </div>
+        
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <p className="text-slate-400 text-sm mb-2">Active Licenses</p>
+          <p className="text-3xl font-bold text-purple-400">{licenses.filter(l => l.status === 'Active').length}</p>
+        </div>
+        
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <p className="text-slate-400 text-sm mb-2">Active Contracts</p>
+          <p className="text-3xl font-bold text-orange-400">{contracts.filter(c => c.status === 'Active').length}</p>
+        </div>
+      </div>
+    </>
+  );
+
   const renderAssetsScreen = () => (
     <>
       {error && (
@@ -1366,6 +1444,8 @@ export default function App() {
 
   const renderScreen = () => {
     switch(currentScreen) {
+      case 'home':
+        return renderHomeScreen();
       case 'assets':
         return renderAssetsScreen();
       case 'licenses':
@@ -1375,7 +1455,7 @@ export default function App() {
       case 'contracts':
         return renderContractsScreen();
       default:
-        return renderAssetsScreen();
+        return renderHomeScreen();
     }
   };
 
@@ -1454,9 +1534,12 @@ export default function App() {
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} lg:w-64 bg-slate-800 border-r border-slate-700 transition-all duration-300 overflow-hidden flex flex-col absolute lg:relative h-full z-20 lg:z-auto`}>
         <div className="p-6 border-b border-slate-700">
-          <div className="flex items-center justify-center">
+          <button 
+            onClick={() => { setCurrentScreen('home'); setShowForm(false); }}
+            className="flex items-center justify-center w-full hover:opacity-80 transition cursor-pointer"
+          >
             <img src="/logo.svg" alt="Asset Tracker" className="h-12 w-auto" />
-          </div>
+          </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
