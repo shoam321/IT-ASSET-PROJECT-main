@@ -1,6 +1,6 @@
 use tauri::{AppHandle, Emitter, Manager, menu::{MenuBuilder, MenuItemBuilder}, tray::{TrayIconBuilder, TrayIconEvent}};
-use std::{sync::{Arc, Mutex}, thread, time::{Duration, SystemTime}};
-use sysinfo::{System, SystemExt, ProcessExt};
+use std::{thread, time::{Duration, SystemTime}};
+use sysinfo::System;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,9 +78,6 @@ async fn send_heartbeat(config: AgentConfig) -> Result<String, String> {
 
 #[tauri::command]
 fn get_system_info() -> String {
-    let mut sys = System::new_all();
-    sys.refresh_all();
-    
     format!(
         "OS: {:?}, Kernel: {:?}, Hostname: {:?}",
         System::name(),
@@ -103,7 +100,7 @@ fn start_process_monitoring(handle: AppHandle) {
             let current_process = sys
                 .processes()
                 .iter()
-                .max_by_key(|(_, p)| p.cpu_usage() as u64)
+                .max_by_key(|(_, p)| (p.cpu_usage() * 100.0) as u64)
                 .map(|(_, p)| p.name().to_string())
                 .unwrap_or_else(|| "Unknown".to_string());
             
@@ -140,7 +137,7 @@ fn start_process_monitoring(handle: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
+        // .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .setup(|app| {
             // Build system tray menu
             let show_item = MenuItemBuilder::with_id("show", "Show Agent").build(app)?;
