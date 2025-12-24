@@ -1,5 +1,19 @@
 -- IT Asset Management Database Schema
 
+-- Authentication Users Table
+CREATE TABLE IF NOT EXISTS auth_users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(100) UNIQUE NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  full_name VARCHAR(255),
+  role VARCHAR(50) DEFAULT 'user',
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_login TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Assets Table
 CREATE TABLE IF NOT EXISTS assets (
   id SERIAL PRIMARY KEY,
@@ -62,6 +76,8 @@ CREATE TABLE IF NOT EXISTS contracts (
 );
 
 -- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_auth_users_email ON auth_users(email);
+CREATE INDEX IF NOT EXISTS idx_auth_users_username ON auth_users(username);
 CREATE INDEX IF NOT EXISTS idx_assets_status ON assets(status);
 CREATE INDEX IF NOT EXISTS idx_assets_asset_tag ON assets(asset_tag);
 CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status);

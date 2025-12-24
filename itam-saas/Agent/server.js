@@ -2,7 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+import { body, validationResult } from 'express-validator';
 import * as db from './queries.js';
+import * as authQueries from './authQueries.js';
+import { authenticateToken, generateToken } from './middleware/auth.js';
 
 dotenv.config();
 
@@ -55,6 +58,124 @@ async function startServer() {
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// ===== AUTHENTICATION ROUTES =====
+
+// Register new user
+app.post('/api/auth/register', [
+  body('username').trim().isLength({ min: 3, max: 100 }).withMessage('Username must be 3-100 characters'),
+  body('email').trim().isEmail().withMessage('Invalid email address'),
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('fullName').optional().trim()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { username, email, password, fullName } = req.body;
+    
+    const user = await authQueries.createAuthUser(username, email, password, fullName, 'user');
+    const token = generateToken(user);
+
+    res.status(201).json({
+      message: 'User registered successfully',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.full_name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    if (error.message.includes('already exists')) {
+      return res.status(409).json({ error: error.message });
+    }
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Failed to register user' });
+  }
+});
+
+// Login
+app.post('/api/auth/login', [
+  body('username').trim().notEmpty().withMessage('Username is required'),
+  body('password').notEmpty().withMessage('Password is required')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { username, password } = req.body;
+    
+    const user = await authQueries.findUserByUsername(username);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({ error: 'Account is deactivated' });
+    }
+
+    const isValidPassword = await authQueries.verifyPassword(password, user.password_hash);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    await authQueries.updateLastLogin(user.id);
+    const token = generateToken(user);
+
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.full_name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Get current user info (protected route)
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await authQueries.findUserById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: user.full_name,
+      role: user.role,
+      isActive: user.is_active,
+      createdAt: user.created_at,
+      lastLogin: user.last_login
+    });
+  } catch (error) {
+    console.error('Get user error:', error);
+    res.status(500).json({ error: 'Failed to get user info' });
+  }
+});
+
+// Logout (client-side token removal, but endpoint for tracking)
+app.post('/api/auth/logout', authenticateToken, (req, res) => {
+  res.json({ message: 'Logged out successfully' });
+});
+
+// ===== ASSET ROUTES =====
 
 // Get all assets
 app.get('/api/assets', async (req, res) => {
