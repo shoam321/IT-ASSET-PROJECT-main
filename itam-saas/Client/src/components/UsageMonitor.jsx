@@ -16,6 +16,12 @@ const UsageMonitor = () => {
   const fetchDevices = async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        setError('Not authenticated. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(`${API_BASE_URL}/agent/devices`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -24,11 +30,15 @@ const UsageMonitor = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch devices');
+        if (response.status === 403) {
+          throw new Error('Authentication failed. Please log in again.');
+        }
+        throw new Error(`Failed to fetch devices (${response.status})`);
       }
       
       const data = await response.json();
-      setDevices(data);
+      setDevices(Array.isArray(data) ? data : []);
+      setError(null); // Clear any previous errors
       
       // Auto-select first device if none selected
       if (!selectedDevice && data.length > 0) {
@@ -37,6 +47,7 @@ const UsageMonitor = () => {
     } catch (err) {
       console.error('Error fetching devices:', err);
       setError(err.message);
+      setDevices([]); // Set empty array on error
     }
   };
 
@@ -46,6 +57,8 @@ const UsageMonitor = () => {
     
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
+
       const response = await fetch(`${API_BASE_URL}/agent/devices/${deviceId}/usage`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -54,13 +67,16 @@ const UsageMonitor = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch usage stats');
+        console.warn(`Failed to fetch usage stats: ${response.status}`);
+        setUsageStats([]);
+        return;
       }
       
       const data = await response.json();
-      setUsageStats(data);
+      setUsageStats(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching usage stats:', err);
+      setUsageStats([]);
     }
   };
 
@@ -68,6 +84,8 @@ const UsageMonitor = () => {
   const fetchAppUsageSummary = async () => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) return;
+
       const response = await fetch(`${API_BASE_URL}/agent/apps/usage`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -76,13 +94,16 @@ const UsageMonitor = () => {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to fetch app usage summary');
+        console.warn(`Failed to fetch app usage: ${response.status}`);
+        setAppUsageSummary([]);
+        return;
       }
       
       const data = await response.json();
-      setAppUsageSummary(data);
+      setAppUsageSummary(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching app usage summary:', err);
+      setAppUsageSummary([]);
     }
   };
 
@@ -156,7 +177,14 @@ const UsageMonitor = () => {
   if (loading) {
     return (
       <div className="usage-monitor">
-        <div className="loading">Loading device data...</div>
+        <div className="usage-header">
+          <h1>📊 Device Usage Monitor</h1>
+          <p className="subtitle">Real-time application usage tracking across all devices</p>
+        </div>
+        <div className="loading" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+          <div style={{ fontSize: '24px', marginBottom: '10px' }}>⏳</div>
+          Loading device data...
+        </div>
       </div>
     );
   }
@@ -164,7 +192,17 @@ const UsageMonitor = () => {
   if (error) {
     return (
       <div className="usage-monitor">
-        <div className="error">Error: {error}</div>
+        <div className="usage-header">
+          <h1>📊 Device Usage Monitor</h1>
+          <p className="subtitle">Real-time application usage tracking across all devices</p>
+        </div>
+        <div className="error" style={{ textAlign: 'center', padding: '40px', color: '#f87171', background: '#1e293b', borderRadius: '12px', border: '1px solid #334155' }}>
+          <div style={{ fontSize: '24px', marginBottom: '10px' }}>⚠️</div>
+          <strong>Error:</strong> {error}
+          <div style={{ marginTop: '20px', fontSize: '14px', color: '#94a3b8' }}>
+            Please make sure the agent is installed and running on your devices.
+          </div>
+        </div>
       </div>
     );
   }
@@ -185,7 +223,21 @@ const UsageMonitor = () => {
           </div>
           <div className="devices-list">
             {devices.length === 0 ? (
-              <div className="no-devices">No devices found. Install the agent to start monitoring.</div>
+              <div className="no-devices" style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+                <div style={{ fontSize: '48px', marginBottom: '15px' }}>💻</div>
+                <strong style={{ display: 'block', marginBottom: '10px', color: '#e2e8f0' }}>No Devices Found</strong>
+                <p style={{ fontSize: '14px', lineHeight: '1.6' }}>
+                  Install and run the IT Asset Tracker agent on your devices to start monitoring application usage.
+                </p>
+                <div style={{ marginTop: '20px', padding: '15px', background: '#1e293b', borderRadius: '8px', fontSize: '13px' }}>
+                  <strong>📥 To add a device:</strong>
+                  <ol style={{ textAlign: 'left', marginTop: '10px', paddingLeft: '20px' }}>
+                    <li>Download the agent from the TauriAgent folder</li>
+                    <li>Install and run it on your device</li>
+                    <li>The device will appear here automatically</li>
+                  </ol>
+                </div>
+              </div>
             ) : (
               devices.map((device) => {
                 const status = getDeviceStatus(device.last_seen);
