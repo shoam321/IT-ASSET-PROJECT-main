@@ -468,6 +468,8 @@ export default function App() {
           <h2 className="text-xl font-semibold text-white mb-4">{editingId ? 'Edit Asset' : 'Add New Asset'}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
+              id="asset_tag"
+              name="asset_tag"
               type="text"
               placeholder="Asset Tag"
               value={formData.asset_tag}
@@ -475,6 +477,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <select
+              id="asset_type"
+              name="asset_type"
               value={formData.asset_type}
               onChange={(e) => setFormData({...formData, asset_type: e.target.value})}
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white"
@@ -486,6 +490,8 @@ export default function App() {
               <option value="network">Network</option>
             </select>
             <input
+              id="manufacturer"
+              name="manufacturer"
               type="text"
               placeholder="Manufacturer"
               value={formData.manufacturer}
@@ -493,6 +499,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="model"
+              name="model"
               type="text"
               placeholder="Model"
               value={formData.model}
@@ -500,6 +508,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="serial_number"
+              name="serial_number"
               type="text"
               placeholder="Serial Number"
               value={formData.serial_number}
@@ -507,6 +517,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="assigned_user_name"
+              name="assigned_user_name"
               type="email"
               placeholder="Assigned User"
               value={formData.assigned_user_name}
@@ -547,6 +559,8 @@ export default function App() {
         <div className="relative">
           <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
           <input
+            id="asset_search"
+            name="asset_search"
             type="text"
             placeholder="Search assets..."
             value={searchTerm}
@@ -674,6 +688,8 @@ export default function App() {
           <h2 className="text-xl font-semibold text-white mb-4">{editingId ? 'Edit License' : 'Add New License'}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
+              id="license_name"
+              name="license_name"
               type="text"
               placeholder="License Name"
               value={licenseFormData.license_name}
@@ -681,6 +697,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="license_type"
+              name="license_type"
               type="text"
               placeholder="License Type"
               value={licenseFormData.license_type}
@@ -688,6 +706,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="license_key"
+              name="license_key"
               type="text"
               placeholder="License Key"
               value={licenseFormData.license_key}
@@ -695,6 +715,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="software_name"
+              name="software_name"
               type="text"
               placeholder="Software Name"
               value={licenseFormData.software_name}
@@ -702,6 +724,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="vendor"
+              name="vendor"
               type="text"
               placeholder="Vendor"
               value={licenseFormData.vendor}
@@ -709,6 +733,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="expiration_date"
+              name="expiration_date"
               type="date"
               placeholder="Expiration Date"
               value={licenseFormData.expiration_date}
@@ -716,6 +742,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="quantity"
+              name="quantity"
               type="number"
               placeholder="Quantity"
               value={licenseFormData.quantity}
@@ -723,6 +751,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <select
+              id="license_status"
+              name="license_status"
               value={licenseFormData.status}
               onChange={(e) => setLicenseFormData({...licenseFormData, status: e.target.value})}
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white"
@@ -876,6 +906,8 @@ export default function App() {
           <h2 className="text-xl font-semibold text-white mb-4">{editingId ? 'Edit User' : 'Add New User'}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
+              id="user_name"
+              name="user_name"
               type="text"
               placeholder="User Name"
               value={userFormData.user_name}
@@ -883,6 +915,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="user_email"
+              name="user_email"
               type="email"
               placeholder="Email"
               value={userFormData.email}
@@ -890,6 +924,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="department"
+              name="department"
               type="text"
               placeholder="Department"
               value={userFormData.department}
@@ -897,6 +933,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="phone"
+              name="phone"
               type="tel"
               placeholder="Phone"
               value={userFormData.phone}
@@ -904,6 +942,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="user_role"
+              name="user_role"
               type="text"
               placeholder="Role"
               value={userFormData.role}
@@ -911,6 +951,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <select
+              id="user_status"
+              name="user_status"
               value={userFormData.status}
               onChange={(e) => setUserFormData({...userFormData, status: e.target.value})}
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white"
@@ -1061,6 +1103,8 @@ export default function App() {
           <h2 className="text-xl font-semibold text-white mb-4">{editingId ? 'Edit Contract' : 'Add New Contract'}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
+              id="contract_name"
+              name="contract_name"
               type="text"
               placeholder="Contract Name"
               value={contractFormData.contract_name}
@@ -1068,6 +1112,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="contract_vendor"
+              name="contract_vendor"
               type="text"
               placeholder="Vendor"
               value={contractFormData.vendor}
@@ -1075,6 +1121,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <select
+              id="contract_type"
+              name="contract_type"
               value={contractFormData.contract_type}
               onChange={(e) => setContractFormData({...contractFormData, contract_type: e.target.value})}
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white"
@@ -1087,6 +1135,8 @@ export default function App() {
               <option value="Support">Support</option>
             </select>
             <input
+              id="start_date"
+              name="start_date"
               type="date"
               placeholder="Start Date"
               value={contractFormData.start_date}
@@ -1094,6 +1144,8 @@ export default function App() {
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
             <input
+              id="end_date"
+              name="end_date"
               type="date"
               placeholder="End Date"
               value={contractFormData.end_date}
@@ -1102,6 +1154,8 @@ export default function App() {
             />
             <div className="flex gap-2">
               <input
+                id="contract_value"
+                name="contract_value"
                 type="number"
                 placeholder="Value"
                 value={contractFormData.value}
@@ -1109,6 +1163,8 @@ export default function App() {
                 className="flex-1 px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
               />
               <select
+                id="currency"
+                name="currency"
                 value={contractFormData.currency}
                 onChange={(e) => setContractFormData({...contractFormData, currency: e.target.value})}
                 className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white w-24"
