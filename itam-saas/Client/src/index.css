@@ -31,3 +31,95 @@ code {
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
 }
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  /* Adjust padding for mobile */
+  main {
+    padding: 1rem !important;
+  }
+
+  /* Make tables scrollable on mobile */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 600px;
+  }
+
+  /* Adjust font sizes for mobile */
+  h1 {
+    font-size: 1.5rem !important;
+  }
+
+  h2 {
+    font-size: 1.25rem !important;
+  }
+
+  /* Make forms stack on mobile */
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Adjust button sizes */
+  button {
+    min-height: 44px; /* Touch-friendly size */
+  }
+
+  /* Stack header items on mobile */
+  .header-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /* Adjust modal sizing */
+  .modal-content {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+  }
+
+  /* Make cards more compact on mobile */
+  .card {
+    padding: 0.75rem !important;
+  }
+
+  /* Adjust grid layouts */
+  .grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Extra small screens */
+  .hidden-mobile {
+    display: none !important;
+  }
+
+  /* Stack everything vertically */
+  .flex {
+    flex-direction: column !important;
+  }
+
+  .flex.flex-row-mobile {
+    flex-direction: row !important;
+  }
+
+  /* Full width buttons on very small screens */
+  button:not(.inline-button) {
+    width: 100%;
+  }
+}
+
+/* Utility classes */
+.overflow-x-auto {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.touch-friendly {
+  min-height: 44px;
+  min-width: 44px;
+}

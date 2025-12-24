@@ -496,77 +496,77 @@ export default function App() {
   // Screen rendering functions
   const renderHomeScreen = () => (
     <>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
-        <p className="text-slate-400">Quick access to all your IT assets</p>
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Dashboard</h1>
+        <p className="text-sm md:text-base text-slate-400">Quick access to all your IT assets</p>
       </div>
 
       {/* Quick Access Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6 md:mb-8">
         <button
           onClick={() => { setCurrentScreen('assets'); setShowForm(false); }}
-          className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-xl"
+          className="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 rounded-xl p-4 md:p-6 text-left transition-all transform hover:scale-105 shadow-xl"
         >
-          <div className="flex items-center justify-between mb-4">
-            <HardDrive className="w-12 h-12 text-white opacity-80" />
-            <span className="text-4xl font-bold text-white">{assets.length}</span>
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <HardDrive className="w-8 h-8 md:w-12 md:h-12 text-white opacity-80" />
+            <span className="text-2xl md:text-4xl font-bold text-white">{assets.length}</span>
           </div>
-          <h3 className="text-xl font-semibold text-white mb-1">Assets</h3>
-          <p className="text-blue-100 text-sm">Manage hardware & equipment</p>
+          <h3 className="text-base md:text-xl font-semibold text-white mb-1">Assets</h3>
+          <p className="text-blue-100 text-xs md:text-sm hidden sm:block">Manage hardware & equipment</p>
         </button>
 
         <button
           onClick={() => { setCurrentScreen('licenses'); setShowForm(false); }}
-          className="bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-xl"
+          className="bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 rounded-xl p-4 md:p-6 text-left transition-all transform hover:scale-105 shadow-xl"
         >
-          <div className="flex items-center justify-between mb-4">
-            <FileText className="w-12 h-12 text-white opacity-80" />
-            <span className="text-4xl font-bold text-white">{licenses.length}</span>
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <FileText className="w-8 h-8 md:w-12 md:h-12 text-white opacity-80" />
+            <span className="text-2xl md:text-4xl font-bold text-white">{licenses.length}</span>
           </div>
-          <h3 className="text-xl font-semibold text-white mb-1">Licenses</h3>
-          <p className="text-purple-100 text-sm">Track software licenses</p>
+          <h3 className="text-base md:text-xl font-semibold text-white mb-1">Licenses</h3>
+          <p className="text-purple-100 text-xs md:text-sm hidden sm:block">Track software licenses</p>
         </button>
 
         <button
           onClick={() => { setCurrentScreen('users'); setShowForm(false); }}
-          className="bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-xl"
+          className="bg-gradient-to-br from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 rounded-xl p-4 md:p-6 text-left transition-all transform hover:scale-105 shadow-xl"
         >
-          <div className="flex items-center justify-between mb-4">
-            <Users className="w-12 h-12 text-white opacity-80" />
-            <span className="text-4xl font-bold text-white">{users.length}</span>
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <Users className="w-8 h-8 md:w-12 md:h-12 text-white opacity-80" />
+            <span className="text-2xl md:text-4xl font-bold text-white">{users.length}</span>
           </div>
-          <h3 className="text-xl font-semibold text-white mb-1">Users</h3>
-          <p className="text-green-100 text-sm">Manage team members</p>
+          <h3 className="text-base md:text-xl font-semibold text-white mb-1">Users</h3>
+          <p className="text-green-100 text-xs md:text-sm hidden sm:block">Manage team members</p>
         </button>
 
         <button
           onClick={() => { setCurrentScreen('contracts'); setShowForm(false); }}
-          className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 rounded-xl p-6 text-left transition-all transform hover:scale-105 shadow-xl"
+          className="bg-gradient-to-br from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 rounded-xl p-4 md:p-6 text-left transition-all transform hover:scale-105 shadow-xl"
         >
-          <div className="flex items-center justify-between mb-4">
-            <FileCheck className="w-12 h-12 text-white opacity-80" />
-            <span className="text-4xl font-bold text-white">{contracts.length}</span>
+          <div className="flex items-center justify-between mb-2 md:mb-4">
+            <FileCheck className="w-8 h-8 md:w-12 md:h-12 text-white opacity-80" />
+            <span className="text-2xl md:text-4xl font-bold text-white">{contracts.length}</span>
           </div>
-          <h3 className="text-xl font-semibold text-white mb-1">Contracts</h3>
-          <p className="text-orange-100 text-sm">View agreements</p>
+          <h3 className="text-base md:text-xl font-semibold text-white mb-1">Contracts</h3>
+          <p className="text-orange-100 text-xs md:text-sm hidden sm:block">View agreements</p>
         </button>
       </div>
 
       {/* Statistics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-          <p className="text-slate-400 text-sm mb-2">Total Assets Value</p>
-          <p className="text-3xl font-bold text-blue-400">${assets.reduce((sum, a) => sum + (a.cost || 0), 0).toLocaleString()}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-6">
+          <p className="text-slate-400 text-xs md:text-sm mb-2">Total Assets Value</p>
+          <p className="text-2xl md:text-3xl font-bold text-blue-400">${assets.reduce((sum, a) => sum + (a.cost || 0), 0).toLocaleString()}</p>
         </div>
         
-        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-          <p className="text-slate-400 text-sm mb-2">Active Licenses</p>
-          <p className="text-3xl font-bold text-purple-400">{licenses.filter(l => l.status === 'Active').length}</p>
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-6">
+          <p className="text-slate-400 text-xs md:text-sm mb-2">Active Licenses</p>
+          <p className="text-2xl md:text-3xl font-bold text-purple-400">{licenses.filter(l => l.status === 'Active').length}</p>
         </div>
         
-        <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-          <p className="text-slate-400 text-sm mb-2">Active Contracts</p>
-          <p className="text-3xl font-bold text-orange-400">{contracts.filter(c => c.status === 'Active').length}</p>
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-6">
+          <p className="text-slate-400 text-xs md:text-sm mb-2">Active Contracts</p>
+          <p className="text-2xl md:text-3xl font-bold text-orange-400">{contracts.filter(c => c.status === 'Active').length}</p>
         </div>
       </div>
     </>
@@ -618,8 +618,8 @@ export default function App() {
     return (
       <>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-white mb-2">Search Results</h1>
-          <p className="text-slate-400">Found {totalResults} result{totalResults !== 1 ? 's' : ''} for "{universalSearch}"</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Search Results</h1>
+          <p className="text-sm md:text-base text-slate-400">Found {totalResults} result{totalResults !== 1 ? 's' : ''} for "{universalSearch}"</p>
         </div>
 
         {totalResults === 0 && (
@@ -1729,13 +1729,13 @@ export default function App() {
       {/* Welcome Guide - First Time Users */}
       {showWelcome && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 rounded-xl p-8 max-w-2xl shadow-2xl border border-slate-700">
+          <div className="bg-slate-800 rounded-xl p-6 md:p-8 max-w-2xl shadow-2xl border border-slate-700 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center gap-3 mb-4">
-              <HelpCircle className="w-8 h-8 text-blue-500" />
-              <h2 className="text-2xl font-bold text-white">Welcome to IT Asset Tracker! 👋</h2>
+              <HelpCircle className="w-6 h-6 md:w-8 md:h-8 text-blue-500" />
+              <h2 className="text-xl md:text-2xl font-bold text-white">Welcome to IT Asset Tracker! 👋</h2>
             </div>
             <div className="space-y-4 text-slate-300">
-              <p className="text-lg">Here's how to get started:</p>
+              <p className="text-base md:text-lg">Here's how to get started:</p>
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
@@ -1897,7 +1897,7 @@ export default function App() {
         
         {/* Header */}
         <header className="bg-slate-800 border-b border-slate-700 shadow-lg relative z-5">
-          <div className="px-6 py-4 flex items-center justify-between gap-4">
+          <div className="px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2 md:gap-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="lg:hidden p-2 hover:bg-slate-700 rounded-lg transition text-slate-300"
@@ -1908,13 +1908,13 @@ export default function App() {
             {/* Universal Search */}
             <div className="flex-1 max-w-2xl">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search across all assets, licenses, users, and contracts..."
+                  placeholder="Search..."
                   value={universalSearch}
                   onChange={(e) => setUniversalSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full pl-9 md:pl-10 pr-8 md:pr-4 py-2 text-sm md:text-base bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
                 {universalSearch && (
                   <button
@@ -1930,47 +1930,47 @@ export default function App() {
             {currentScreen === 'assets' && !universalSearch && (
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
               >
-                <Plus className="w-5 h-5" />
-                Add Asset
+                <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="hidden sm:inline">Add Asset</span>
               </button>
             )}
             
             {currentScreen === 'licenses' && !universalSearch && (
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
               >
-                <Plus className="w-5 h-5" />
-                Add License
+                <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="hidden sm:inline">Add License</span>
               </button>
             )}
             
             {currentScreen === 'users' && !universalSearch && (
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
               >
-                <Plus className="w-5 h-5" />
-                Add User
+                <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="hidden sm:inline">Add User</span>
               </button>
             )}
             
             {currentScreen === 'contracts' && !universalSearch && (
               <button
                 onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
               >
-                <Plus className="w-5 h-5" />
-                Add Contract
+                <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="hidden sm:inline">Add Contract</span>
               </button>
             )}
           </div>
         </header>
 
         {/* Screen Content */}
-        <main className="flex-1 overflow-auto p-8">
+        <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
           {renderScreen()}
         </main>
       </div>
