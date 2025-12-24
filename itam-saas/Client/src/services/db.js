@@ -180,7 +180,7 @@ export async function createLicense(licenseData) {
   try {
     const response = await fetch(`${API_URL}/licenses`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(licenseData),
     });
     if (!response.ok) throw new Error('Failed to create license');
@@ -198,7 +198,7 @@ export async function updateLicense(id, licenseData) {
   try {
     const response = await fetch(`${API_URL}/licenses/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(licenseData),
     });
     if (!response.ok) throw new Error('Failed to update license');
@@ -216,6 +216,7 @@ export async function deleteLicense(id) {
   try {
     const response = await fetch(`${API_URL}/licenses/${id}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to delete license');
     return await response.json();
@@ -263,7 +264,7 @@ export async function createUser(userData) {
   try {
     const response = await fetch(`${API_URL}/users`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(userData),
     });
     if (!response.ok) throw new Error('Failed to create user');
@@ -281,7 +282,7 @@ export async function updateUser(id, userData) {
   try {
     const response = await fetch(`${API_URL}/users/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(userData),
     });
     if (!response.ok) throw new Error('Failed to update user');
@@ -299,6 +300,7 @@ export async function deleteUser(id) {
   try {
     const response = await fetch(`${API_URL}/users/${id}`, {
       method: 'DELETE',
+      headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to delete user');
     return await response.json();
