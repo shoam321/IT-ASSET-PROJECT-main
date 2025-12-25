@@ -147,9 +147,6 @@ const ForbiddenApps = () => {
     } catch (err) {
       setError(err.message);
       setTimeout(() => setError(null), 5000);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const getSeverityColor = (severity) => {
@@ -158,46 +155,19 @@ const ForbiddenApps = () => {
       'Medium': '#f59e0b',
       'High': '#ef4444',
       'Critical': '#dc2626'
+    };
+    return colors[severity] || '#6b7280';
+  };
+
   const severityInfo = {
     'Critical': { icon: '🔴', desc: 'Severe security threat or policy violation', color: '#dc2626' },
     'High': { icon: '🟠', desc: 'Significant risk or policy concern', color: '#ef4444' },
     'Medium': { icon: '🟡', desc: 'Moderate policy violation', color: '#f59e0b' },
     'Low': { icon: '🟢', desc: 'Minor policy or productivity concern', color: '#10b981' }
-  };     <p>{error}</p>
-        <button onClick={fetchForbiddenApps}>🔄 Retry</button>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h2>🚫 Forbidden Applications</h2>
-        <button 
-          className="add-button"
-          onClick={() => setShowAddForm(!showAddForm)}
-          style={{ padding: '8px 16px', fontSize: '14px' }}
-        > style={{ maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Header */}
-      <div className="dashboard-header" style={{ marginBottom: '24px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-            <Shield size={32} style={{ color: '#ef4444' }} />
-            <h2 style={{ margin: 0, fontSize: '28px' }}>Forbidden Applications</h2>
-          </div>
-          <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
-            Manage applications that are not allowed to run on monitored devices
-          </p>
-        </div>
-        <button 
-          className="add-button"
-          onClick={() => {
-            setShowAddForm(!showAddForm);
-       /* Add Form */}
-      {showAddForm && (
-        <div style={{
-          background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
-          padding: '24px',
+    <div className="dashboard-container" style={{ maxWidth: '1400px', margin: '0 auto' }}>
           borderRadius: '12px',
           marginBottom: '24px',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
