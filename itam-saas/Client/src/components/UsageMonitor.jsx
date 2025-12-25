@@ -10,7 +10,7 @@ const UsageMonitor = () => {
   const [error, setError] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app';
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
   // Fetch all devices
   const fetchDevices = async () => {
@@ -22,7 +22,7 @@ const UsageMonitor = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/agent/devices`, {
+      const response = await fetch(`${API_BASE_URL}/agent/devices`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -61,7 +61,7 @@ const UsageMonitor = () => {
       const token = localStorage.getItem('authToken');
       if (!token) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/agent/devices/${deviceId}/usage`, {
+      const response = await fetch(`${API_BASE_URL}/agent/devices/${deviceId}/usage`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -88,7 +88,7 @@ const UsageMonitor = () => {
       const token = localStorage.getItem('authToken');
       if (!token) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/agent/apps/usage`, {
+      const response = await fetch(`${API_BASE_URL}/agent/apps/usage`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
