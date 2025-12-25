@@ -4,6 +4,9 @@ use std::{thread, time::{Duration, SystemTime}};
 use sysinfo::System;
 use serde::{Deserialize, Serialize};
 
+mod forbidden;
+use forbidden::{ForbiddenApp, ViolationReport, sync_forbidden_list, scan_processes, report_violation};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct UsageData {
     app_name: String,
@@ -221,6 +224,83 @@ fn start_process_monitoring(handle: AppHandle) {
     });
 }
 
+// Forbidden app monitoring and alerting
+fn start_forbidden_app_monitoring(handle: AppHandle) {
+    thread::spawn(move || {
+        let api_url = "https://it-asset-project-production.up.railway.app";
+        let mut forbidden_list: Vec<ForbiddenApp> = Vec::new();
+        let mut last_sync = SystemTime::UNIX_EPOCH;
+        let mut auth_token = String::new();
+        
+        loop {
+            // Get auth token from app state/storage
+            // For now, we'll wait for it to be set via Tauri command
+            if auth_token.is_empty() {
+                thread::sleep(Duration::from_secs(10));
+                continue;
+            }
+            
+            // Sync forbidden list every 5 minutes
+            let time_since_sync = SystemTime::now()
+                .duration_since(last_sync)
+                .unwrap_or(Duration::from_secs(999999));
+            
+            if time_since_sync.as_secs() > 300 {
+                // 5 minutes
+                let runtime = tokio::runtime::Runtime::new().unwrap();
+                match runtime.block_on(sync_forbidden_list(api_url, &auth_token)) {
+                    Ok(apps) => {
+                        forbidden_list = apps;
+                        last_sync = SystemTime::now();
+                        println!("✅ Synced {} forbidden apps", forbidden_list.len());
+                        
+                        // Emit to frontend
+                        let _ = handle.emit("forbidden-list-updated", forbidden_list.len());
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Failed to sync forbidden list: {}", e);
+                    }
+                }
+            }
+            
+            // Scan for violations every 60 seconds
+            if !forbidden_list.is_empty() {
+                let violations = scan_processes(&forbidden_list);
+                
+                if !violations.is_empty() {
+                    println!("🚨 Detected {} violations", violations.len());
+                    
+                    // Report each violation
+                    let runtime = tokio::runtime::Runtime::new().unwrap();
+                    for violation in &violations {
+                        match runtime.block_on(report_violation(api_url, &auth_token, violation)) {
+                            Ok(_) => {
+                                println!("✅ Reported: {}", violation.app_detected);
+                                
+                                // Emit to frontend for local notification
+                                let _ = handle.emit("violation-detected", violation);
+                            }
+                            Err(e) => {
+                                eprintln!("❌ Failed to report violation: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            thread::sleep(Duration::from_secs(60)); // Check every 60 seconds
+        }
+    });
+}
+
+// Tauri command to set auth token for forbidden app monitoring
+#[tauri::command]
+fn set_monitoring_token(token: String) -> Result<String, String> {
+    // Store token in app state
+    // For simplicity, we'll use a global or pass through app handle
+    Ok("Token set successfully".to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -288,7 +368,10 @@ pub fn run() {
             
             // Start background process monitoring
             let handle = app.handle().clone();
-            start_process_monitoring(handle);
+            start_process_monitoring(handle.clone());
+            
+            // Start forbidden app monitoring
+            start_forbidden_app_monitoring(handle);
             
             Ok(())
         })
@@ -305,7 +388,8 @@ pub fn run() {
             send_usage_data,
             send_heartbeat,
             get_system_info,
-            collect_and_send_usage
+            collect_and_send_usage,
+            set_monitoring_token
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

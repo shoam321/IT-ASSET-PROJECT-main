@@ -3,14 +3,45 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import { body, validationResult } from 'express-validator';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
 import { authenticateToken, generateToken } from './middleware/auth.js';
+import { initializeAlertService, shutdownAlertService } from './alertService.js';
 
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Socket.IO configuration
+const io = new Server(httpServer, {
+  cors: {
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      const allowedOrigins = process.env.REACT_APP_URL 
+        ? process.env.REACT_APP_URL.split(',').map(o => o.trim())
+        : ['https://it-asset-project.vercel.app'];
+      if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true
+  }
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('🔌 WebSocket client connected:', socket.id);
+  
+  socket.on('disconnect', () => {
+    console.log('🔌 WebSocket client disconnected:', socket.id);
+  });
+});
 
 // CORS configuration
 const allowedOrigins = process.env.REACT_APP_URL 
@@ -50,6 +81,15 @@ async function startServer() {
       console.log(`🔄 Attempting to initialize database (${6 - retries}/5)...`);
       await db.initDatabase();
       console.log('✅ Database initialized successfully');
+      
+      // Initialize alert service after database is ready
+      try {
+        await initializeAlertService(io);
+        console.log('✅ Alert Service initialized successfully');
+      } catch (alertError) {
+        console.error('⚠️ Alert Service failed to initialize:', alertError.message);
+      }
+      
       return;
     } catch (error) {
       retries--;
@@ -608,15 +648,258 @@ app.get('/api/agent/apps/usage', authenticateToken, async (req, res) => {
   }
 });
 
+// ===== FORBIDDEN APPS & SECURITY ALERTS ROUTES =====
+
+// Get all forbidden apps (for agent sync)
+app.get('/api/forbidden-apps', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
+    const forbiddenApps = await db.getAllForbiddenApps();
+    res.json(forbiddenApps);
+  } catch (error) {
+    console.error('Error fetching forbidden apps:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get forbidden apps list (lightweight for agent sync)
+app.get('/api/forbidden-apps/list', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
+    const list = await db.getForbiddenAppsList();
+    res.json(list);
+  } catch (error) {
+    console.error('Error fetching forbidden apps list:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Create forbidden app (admin only)
+app.post('/api/forbidden-apps', [
+  authenticateToken,
+  body('process_name').trim().notEmpty().withMessage('Process name is required'),
+  body('severity').optional().isIn(['Low', 'Medium', 'High', 'Critical']).withMessage('Invalid severity level')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { userId, role } = req.user;
+    
+    // Check if user is admin
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    await db.setCurrentUserId(userId);
+    
+    const appData = {
+      process_name: req.body.process_name,
+      description: req.body.description,
+      severity: req.body.severity || 'Medium',
+      created_by: userId
+    };
+    
+    const newApp = await db.createForbiddenApp(appData);
+    res.status(201).json(newApp);
+  } catch (error) {
+    console.error('Error creating forbidden app:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update forbidden app (admin only)
+app.put('/api/forbidden-apps/:id', authenticateToken, async (req, res) => {
+  try {
+    const { userId, role } = req.user;
+    
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    await db.setCurrentUserId(userId);
+    
+    const { id } = req.params;
+    const updatedApp = await db.updateForbiddenApp(id, req.body);
+    
+    if (!updatedApp) {
+      return res.status(404).json({ error: 'Forbidden app not found' });
+    }
+    
+    res.json(updatedApp);
+  } catch (error) {
+    console.error('Error updating forbidden app:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete forbidden app (admin only)
+app.delete('/api/forbidden-apps/:id', authenticateToken, async (req, res) => {
+  try {
+    const { userId, role } = req.user;
+    
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    await db.setCurrentUserId(userId);
+    
+    const { id } = req.params;
+    const deleted = await db.deleteForbiddenApp(id);
+    
+    if (!deleted) {
+      return res.status(404).json({ error: 'Forbidden app not found' });
+    }
+    
+    res.json({ message: 'Forbidden app deleted successfully', deleted });
+  } catch (error) {
+    console.error('Error deleting forbidden app:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Report security alert (from agent)
+app.post('/api/alerts', [
+  authenticateToken,
+  body('device_id').notEmpty().withMessage('device_id is required'),
+  body('app_detected').notEmpty().withMessage('app_detected is required'),
+  body('severity').optional().isIn(['Low', 'Medium', 'High', 'Critical'])
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
+    const alertData = {
+      device_id: req.body.device_id,
+      app_detected: req.body.app_detected,
+      severity: req.body.severity || 'Medium',
+      process_id: req.body.process_id,
+      user_id: userId
+    };
+    
+    const alert = await db.createSecurityAlert(alertData);
+    
+    // Note: PostgreSQL trigger will automatically broadcast via WebSocket
+    console.log('🚨 Security alert created:', alert);
+    
+    res.status(201).json(alert);
+  } catch (error) {
+    console.error('Error creating security alert:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all security alerts
+app.get('/api/alerts', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
+    const { limit, status } = req.query;
+    const alerts = await db.getAllSecurityAlerts(
+      limit ? parseInt(limit) : 100,
+      status || null
+    );
+    
+    res.json(alerts);
+  } catch (error) {
+    console.error('Error fetching alerts:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get alert statistics
+app.get('/api/alerts/stats', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
+    const stats = await db.getAlertStatistics();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching alert stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update alert status (admin only)
+app.patch('/api/alerts/:id', authenticateToken, async (req, res) => {
+  try {
+    const { userId, role } = req.user;
+    
+    if (role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    
+    await db.setCurrentUserId(userId);
+    
+    const { id } = req.params;
+    const { status, notes } = req.body;
+    
+    const updated = await db.updateAlertStatus(id, status, userId, notes);
+    
+    if (!updated) {
+      return res.status(404).json({ error: 'Alert not found' });
+    }
+    
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating alert:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get alerts for specific device
+app.get('/api/alerts/device/:deviceId', authenticateToken, async (req, res) => {
+  try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
+    const { deviceId } = req.params;
+    const { limit } = req.query;
+    
+    const alerts = await db.getDeviceAlerts(deviceId, limit ? parseInt(limit) : 50);
+    res.json(alerts);
+  } catch (error) {
+    console.error('Error fetching device alerts:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Initialize and start server
 startServer();
 
 // Export for Vercel
 export default app;
 
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully...');
+  await shutdownAlertService();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully...');
+  await shutdownAlertService();
+  process.exit(0);
+});
+
 // Start listening (both production and development)
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`\n🚀 IT Asset Tracker Server running on http://localhost:${PORT}`);
   console.log(`📊 API available at http://localhost:${PORT}/api`);
-  console.log(`🏥 Health check: http://localhost:${PORT}/health\n`);
+  console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔌 WebSocket ready for real-time alerts\n`);
 });

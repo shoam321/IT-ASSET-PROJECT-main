@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle } from 'lucide-react';
 import * as dbService from './services/db';
 import { useAuth } from './context/AuthContext';
 import UsageMonitor from './components/UsageMonitor';
+import ForbiddenApps from './components/ForbiddenApps';
+import AlertHistory from './components/AlertHistory';
 
 // Helper function to format dates in a user-friendly way
 const formatDate = (dateString) => {
@@ -1719,6 +1721,10 @@ export default function App() {
         return renderContractsScreen();
       case 'usage':
         return <UsageMonitor />;
+      case 'forbidden-apps':
+        return <ForbiddenApps />;
+      case 'alerts':
+        return <AlertHistory />;
       default:
         return renderHomeScreen();
     }
@@ -1866,6 +1872,30 @@ export default function App() {
           >
             <Activity className="w-5 h-5" />
             <span>Usage Monitor</span>
+          </button>
+
+          <button
+            onClick={() => { setCurrentScreen('forbidden-apps'); setShowForm(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+              currentScreen === 'forbidden-apps' 
+                ? 'bg-blue-600 text-white' 
+                : 'text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            <Shield className="w-5 h-5" />
+            <span>Forbidden Apps</span>
+          </button>
+
+          <button
+            onClick={() => { setCurrentScreen('alerts'); setShowForm(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+              currentScreen === 'alerts' 
+                ? 'bg-blue-600 text-white' 
+                : 'text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            <AlertTriangle className="w-5 h-5" />
+            <span>Security Alerts</span>
           </button>
         </nav>
 

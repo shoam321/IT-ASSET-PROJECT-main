@@ -863,3 +863,226 @@ export async function getInstalledApps(device_id) {
     throw error;
   }
 }
+
+// ============ FORBIDDEN APPS & SECURITY ALERTS FUNCTIONS ============
+
+/**
+ * Get all forbidden apps
+ */
+export async function getAllForbiddenApps() {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM forbidden_apps 
+       ORDER BY severity DESC, process_name ASC`
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching forbidden apps:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get forbidden apps as simple array (for agent sync)
+ */
+export async function getForbiddenAppsList() {
+  try {
+    const result = await pool.query(
+      `SELECT process_name, severity FROM forbidden_apps`
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching forbidden apps list:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create forbidden app
+ */
+export async function createForbiddenApp(appData) {
+  const { process_name, description, severity, created_by } = appData;
+  
+  if (!process_name || !process_name.trim()) {
+    throw new Error('Process name is required');
+  }
+  
+  try {
+    const result = await pool.query(
+      `INSERT INTO forbidden_apps (process_name, description, severity, created_by)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [process_name.trim().toLowerCase(), description || null, severity || 'Medium', created_by || null]
+    );
+    return result.rows[0];
+  } catch (error) {
+    if (error.code === '23505') { // Unique violation
+      throw new Error(`Process "${process_name}" is already in the forbidden list`);
+    }
+    console.error('Error creating forbidden app:', error);
+    throw new Error(`Failed to create forbidden app: ${error.message}`);
+  }
+}
+
+/**
+ * Update forbidden app
+ */
+export async function updateForbiddenApp(id, appData) {
+  const fields = [];
+  const values = [];
+  let paramCount = 1;
+  
+  const excludeFields = ['id', 'created_at', 'updated_at', 'created_by'];
+
+  for (const [key, value] of Object.entries(appData)) {
+    if (excludeFields.includes(key) || value === undefined) {
+      continue;
+    }
+    
+    let processedValue = value;
+    if (key === 'process_name' && typeof value === 'string') {
+      processedValue = value.trim().toLowerCase();
+    } else if (typeof processedValue === 'string') {
+      processedValue = processedValue.trim();
+    }
+    
+    fields.push(`${key} = $${paramCount}`);
+    values.push(processedValue);
+    paramCount++;
+  }
+
+  if (fields.length === 0) {
+    throw new Error('No fields to update');
+  }
+
+  values.push(id);
+
+  try {
+    const query = `UPDATE forbidden_apps SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount} RETURNING *`;
+    const result = await pool.query(query, values);
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error updating forbidden app:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete forbidden app
+ */
+export async function deleteForbiddenApp(id) {
+  try {
+    const result = await pool.query(
+      'DELETE FROM forbidden_apps WHERE id = $1 RETURNING *',
+      [id]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error deleting forbidden app:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create security alert
+ */
+export async function createSecurityAlert(alertData) {
+  const { device_id, app_detected, severity, process_id, user_id } = alertData;
+  
+  if (!device_id || !app_detected) {
+    throw new Error('device_id and app_detected are required');
+  }
+  
+  try {
+    const result = await pool.query(
+      `INSERT INTO security_alerts (device_id, app_detected, severity, process_id, user_id, status)
+       VALUES ($1, $2, $3, $4, $5, 'New')
+       RETURNING *`,
+      [device_id, app_detected, severity || 'Medium', process_id || null, user_id || null]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error creating security alert:', error);
+    throw new Error(`Failed to create security alert: ${error.message}`);
+  }
+}
+
+/**
+ * Get all security alerts
+ */
+export async function getAllSecurityAlerts(limit = 100, status = null) {
+  try {
+    let query = `SELECT * FROM recent_alerts`;
+    const params = [];
+    
+    if (status) {
+      query += ` WHERE status = $1`;
+      params.push(status);
+      query += ` LIMIT $2`;
+      params.push(limit);
+    } else {
+      query += ` LIMIT $1`;
+      params.push(limit);
+    }
+    
+    const result = await pool.query(query, params);
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching security alerts:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get alert statistics
+ */
+export async function getAlertStatistics() {
+  try {
+    const result = await pool.query('SELECT * FROM alert_statistics');
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error fetching alert statistics:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update alert status
+ */
+export async function updateAlertStatus(id, status, resolved_by = null, notes = null) {
+  try {
+    const result = await pool.query(
+      `UPDATE security_alerts 
+       SET status = $1, 
+           resolved_by = $2, 
+           resolved_at = CASE WHEN $1 = 'Resolved' THEN CURRENT_TIMESTAMP ELSE resolved_at END,
+           notes = COALESCE($3, notes)
+       WHERE id = $4
+       RETURNING *`,
+      [status, resolved_by, notes, id]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error updating alert status:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get alerts for specific device
+ */
+export async function getDeviceAlerts(device_id, limit = 50) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM security_alerts 
+       WHERE device_id = $1 
+       ORDER BY created_at DESC 
+       LIMIT $2`,
+      [device_id, limit]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching device alerts:', error);
+    throw error;
+  }
+}
