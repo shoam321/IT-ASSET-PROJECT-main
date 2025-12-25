@@ -26,12 +26,6 @@
     "security": {
       "csp": null
     },
-    "trayIcon": {
-      "iconPath": "icons/icon.png",
-      "iconAsTemplate": false,
-      "menuOnLeftClick": false,
-      "title": "IT Asset Agent"
-    },
     "withGlobalTauri": true
   },
   "bundle": {
