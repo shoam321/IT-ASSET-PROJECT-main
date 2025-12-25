@@ -178,10 +178,10 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         // .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .setup(|app| {
-            // Build system tray menu
-            let show_item = MenuItemBuilder::with_id("show", "Show Agent").build(app)?;
-            let hide_item = MenuItemBuilder::with_id("hide", "Hide to Tray").build(app)?;
-            let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+            // Build system tray menu with user-friendly labels
+            let show_item = MenuItemBuilder::with_id("show", "📊 Open Dashboard").build(app)?;
+            let hide_item = MenuItemBuilder::with_id("hide", "↓ Minimize to Tray").build(app)?;
+            let quit_item = MenuItemBuilder::with_id("quit", "🚪 Exit Monitor").build(app)?;
             
             let menu = MenuBuilder::new(app)
                 .item(&show_item)
