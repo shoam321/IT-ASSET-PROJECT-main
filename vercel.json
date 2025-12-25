@@ -2,11 +2,11 @@
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "env": {
-    "REACT_APP_API_URL": "https://it-asset-project-production.up.railway.app"
+    "REACT_APP_API_URL": "https://it-asset-project-production.up.railway.app/api"
   },
   "build": {
     "env": {
-      "REACT_APP_API_URL": "https://it-asset-project-production.up.railway.app"
+      "REACT_APP_API_URL": "https://it-asset-project-production.up.railway.app/api"
     }
   }
 }
