@@ -62,10 +62,16 @@ export async function initDatabase() {
       ) as users_exists,
       EXISTS (
         SELECT 1 FROM information_schema.tables WHERE table_name = 'contracts'
-      ) as contracts_exists;
+      ) as contracts_exists,
+      EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'forbidden_apps'
+      ) as forbidden_apps_exists,
+      EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'security_alerts'
+      ) as security_alerts_exists;
     `);
     
-    const { assets_exists, licenses_exists, users_exists, contracts_exists } = tablesCheck.rows[0];
+    const { assets_exists, licenses_exists, users_exists, contracts_exists, forbidden_apps_exists, security_alerts_exists } = tablesCheck.rows[0];
     
     if (assets_exists) {
       console.log('✅ Assets table exists');
@@ -89,6 +95,18 @@ export async function initDatabase() {
       console.log('✅ Contracts table exists');
     } else {
       console.warn('⚠️ Contracts table not found');
+    }
+    
+    if (forbidden_apps_exists) {
+      console.log('✅ Forbidden Apps table exists');
+    } else {
+      console.warn('⚠️ Forbidden Apps table not found - run: node run-forbidden-migration.js');
+    }
+    
+    if (security_alerts_exists) {
+      console.log('✅ Security Alerts table exists');
+    } else {
+      console.warn('⚠️ Security Alerts table not found - run: node run-forbidden-migration.js');
     }
     
     if (assets_exists && licenses_exists && users_exists && contracts_exists) {
