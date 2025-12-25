@@ -1,25 +1,15 @@
-import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
+import { useState } from "react";
 import "./App.css";
 
 function App() {
-  const [currentApp, setCurrentApp] = useState("Scanning...");
-  const [status, setStatus] = useState("Initializing...");
-  const [systemInfo, setSystemInfo] = useState("");
-  const [usageHistory, setUsageHistory] = useState([]);
-  const [isConnected, setIsConnected] = useState(false);
-  
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
-  const [authToken, setAuthToken] = useState("");
 
   // Configuration
   const API_URL = "https://it-asset-project-production.up.railway.app/api";
-  const DEVICE_ID = "device_" + Math.random().toString(36).substr(2, 9);
 
   // Login handler
   const handleLogin = async (e) => {
@@ -39,30 +29,18 @@ function App() {
         throw new Error(data.error || "Login failed");
       }
 
-      setAuthToken(data.token);
       setIsAuthenticated(true);
       setLoginError("");
+      alert(`✅ Login successful! Token: ${data.token.substring(0, 20)}...`);
     } catch (err) {
       setLoginError(err.message);
     }
   };
 
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    const config = {
-      api_url: API_URL,
-      auth_token: authToken,
-      device_id: DEVICE_ID,
-      poll_interval: 5,
-    };
-
-    // 1. Listen for usage updates from Rust
-    const unlistenUsage = listen("usage-update", (event) => {
   // Login screen
   if (!isAuthenticated) {
     return (
-      <div className="agent-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <div className="agent-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#1a1a1a', color: 'white' }}>
         <div style={{ width: '100%', maxWidth: '400px', padding: '2rem' }}>
           <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
             <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🖥️ IT Asset Agent</h1>
@@ -84,7 +62,8 @@ function App() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="admin"
                 required
-                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '1px solid #333', background: '#1a1a1a', color: 'white' }}
+                autoFocus
+                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '1px solid #333', background: '#2a2a2a', color: 'white' }}
               />
             </div>
 
@@ -96,7 +75,7 @@ function App() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
                 required
-                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '1px solid #333', background: '#1a1a1a', color: 'white' }}
+                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '1px solid #333', background: '#2a2a2a', color: 'white' }}
               />
             </div>
 
@@ -116,88 +95,17 @@ function App() {
     );
   }
 
-      console.log("Usage update:", event.payload);
-      setUsageHistory((prev) => [event.payload, ...prev.slice(0, 9)]);
-    });
-
-    // 2. Listen for current activity
-    const unlistenActivity = listen("current-activity", (event) => {
-      setCurrentApp(event.payload);
-    });
-
-    // 3. Get agent status on mount
-    invoke("get_agent_status").then((s) => {
-      setStatus(s);
-      setIsConnected(true);
-    });
-
-    // 4. Get system info
-    invoke("get_system_info").then(setSystemInfo);
-
-    // 5. Send heartbeat every 30 seconds
-    const heartbeatInterval = setInterval(() => {
-      invoke("send_heartbeat", { config })
-        .then(() => setIsConnected(true))
-        .catch((err) => {
-          console.error("Heartbeat failed:", err);
-          setIsConnected(false);
-        });
-    }, 30000);
-
-    return () => {
-      unlistenUsage.then((f) => f());
-      unlistenActivity.then((f) => f());
-      clearInterval(heartbeatInterval);
-    };
-  }, [isAuthenticated, authToken]);
-
+  // Logged in view
   return (
-    <div className="agent-container">
-      <header className="agent-header">
-        <h1>🖥️ IT Asset Agent</h1>
-        <div className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}>
-          {isConnected ? '● Connected' : '○ Disconnected'}
-        </div>
-      </header>
-
-      <div className="agent-content">
-        <section className="status-section">
-          <h2>Agent Status</h2>
-          <p className="status-text">{status}</p>
-          <p className="system-info">{systemInfo}</p>
-        </section>
-
-        <section className="activity-section">
-          <h2>Current Activity</h2>
-          <div className="activity-card">
-            <div className="activity-icon">📱</div>
-            <div className="activity-details">
-              <span className="activity-label">Active Application:</span>
-              <h3 className="activity-name">{currentApp}</h3>
-            </div>
-          </div>
-        </section>
-
-        <section className="history-section">
-          <h2>Recent Activity</h2>
-          <div className="history-list">
-            {usageHistory.length === 0 ? (
-              <p className="no-history">No activity recorded yet...</p>
-            ) : (
-              usageHistory.map((item, index) => (
-                <div key={index} className="history-item">
-                  <span className="history-app">{item.app_name}</span>
-                  <span className="history-duration">{item.duration}s</span>
-                </div>
-              ))
-            )}
-          </div>
-        </section>
-      </div>
-
-      <footer className="agent-footer">
-        <p>Device ID: {config.device_id}</p>
-      </footer>
+    <div className="agent-container" style={{ padding: '2rem', background: '#1a1a1a', color: 'white', minHeight: '100vh' }}>
+      <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>✅ Agent Running</h1>
+      <p style={{ color: '#888' }}>Monitoring active and sending data to server...</p>
+      <button
+        onClick={() => setIsAuthenticated(false)}
+        style={{ marginTop: '2rem', padding: '0.5rem 1rem', background: '#ff4444', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+      >
+        Logout
+      </button>
     </div>
   );
 }
