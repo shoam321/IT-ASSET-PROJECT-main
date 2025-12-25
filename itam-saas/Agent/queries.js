@@ -1,12 +1,36 @@
 import pool from './db.js';
 
 /**
- * Set the current user ID for PostgreSQL Row-Level Security
- * This session variable is used by RLS policies to filter data
+ * Set the current user ID for PostgreSQL Row-Level Security (RLS)
+ * 
+ * HOW IT WORKS:
+ * - Sets PostgreSQL session variable 'app.current_user_id' = userId from JWT
+ * - RLS policies check this variable using: current_setting('app.current_user_id', true)::integer
+ * - Database automatically filters queries based on user_id and role
+ * 
+ * ADMIN vs USER ACCESS:
+ * - Admin users (role='admin'): See ALL devices and usage data from ALL users
+ * - Regular users (role='user'): See ONLY their own devices and usage data
+ * - RLS policies defined in migrations/add-multi-tenancy.sql
+ * 
+ * WHO IS ADMIN:
+ * - Created using: node create-admin.js (default: admin/admin@itasset.local/admin123)
+ * - First admin must be created manually before system use
+ * - Admins can create more users/admins via API (future feature)
+ * 
+ * IMPORTANT FIXES LEARNED:
+ * - Use SET (not SET LOCAL) because SET LOCAL only works in transactions
+ * - With connection pooling, SET persists for the connection session
+ * - Must call this BEFORE any database query that needs user filtering
+ * 
+ * SECURITY BENEFITS:
+ * - Defense-in-depth: Even if app code has bugs, database enforces access rules
+ * - Database-level security prevents SQL injection from bypassing filters
+ * - Zero-trust: Every query is filtered at database level, not app level
  */
 export async function setCurrentUserId(userId) {
   try {
-    await pool.query('SET LOCAL app.current_user_id = $1', [userId]);
+    await pool.query('SET app.current_user_id = $1', [userId]);
   } catch (error) {
     console.error('Error setting current user ID:', error);
     throw error;

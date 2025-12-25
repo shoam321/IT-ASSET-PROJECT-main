@@ -37,6 +37,77 @@ export const requireAdmin = (req, res, next) => {
 
 /**
  * Get permissions for a role
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ROLE-BASED ACCESS CONTROL (RBAC) SYSTEM DOCUMENTATION
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * ADMIN ROLE:
+ * - 'read:all_devices': Can view all devices from all users
+ * - 'write:all_devices': Can create/update any device
+ * - 'manage:users': Can create/edit/delete users (future feature)
+ * - Also includes all user permissions
+ * 
+ * USER ROLE (default):
+ * - 'read:own_devices': Can only view their own devices
+ * - 'write:own_devices': Can only create/update their own devices
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * WHO IS THE ADMIN?
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * CREATING THE FIRST ADMIN:
+ * 1. Run command: node create-admin.js
+ * 2. Default credentials created:
+ *    - Username: admin
+ *    - Email: admin@itasset.local
+ *    - Password: admin123
+ *    - Role: admin
+ * 
+ * 3. Custom admin creation:
+ *    node create-admin.js myusername admin@company.com StrongPass123 "Jane Doe"
+ * 
+ * 4. Admin user is stored in 'auth_users' table with role='admin'
+ * 
+ * WHAT HAPPENS DURING MIGRATION:
+ * - All existing devices get assigned to first admin user (user_id = admin's ID)
+ * - This ensures no orphaned data after adding multi-tenancy
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * HOW PERMISSIONS ARE USED:
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * 1. During LOGIN (/api/auth/login):
+ *    - User credentials verified
+ *    - generateToken() calls getRolePermissions(user.role)
+ *    - Permissions array added to JWT token
+ *    - Token sent to client (stored in localStorage)
+ * 
+ * 2. During API REQUESTS:
+ *    - Client sends JWT in Authorization header: "Bearer <token>"
+ *    - authenticateToken() middleware verifies token
+ *    - authorize() middleware checks permissions
+ *    - Example: authorize('read:all_devices') → Only admins pass
+ * 
+ * 3. In DATABASE (Row-Level Security):
+ *    - setCurrentUserId() called with user.userId from JWT
+ *    - PostgreSQL RLS policies check:
+ *      - Is user admin? → Show all data
+ *      - Is user regular? → Show only WHERE user_id = current_user_id
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SECURITY BENEFITS:
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * DEFENSE IN DEPTH (Multiple security layers):
+ * 1. JWT Permission Check (App Layer): Fast, prevents API calls
+ * 2. PostgreSQL RLS (Database Layer): Even if app has bugs, DB enforces rules
+ * 3. User ID in JWT (Signed): Can't be tampered, cryptographically verified
+ * 
+ * ZERO-TRUST MODEL:
+ * - Every request is authenticated (JWT required)
+ * - Every query is filtered (RLS enforced at DB level)
+ * - Admin access is explicit (must have role='admin')
  */
 const getRolePermissions = (role) => {
   const permissions = {
@@ -71,6 +142,40 @@ export const authorize = (...allowedPermissions) => {
 
 /**
  * Generate JWT token for a user
+ * 
+ * JWT TOKEN STRUCTURE:
+ * After successful login, user receives a JWT token containing:
+ * {
+ *   userId: 123,                    // User's ID from auth_users table
+ *   username: "john.doe",            // Username for display
+ *   email: "john@example.com",      // Email address
+ *   role: "user" or "admin",        // User's role (determines permissions)
+ *   permissions: ["read:own_devices", ...],  // Array of permission strings
+ *   exp: 1735123456                 // Token expiration timestamp (auto-added by jwt.sign)
+ * }
+ * 
+ * WHY INCLUDE PERMISSIONS IN JWT:
+ * - Avoids database lookup on every single API request (performance)
+ * - Fast permission checking in authorize() middleware
+ * - Token is cryptographically signed with JWT_SECRET, can't be tampered
+ * - If someone tries to change role/permissions, signature verification fails
+ * 
+ * SECURITY CONSIDERATIONS:
+ * - JWT_SECRET must be strong (set in .env: long random string)
+ * - Token expires after 7 days (then user must login again)
+ * - Token stored in localStorage on client-side
+ * - Sent as Authorization header: "Bearer <token>"
+ * 
+ * ROLE ASSIGNMENT:
+ * - Admin: Created manually via: node create-admin.js
+ * - User: Default role when registering via /api/auth/register
+ * - Role stored in auth_users.role column in database
+ * - Role determines which permissions are added to token
+ * 
+ * IMPORTANT FIX LEARNED:
+ * - Changed from { id, username, ... } to { userId, username, ... }
+ * - Frontend code expects "userId" key, not "id"
+ * - Inconsistency caused authentication bugs during multi-tenancy implementation
  */
 export const generateToken = (user) => {
   const permissions = getRolePermissions(user.role);
