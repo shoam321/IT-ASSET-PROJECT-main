@@ -132,38 +132,45 @@ async fn collect_and_send_usage(auth_token: String) -> Result<String, String> {
     let client = reqwest::Client::new();
     let url = "https://it-asset-project-production.up.railway.app/api/agent/usage";
     
-    // Collect running processes
-    let mut usage_records = Vec::new();
+    // Get device info for device_id
+    let hostname = System::host_name().unwrap_or_else(|| "unknown".to_string());
+    let device_id = hostname.clone(); // Use hostname as device_id
+    
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
         .as_secs();
     
-    for (_, process) in sys.processes().iter().take(10) {
+    // Send usage records one by one (API expects individual records, not array)
+    let mut success_count = 0;
+    let processes: Vec<_> = sys.processes().iter().take(10).collect();
+    
+    for (_, process) in processes {
         let usage_data = serde_json::json!({
-            "appName": process.name().to_string(),
-            "windowTitle": process.name().to_string(),
+            "device_id": device_id,
+            "app_name": process.name().to_string(),
+            "window_title": process.name().to_string(),
             "duration": 120, // 2 minutes in seconds
             "timestamp": timestamp
         });
-        usage_records.push(usage_data);
+        
+        let response = client
+            .post(url)
+            .header("Authorization", format!("Bearer {}", auth_token))
+            .json(&usage_data)
+            .send()
+            .await
+            .map_err(|e| format!("Network error: {}", e))?;
+        
+        if response.status().is_success() {
+            success_count += 1;
+        } else {
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(format!("API error: {}", error_text));
+        }
     }
     
-    // Send to API
-    let response = client
-        .post(url)
-        .header("Authorization", format!("Bearer {}", auth_token))
-        .json(&usage_records)
-        .send()
-        .await
-        .map_err(|e| format!("Network error: {}", e))?;
-    
-    if response.status().is_success() {
-        Ok(format!("Sent {} usage records", usage_records.len()))
-    } else {
-        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-        Err(format!("API error: {}", error_text))
-    }
+    Ok(format!("Successfully sent {} usage records", success_count))
 }
 
 // Background process monitoring
