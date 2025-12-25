@@ -1,4 +1,5 @@
 use tauri::{AppHandle, Emitter, Manager, menu::{MenuBuilder, MenuItemBuilder}, tray::{TrayIconBuilder, TrayIconEvent}};
+use tauri_plugin_single_instance::init as single_instance_init;
 use std::{thread, time::{Duration, SystemTime}};
 use sysinfo::System;
 use serde::{Deserialize, Serialize};
@@ -225,6 +226,14 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(single_instance_init(|app, _args, _cwd| {
+            // When a second instance is launched, focus the existing window
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.unminimize();
+            }
+        }))
         // .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--minimized"])))
         .setup(|app| {
             // Build system tray menu with user-friendly labels
