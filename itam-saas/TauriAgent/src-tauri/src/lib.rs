@@ -124,6 +124,48 @@ fn get_system_info() -> String {
     )
 }
 
+#[tauri::command]
+async fn collect_and_send_usage(auth_token: String) -> Result<String, String> {
+    let mut sys = System::new_all();
+    sys.refresh_processes();
+    
+    let client = reqwest::Client::new();
+    let url = "https://it-asset-project-production.up.railway.app/api/agent/usage";
+    
+    // Collect running processes
+    let mut usage_records = Vec::new();
+    let timestamp = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    
+    for (_, process) in sys.processes().iter().take(10) {
+        let usage_data = serde_json::json!({
+            "appName": process.name().to_string(),
+            "windowTitle": process.name().to_string(),
+            "duration": 120, // 2 minutes in seconds
+            "timestamp": timestamp
+        });
+        usage_records.push(usage_data);
+    }
+    
+    // Send to API
+    let response = client
+        .post(url)
+        .header("Authorization", format!("Bearer {}", auth_token))
+        .json(&usage_records)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    
+    if response.status().is_success() {
+        Ok(format!("Sent {} usage records", usage_records.len()))
+    } else {
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        Err(format!("API error: {}", error_text))
+    }
+}
+
 // Background process monitoring
 fn start_process_monitoring(handle: AppHandle) {
     thread::spawn(move || {
@@ -246,7 +288,8 @@ pub fn run() {
             get_agent_status,
             send_usage_data,
             send_heartbeat,
-            get_system_info
+            get_system_info,
+            collect_and_send_usage
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

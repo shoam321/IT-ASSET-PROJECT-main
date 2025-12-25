@@ -12,6 +12,8 @@ function App() {
   const [authToken, setAuthToken] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
+  const [lastSync, setLastSync] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("Initializing...");
 
   // Configuration
   const API_URL = "https://it-asset-project-production.up.railway.app/api";
@@ -35,6 +37,32 @@ function App() {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Start monitoring after login - send data every 2 minutes
+  useEffect(() => {
+    if (!isAuthenticated || !authToken) return;
+
+    const sendData = async () => {
+      try {
+        setSyncStatus("Syncing...");
+        const result = await invoke('collect_and_send_usage', { authToken });
+        setSyncStatus("Active");
+        setLastSync(new Date());
+        console.log("Usage data sent:", result);
+      } catch (err) {
+        setSyncStatus("Error");
+        console.error("Failed to send usage data:", err);
+      }
+    };
+
+    // Send immediately on login
+    sendData();
+
+    // Then send every 2 minutes (120000 ms)
+    const interval = setInterval(sendData, 120000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, authToken]);
 
   // Auto-minimize to tray
   const minimizeToTray = async () => {
@@ -218,9 +246,16 @@ function App() {
         <div style={{ background: 'white', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
           <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📊</div>
           <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem', color: '#2C3E50' }}>Monitoring Active</h3>
-          <p style={{ margin: 0, color: '#7F8C8D', fontSize: '0.9rem' }}>Started at {formatTime(new Date())}</p>
-          <div style={{ marginTop: '1rem', padding: '0.5rem', background: '#F8FAFB', borderRadius: '8px', fontSize: '0.85rem', color: '#5B8DEE' }}>
-            Running in background
+          <p style={{ margin: 0, color: '#7F8C8D', fontSize: '0.9rem' }}>
+            {lastSync 
+              ? `Last synced: ${Math.floor((new Date() - lastSync) / 1000)}s ago` 
+              : 'Initializing...'}
+          </p>
+          <div style={{ marginTop: '1rem', padding: '0.5rem', background: syncStatus === 'Active' ? '#E8F5E9' : '#FFF3E0', borderRadius: '8px', fontSize: '0.85rem', color: syncStatus === 'Active' ? '#4CAF50' : '#FF9800', fontWeight: '600' }}>
+            {syncStatus === 'Syncing...' && '🔄 Syncing data...'}
+            {syncStatus === 'Active' && '✓ Sending every 2 minutes'}
+            {syncStatus === 'Error' && '⚠️ Connection issue'}
+            {syncStatus === 'Initializing...' && '⏳ Starting monitoring...'}
           </div>
         </div>
 
@@ -228,10 +263,12 @@ function App() {
         <div style={{ background: 'white', borderRadius: '16px', padding: '1.75rem', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
           <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🌐</div>
           <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem', color: '#2C3E50' }}>Connection</h3>
-          <p style={{ margin: 0, color: '#7F8C8D', fontSize: '0.9rem' }}>Secure connection established</p>
+          <p style={{ margin: 0, color: '#7F8C8D', fontSize: '0.9rem' }}>Railway API endpoint</p>
           <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#4CAF50' }}></div>
-            <span style={{ fontSize: '0.85rem', color: '#4CAF50', fontWeight: '600' }}>Connected</span>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: syncStatus === 'Active' ? '#4CAF50' : '#FF9800' }}></div>
+            <span style={{ fontSize: '0.85rem', color: syncStatus === 'Active' ? '#4CAF50' : '#FF9800', fontWeight: '600' }}>
+              {syncStatus === 'Active' ? 'Connected' : syncStatus}
+            </span>
           </div>
         </div>
       </div>
