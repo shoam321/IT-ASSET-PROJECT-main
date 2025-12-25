@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import './UsageMonitor.css';
+import { RefreshCw, Filter } from 'lucide-react';
 
 const AlertHistory = () => {
   const [alerts, setAlerts] = useState([]);
@@ -32,25 +30,6 @@ const AlertHistory = () => {
 
     newSocket.on('security-alert', (alert) => {
       console.log('🚨 Real-time alert received:', alert);
-      
-      // Show toast notification
-      toast.error(
-        `🚨 Security Alert: ${alert.app_detected} detected on ${alert.device_id}`,
-        {
-          position: 'top-right',
-          autoClose: 10000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        }
-      );
-
-      // Play alert sound
-      const audio = new Audio('/alert.mp3'); // You can add a sound file
-      audio.play().catch(e => console.log('Audio play failed:', e));
-
-      // Refresh alerts list
       fetchAlerts();
       fetchStats();
     });
@@ -122,28 +101,29 @@ const AlertHistory = () => {
       fetchStats();
       toast.success(`✅ Alert marked as ${newStatus}`);
     } catch (err) {
-      toast.error(`❌ Error: ${err.message}`);
+      setError(err.message);
+      setTimeout(() => setError(null), 3000);
     }
   };
 
   const getSeverityColor = (severity) => {
     const colors = {
-      'Low': '#10b981',
-      'Medium': '#f59e0b',
-      'High': '#ef4444',
-      'Critical': '#dc2626'
+      'Low': 'bg-green-900 text-green-200',
+      'Medium': 'bg-yellow-900 text-yellow-200',
+      'High': 'bg-orange-900 text-orange-200',
+      'Critical': 'bg-red-900 text-red-200'
     };
-    return colors[severity] || '#6b7280';
+    return colors[severity] || 'bg-slate-600 text-slate-300';
   };
 
   const getStatusColor = (status) => {
     const colors = {
-      'New': '#ef4444',
-      'Acknowledged': '#f59e0b',
-      'Resolved': '#10b981',
-      'False Positive': '#6b7280'
+      'New': 'bg-red-900 text-red-200',
+      'Acknowledged': 'bg-yellow-900 text-yellow-200',
+      'Resolved': 'bg-green-900 text-green-200',
+      'False Positive': 'bg-slate-600 text-slate-300'
     };
-    return colors[status] || '#6b7280';
+    return colors[status] || 'bg-slate-600 text-slate-300';
   };
 
   const filteredAlerts = alerts.filter(alert => {
@@ -151,209 +131,154 @@ const AlertHistory = () => {
     return alert.status === filter;
   });
 
-  if (loading) {
-    return (
-      <div className="dashboard-container">
-        <h2>⏳ Loading alerts...</h2>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="dashboard-container">
-        <h2>❌ Error</h2>
-        <p>{error}</p>
-        <button onClick={fetchAlerts}>🔄 Retry</button>
-      </div>
-    );
-  }
-
   return (
-    <div className="dashboard-container">
-      <ToastContainer />
-      
-      <div className="dashboard-header">
-        <h2>🚨 Security Alerts</h2>
-        <div>
-          <span style={{ 
-            color: socket?.connected ? '#10b981' : '#ef4444',
-            marginRight: '10px',
-            fontSize: '12px'
-          }}>
-            {socket?.connected ? '🟢 Live' : '🔴 Offline'}
+    <>
+      {error && (
+        <div className="mb-6 p-4 bg-red-900 border border-red-700 rounded-lg">
+          <p className="text-red-200">{error}</p>
+        </div>
+      )}
+
+      {loading && (
+        <div className="mb-6 p-4 bg-blue-900 border border-blue-700 rounded-lg">
+          <p className="text-blue-200">Loading alerts...</p>
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <div className="flex items-center gap-3">
+          <Filter className="w-5 h-5 text-slate-400" />
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white"
+          >
+            <option value="all">All Alerts</option>
+            <option value="New">New Only</option>
+            <option value="Acknowledged">Acknowledged</option>
+            <option value="Resolved">Resolved</option>
+            <option value="False Positive">False Positives</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs px-2 py-1 rounded ${socket?.connected ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'}`}>
+            {socket?.connected ? '● Live' : '● Offline'}
           </span>
-          <button onClick={fetchAlerts} style={{ padding: '8px 16px', fontSize: '14px' }}>
-            🔄 Refresh
+          <button
+            onClick={fetchAlerts}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
           </button>
         </div>
       </div>
 
       {stats && (
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-value">{stats.total_alerts || 0}</div>
-            <div className="stat-label">Total Alerts</div>
+        <div className="mt-8 mb-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-slate-700 border border-slate-600 rounded-lg p-6 shadow-lg">
+            <p className="text-slate-400 text-sm">Total Alerts</p>
+            <p className="text-3xl font-bold text-white mt-2">{stats.total_alerts || 0}</p>
           </div>
-          <div className="stat-card">
-            <div className="stat-value">{stats.new_alerts || 0}</div>
-            <div className="stat-label">New</div>
+          <div className="bg-slate-700 border border-slate-600 rounded-lg p-6 shadow-lg">
+            <p className="text-slate-400 text-sm">New</p>
+            <p className="text-3xl font-bold text-red-400 mt-2">{stats.new_alerts || 0}</p>
           </div>
-          <div className="stat-card">
-            <div className="stat-value">{stats.critical_alerts || 0}</div>
-            <div className="stat-label">Critical</div>
+          <div className="bg-slate-700 border border-slate-600 rounded-lg p-6 shadow-lg">
+            <p className="text-slate-400 text-sm">Critical</p>
+            <p className="text-3xl font-bold text-orange-400 mt-2">{stats.critical_alerts || 0}</p>
           </div>
-          <div className="stat-card">
-            <div className="stat-value">{stats.alerts_24h || 0}</div>
-            <div className="stat-label">Last 24h</div>
+          <div className="bg-slate-700 border border-slate-600 rounded-lg p-6 shadow-lg">
+            <p className="text-slate-400 text-sm">Last 24h</p>
+            <p className="text-3xl font-bold text-blue-400 mt-2">{stats.alerts_24h || 0}</p>
           </div>
         </div>
       )}
 
-      <div style={{ marginBottom: '20px' }}>
-        <label style={{ marginRight: '10px', fontWeight: 'bold' }}>Filter:</label>
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          style={{
-            padding: '8px 12px',
-            borderRadius: '6px',
-            border: '1px solid #ddd',
-            fontSize: '14px'
-          }}
-        >
-          <option value="all">All Alerts</option>
-          <option value="New">New Only</option>
-          <option value="Acknowledged">Acknowledged</option>
-          <option value="Resolved">Resolved</option>
-          <option value="False Positive">False Positives</option>
-        </select>
-      </div>
-
-      <div className="table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Device</th>
-              <th>App Detected</th>
-              <th>Severity</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredAlerts.length === 0 ? (
+      <div className="bg-slate-700 border border-slate-600 rounded-lg overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-800 border-b border-slate-600">
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
-                  {filter === 'all' 
-                    ? '✅ No security alerts - All clear!' 
-                    : `ℹ️ No alerts with status: ${filter}`
-                  }
-                </td>
+                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Time</th>
+                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Device</th>
+                <th className="px-6 py-3 text-left text-slate-300 font-semibold">App Detected</th>
+                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Severity</th>
+                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Status</th>
+                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Actions</th>
               </tr>
-            ) : (
-              filteredAlerts.map((alert) => (
-                <tr key={alert.id} style={{
-                  backgroundColor: alert.status === 'New' ? '#fef2f2' : 'transparent'
-                }}>
-                  <td>{new Date(alert.created_at).toLocaleString()}</td>
-                  <td>
-                    <strong>{alert.device_id}</strong>
-                    {alert.hostname && <div style={{ fontSize: '12px', color: '#666' }}>
-                      {alert.hostname}
-                    </div>}
-                  </td>
-                  <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
-                    {alert.app_detected}
-                  </td>
-                  <td>
-                    <span
-                      style={{
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: '#fff',
-                        backgroundColor: getSeverityColor(alert.severity)
-                      }}
-                    >
-                      {alert.severity}
-                    </span>
-                  </td>
-                  <td>
-                    <span
-                      style={{
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: '#fff',
-                        backgroundColor: getStatusColor(alert.status)
-                      }}
-                    >
-                      {alert.status}
-                    </span>
-                  </td>
-                  <td>
-                    {alert.status === 'New' && (
-                      <button
-                        onClick={() => handleStatusChange(alert.id, 'Acknowledged')}
-                        style={{
-                          padding: '6px 12px',
-                          backgroundColor: '#f59e0b',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '6px',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          marginRight: '5px'
-                        }}
-                      >
-                        ✔️ Acknowledge
-                      </button>
-                    )}
-                    {(alert.status === 'New' || alert.status === 'Acknowledged') && (
-                      <>
-                        <button
-                          onClick={() => handleStatusChange(alert.id, 'Resolved')}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#10b981',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            marginRight: '5px'
-                          }}
-                        >
-                          ✅ Resolve
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(alert.id, 'False Positive')}
-                          style={{
-                            padding: '6px 12px',
-                            backgroundColor: '#6b7280',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontSize: '12px'
-                          }}
-                        >
-                          ❌ False Positive
-                        </button>
-                      </>
-                    )}
+            </thead>
+            <tbody>
+              {filteredAlerts.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
+                    {filter === 'all' ? 'No security alerts' : `No ${filter} alerts`}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                filteredAlerts.map((alert) => (
+                  <tr 
+                    key={alert.id} 
+                    className={`border-b border-slate-600 hover:bg-slate-600 transition ${alert.status === 'New' ? 'bg-slate-600/30' : ''}`}
+                  >
+                    <td className="px-6 py-4 text-slate-300 text-xs">
+                      {new Date(alert.created_at).toLocaleString()}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-white font-medium">{alert.device_id}</div>
+                      {alert.hostname && (
+                        <div className="text-xs text-slate-400">{alert.hostname}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-white font-medium font-mono">
+                      {alert.app_detected}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(alert.severity)}`}>
+                        {alert.severity}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(alert.status)}`}>
+                        {alert.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2">
+                        {alert.status === 'New' && (
+                          <button
+                            onClick={() => handleStatusChange(alert.id, 'Acknowledged')}
+                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded text-xs transition"
+                          >
+                            Acknowledge
+                          </button>
+                        )}
+                        {(alert.status === 'New' || alert.status === 'Acknowledged') && (
+                          <>
+                            <button
+                              onClick={() => handleStatusChange(alert.id, 'Resolved')}
+                              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition"
+                            >
+                              Resolve
+                            </button>
+                            <button
+                              onClick={() => handleStatusChange(alert.id, 'False Positive')}
+                              className="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs transition"
+                            >
+                              False
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
