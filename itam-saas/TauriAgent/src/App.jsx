@@ -9,18 +9,113 @@ function App() {
   const [systemInfo, setSystemInfo] = useState("");
   const [usageHistory, setUsageHistory] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [authToken, setAuthToken] = useState("");
 
-  // Configuration - in production, load from config file
-  const config = {
-    api_url: "https://it-asset-project-production.up.railway.app/api",
-    auth_token: "", // TODO: Set this with your login token from localStorage.getItem('token')
-    device_id: "device_" + Math.random().toString(36).substr(2, 9),
-    poll_interval: 5,
+  // Configuration
+  const API_URL = "https://it-asset-project-production.up.railway.app/api";
+  const DEVICE_ID = "device_" + Math.random().toString(36).substr(2, 9);
+
+  // Login handler
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError("");
+
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+
+      setAuthToken(data.token);
+      setIsAuthenticated(true);
+      setLoginError("");
+    } catch (err) {
+      setLoginError(err.message);
+    }
   };
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const config = {
+      api_url: API_URL,
+      auth_token: authToken,
+      device_id: DEVICE_ID,
+      poll_interval: 5,
+    };
+
     // 1. Listen for usage updates from Rust
     const unlistenUsage = listen("usage-update", (event) => {
+  // Login screen
+  if (!isAuthenticated) {
+    return (
+      <div className="agent-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div style={{ width: '100%', maxWidth: '400px', padding: '2rem' }}>
+          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+            <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🖥️ IT Asset Agent</h1>
+            <p style={{ color: '#888' }}>Please login to start monitoring</p>
+          </div>
+
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {loginError && (
+              <div style={{ padding: '0.75rem', background: '#ff4444', borderRadius: '8px', color: 'white', fontSize: '0.9rem' }}>
+                {loginError}
+              </div>
+            )}
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Username</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="admin"
+                required
+                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '1px solid #333', background: '#1a1a1a', color: 'white' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                required
+                style={{ width: '100%', padding: '0.75rem', fontSize: '1rem', borderRadius: '8px', border: '1px solid #333', background: '#1a1a1a', color: 'white' }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              style={{ padding: '0.75rem', fontSize: '1rem', fontWeight: 'bold', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
+            >
+              Login & Start Monitoring
+            </button>
+
+            <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#666', marginTop: '1rem' }}>
+              Default: admin / SecureAdmin2025
+            </p>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
       console.log("Usage update:", event.payload);
       setUsageHistory((prev) => [event.payload, ...prev.slice(0, 9)]);
     });
@@ -54,7 +149,7 @@ function App() {
       unlistenActivity.then((f) => f());
       clearInterval(heartbeatInterval);
     };
-  }, []);
+  }, [isAuthenticated, authToken]);
 
   return (
     <div className="agent-container">

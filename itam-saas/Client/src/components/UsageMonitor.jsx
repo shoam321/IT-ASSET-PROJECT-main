@@ -37,7 +37,9 @@ const UsageMonitor = () => {
       }
       
       const data = await response.json();
-      setDevices(Array.isArray(data) ? data : []);
+      // Handle both array response and {value: array} response
+      const devicesArray = Array.isArray(data) ? data : (data.value || []);
+      setDevices(devicesArray);
       setError(null); // Clear any previous errors
       
       // Auto-select first device if none selected
