@@ -69,7 +69,7 @@ const AlertHistory = () => {
   const fetchAlerts = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/alerts?limit=100`, {
+      const response = await fetch(`${API_URL}/alerts?limit=100`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -89,7 +89,7 @@ const AlertHistory = () => {
   const fetchStats = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/alerts/stats`, {
+      const response = await fetch(`${API_URL}/alerts/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -107,7 +107,7 @@ const AlertHistory = () => {
   const handleStatusChange = async (id, newStatus) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/api/alerts/${id}`, {
+      const response = await fetch(`${API_URL}/alerts/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
