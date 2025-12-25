@@ -15,7 +15,7 @@ const UsageMonitor = () => {
   // Fetch all devices
   const fetchDevices = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       if (!token) {
         setError('Not authenticated. Please log in again.');
         setLoading(false);
@@ -58,7 +58,7 @@ const UsageMonitor = () => {
     if (!deviceId) return;
     
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       if (!token) return;
 
       const response = await fetch(`${API_BASE_URL}/api/agent/devices/${deviceId}/usage`, {
@@ -85,7 +85,7 @@ const UsageMonitor = () => {
   // Fetch app usage summary
   const fetchAppUsageSummary = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       if (!token) return;
 
       const response = await fetch(`${API_BASE_URL}/api/agent/apps/usage`, {
