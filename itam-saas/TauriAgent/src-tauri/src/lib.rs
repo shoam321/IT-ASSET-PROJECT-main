@@ -156,6 +156,7 @@ pub fn run() {
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
+                .menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
@@ -169,17 +170,22 @@ pub fn run() {
                         }
                     }
                     "quit" => {
-                        app.exit(0);
+                        std::process::exit(0);
                     }
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { .. } = event {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                    match event {
+                        TrayIconEvent::Click { button, .. } => {
+                            let app = tray.app_handle();
+                            if button == tauri::tray::MouseButton::Left {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
                         }
+                        _ => {}
                     }
                 })
                 .build(app)?;
