@@ -281,48 +281,6 @@ function App() {
         </div>
       </div>
 
-      {/* Info Panel */}
-      <div style={{ background: 'white', borderRadius: '16px', padding: '2rem', marginBottom: '1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-        <h3 style={{ margin: '0 0 1.25rem 0', fontSize: '1.2rem', color: '#2C3E50', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span>ℹ️</span>
-          What We Monitor
-        </h3>
-        
-        <div style={{ display: 'grid', gap: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <span style={{ color: '#4CAF50', fontSize: '1.25rem' }}>✓</span>
-            <div>
-              <div style={{ fontWeight: '600', color: '#2C3E50', fontSize: '0.95rem' }}>Applications used</div>
-              <div style={{ color: '#7F8C8D', fontSize: '0.85rem' }}>Track which programs are running</div>
-            </div>
-          </div>
-          
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <span style={{ color: '#4CAF50', fontSize: '1.25rem' }}>✓</span>
-            <div>
-              <div style={{ fontWeight: '600', color: '#2C3E50', fontSize: '0.95rem' }}>Device information</div>
-              <div style={{ color: '#7F8C8D', fontSize: '0.85rem' }}>System specs and configuration</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <span style={{ color: '#E74C3C', fontSize: '1.25rem' }}>✗</span>
-            <div>
-              <div style={{ fontWeight: '600', color: '#2C3E50', fontSize: '0.95rem' }}>Your work or documents</div>
-              <div style={{ color: '#7F8C8D', fontSize: '0.85rem' }}>We never monitor your actual content</div>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <span style={{ color: '#E74C3C', fontSize: '1.25rem' }}>✗</span>
-            <div>
-              <div style={{ fontWeight: '600', color: '#2C3E50', fontSize: '0.95rem' }}>Keystrokes or passwords</div>
-              <div style={{ color: '#7F8C8D', fontSize: '0.85rem' }}>Your privacy is protected</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Actions */}
       <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
         <button
