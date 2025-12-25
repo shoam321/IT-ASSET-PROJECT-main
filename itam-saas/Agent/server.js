@@ -459,6 +459,15 @@ app.post('/api/agent/usage', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'device_id and app_name are required' });
     }
 
+    // Ensure device exists first (auto-create if needed)
+    await db.upsertDevice({
+      device_id,
+      hostname: device_id, // Use device_id as hostname if not provided
+      os_name: 'Unknown',
+      os_version: 'Unknown',
+      timestamp: Date.now()
+    });
+
     const usageData = await db.insertUsageData({
       device_id,
       app_name,

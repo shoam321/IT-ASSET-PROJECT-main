@@ -14,6 +14,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [lastSync, setLastSync] = useState(null);
   const [syncStatus, setSyncStatus] = useState("Initializing...");
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Configuration
   const API_URL = "https://it-asset-project-production.up.railway.app/api";
@@ -45,13 +46,15 @@ function App() {
     const sendData = async () => {
       try {
         setSyncStatus("Syncing...");
+        setErrorMessage("");
         const result = await invoke('collect_and_send_usage', { authToken });
         setSyncStatus("Active");
         setLastSync(new Date());
-        console.log("Usage data sent:", result);
+        console.log("✅ Usage data sent:", result);
       } catch (err) {
         setSyncStatus("Error");
-        console.error("Failed to send usage data:", err);
+        setErrorMessage(String(err));
+        console.error("❌ Failed to send usage data:", err);
       }
     };
 
@@ -257,6 +260,11 @@ function App() {
             {syncStatus === 'Error' && '⚠️ Connection issue'}
             {syncStatus === 'Initializing...' && '⏳ Starting monitoring...'}
           </div>
+          {errorMessage && (
+            <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#FFF3E0', borderRadius: '8px', fontSize: '0.75rem', color: '#E65100', border: '1px solid #FFB74D', wordBreak: 'break-word' }}>
+              <strong>Error:</strong> {errorMessage}
+            </div>
+          )}
         </div>
 
         {/* Connection Status */}
