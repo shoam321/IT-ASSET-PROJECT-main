@@ -22,7 +22,7 @@ const UsageMonitor = () => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/agent/devices`, {
+      const response = await fetch(`${API_BASE_URL}/api/agent/devices`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -61,7 +61,7 @@ const UsageMonitor = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`${API_BASE_URL}/agent/devices/${deviceId}/usage`, {
+      const response = await fetch(`${API_BASE_URL}/api/agent/devices/${deviceId}/usage`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -88,7 +88,7 @@ const UsageMonitor = () => {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch(`${API_BASE_URL}/agent/apps/usage`, {
+      const response = await fetch(`${API_BASE_URL}/api/agent/apps/usage`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
