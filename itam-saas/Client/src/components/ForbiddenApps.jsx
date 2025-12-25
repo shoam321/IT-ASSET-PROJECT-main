@@ -25,7 +25,6 @@ const ForbiddenApps = () => {
   }, []);
 
   useEffect(() => {
-    // Filter apps based on search and severity
     let filtered = forbiddenApps;
     
     if (searchTerm) {
@@ -147,6 +146,9 @@ const ForbiddenApps = () => {
     } catch (err) {
       setError(err.message);
       setTimeout(() => setError(null), 5000);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getSeverityColor = (severity) => {
@@ -160,18 +162,90 @@ const ForbiddenApps = () => {
   };
 
   const severityInfo = {
-    'Critical': { icon: '🔴', desc: 'Severe security threat or policy violation', color: '#dc2626' },
-    'High': { icon: '🟠', desc: 'Significant risk or policy concern', color: '#ef4444' },
-    'Medium': { icon: '🟡', desc: 'Moderate policy violation', color: '#f59e0b' },
-    'Low': { icon: '🟢', desc: 'Minor policy or productivity concern', color: '#10b981' }
+    'Critical': { icon: '🔴', desc: 'Severe security threat or policy violation' },
+    'High': { icon: '🟠', desc: 'Significant risk or policy concern' },
+    'Medium': { icon: '🟡', desc: 'Moderate policy violation' },
+    'Low': { icon: '🟢', desc: 'Minor policy or productivity concern' }
   };
 
   return (
     <div className="dashboard-container" style={{ maxWidth: '1400px', margin: '0 auto' }}>
+      <div className="dashboard-header" style={{ marginBottom: '24px' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+            <Shield size={32} style={{ color: '#ef4444' }} />
+            <h2 style={{ margin: 0, fontSize: '28px' }}>Forbidden Applications</h2>
+          </div>
+          <p style={{ margin: 0, color: '#64748b', fontSize: '14px' }}>
+            Manage applications that are not allowed to run on monitored devices
+          </p>
+        </div>
+        <button 
+          className="add-button"
+          onClick={() => {
+            setShowAddForm(!showAddForm);
+            setFormErrors({});
+            if (!showAddForm) {
+              setNewApp({ process_name: '', description: '', severity: 'Medium' });
+            }
+          }}
+          style={{ 
+            padding: '12px 20px', 
+            fontSize: '14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            backgroundColor: showAddForm ? '#64748b' : '#3b82f6',
+            fontWeight: '600'
+          }}
+        >
+          {showAddForm ? (
+            <><X size={18} /> Cancel</>
+          ) : (
+            <><Plus size={18} /> Add Application</>
+          )}
+        </button>
+      </div>
+
+      {successMessage && (
+        <div style={{
+          backgroundColor: '#dcfce7',
+          border: '1px solid #86efac',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <CheckCircle size={20} style={{ color: '#16a34a', flexShrink: 0 }} />
+          <span style={{ color: '#166534', fontSize: '14px' }}>{successMessage}</span>
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          backgroundColor: '#fee2e2',
+          border: '1px solid #fca5a5',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          marginBottom: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <AlertTriangle size={20} style={{ color: '#dc2626', flexShrink: 0 }} />
+          <span style={{ color: '#991b1b', fontSize: '14px' }}>{error}</span>
+        </div>
+      )}
+
+      {showAddForm && (
+        <div style={{
+          background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+          padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          animation: 'slideIn 0.3s ease-out'
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
         }}>
           <h3 style={{ color: '#fff', marginTop: 0, marginBottom: '16px', fontSize: '18px' }}>
             Add New Forbidden Application
@@ -240,40 +314,69 @@ const ForbiddenApps = () => {
                 style={{
                   width: '100%',
                   padding: '12px',
-      {/* Stats Grid */}
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                {Object.entries(severityInfo).map(([level, info]) => (
+                  <option key={level} value={level}>
+                    {info.icon} {level} - {info.desc}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: loading ? '#94a3b8' : '#10b981',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '14px',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {loading ? '⏳ Adding...' : <><CheckCircle size={18} /> Add to Forbidden List</>}
+            </button>
+          </form>
+        </div>
+      )}
+
       <div className="stats-grid" style={{ marginBottom: '24px' }}>
         <div className="stat-card" style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' }}>
           <div className="stat-value" style={{ color: '#fff' }}>{forbiddenApps.length}</div>
-          <div className="stat-label" style={{ color: 'rgba(255,255,255,0.9)' }}>Total Forbidden Apps</div>
+          <div className="stat-label" style={{ color: 'rgba(255,255,255,0.9)' }}>Total Apps</div>
         </div>
         <div className="stat-card" style={{ background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)' }}>
           <div className="stat-value" style={{ color: '#fff' }}>
             {forbiddenApps.filter(a => a.severity === 'Critical').length}
           </div>
-          <div className="stat-label" style={{ color: 'rgba(255,255,255,0.9)' }}>🔴 Critical</div>
+          <div className="stat-label" style={{ color: 'rgba(255,255,255,0.9)' }}>Critical</div>
         </div>
         <div className="stat-card" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' }}>
           <div className="stat-value" style={{ color: '#fff' }}>
             {forbiddenApps.filter(a => a.severity === 'High').length}
           </div>
-          <div className="stat-label" style={{ color: 'rgba(255,255,255,0.9)' }}>🟠 High</div>
+          <div className="stat-label" style={{ color: 'rgba(255,255,255,0.9)' }}>High</div>
         </div>
         <div className="stat-card" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
           <div className="stat-value" style={{ color: '#fff' }}>
             {forbiddenApps.filter(a => a.severity === 'Medium').length}
           </div>
-          <div className="stat-label" style={{ color: 'rgba(255,255,255,0.9)' }}>🟡 Medium</div>
+          <div className="stat-label" style={{ color: 'rgba(255,255,255,0.9)' }}>Medium</div>
         </div>
       </div>
 
-      {/* Search and Filter Bar */}
-      <div style={{
-        display: 'flex',
-        gap: '16px',
-        marginBottom: '20px',
-        flexWrap: 'wrap',
-        alignItems: 'center'
-      }}>
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
           <Search size={18} style={{ 
             position: 'absolute', 
@@ -309,10 +412,10 @@ const ForbiddenApps = () => {
           }}
         >
           <option value="All">All Severities</option>
-          <option value="Critical">🔴 Critical</option>
-          <option value="High">🟠 High</option>
-          <option value="Medium">🟡 Medium</option>
-          <option value="Low">🟢 Low</option>
+          <option value="Critical">Critical</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
         </select>
         {(searchTerm || filterSeverity !== 'All') && (
           <button
@@ -327,7 +430,14 @@ const ForbiddenApps = () => {
               border: 'none',
               borderRadius: '8px',
               cursor: 'pointer',
-      {/* Table */}
+              fontSize: '14px'
+            }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       <div className="table-container" style={{ 
         background: '#fff', 
         borderRadius: '12px', 
@@ -337,63 +447,31 @@ const ForbiddenApps = () => {
         {loading && !forbiddenApps.length ? (
           <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-            <p style={{ margin: 0, fontSize: '16px' }}>Loading forbidden applications...</p>
-          </div>
-        ) : filteredApps.length === 0 && searchTerm ? (
-          <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
-            <Search size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-            <p style={{ margin: 0, fontSize: '16px' }}>No applications match your search</p>
-            <button
-              onClick={() => setSearchTerm('')}
-              style={{
-                marginTop: '16px',
-                padding: '8px 16px',
-                backgroundColor: '#3b82f6',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              Clear Search
-            </button>
+            <p style={{ margin: 0 }}>Loading forbidden applications...</p>
           </div>
         ) : forbiddenApps.length === 0 ? (
           <div style={{ padding: '60px', textAlign: 'center', color: '#64748b' }}>
             <Shield size={48} style={{ marginBottom: '16px', opacity: 0.5 }} />
-            <p style={{ margin: 0, fontSize: '16px', marginBottom: '8px' }}>No forbidden apps configured yet</p>
-            <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8' }}>
-              Click "Add Application" to start building your forbidden apps list
-            </p>
+            <p style={{ margin: 0 }}>No forbidden apps configured yet</p>
           </div>
         ) : (
-          <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="data-table" style={{ width: '100%' }}>
             <thead>
-              <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Process Name</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Description</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Severity</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontWeight: '600', color: '#475569' }}>Added</th>
-                <th style={{ padding: '16px', textAlign: 'center', fontWeight: '600', color: '#475569' }}>Actions</th>
+              <tr style={{ backgroundColor: '#f8fafc' }}>
+                <th style={{ padding: '16px', textAlign: 'left' }}>Process Name</th>
+                <th style={{ padding: '16px', textAlign: 'left' }}>Description</th>
+                <th style={{ padding: '16px', textAlign: 'left' }}>Severity</th>
+                <th style={{ padding: '16px', textAlign: 'left' }}>Added</th>
+                <th style={{ padding: '16px', textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredApps.map((app, index) => (
-                <tr 
-                  key={app.id}
-                  style={{
-                    borderBottom: index !== filteredApps.length - 1 ? '1px solid #e2e8f0' : 'none',
-                    backgroundColor: index % 2 === 0 ? '#fff' : '#f8fafc',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f1f5f9'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8fafc'}
-                >
-                  <td style={{ padding: '16px', fontWeight: '600', fontFamily: 'monospace', fontSize: '14px', color: '#1e293b' }}>
+              {filteredApps.map((app) => (
+                <tr key={app.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '16px', fontWeight: '600', fontFamily: 'monospace' }}>
                     {app.process_name}
                   </td>
-                  <td style={{ padding: '16px', color: '#64748b', fontSize: '14px' }}>
+                  <td style={{ padding: '16px', color: '#64748b' }}>
                     {app.description || <span style={{ fontStyle: 'italic', color: '#cbd5e1' }}>No description</span>}
                   </td>
                   <td style={{ padding: '16px' }}>
@@ -404,21 +482,14 @@ const ForbiddenApps = () => {
                         fontSize: '12px',
                         fontWeight: '600',
                         color: '#fff',
-                        backgroundColor: getSeverityColor(app.severity),
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px'
+                        backgroundColor: getSeverityColor(app.severity)
                       }}
                     >
                       {severityInfo[app.severity]?.icon} {app.severity}
                     </span>
                   </td>
-                  <td style={{ padding: '16px', color: '#64748b', fontSize: '14px' }}>
-                    {new Date(app.created_at).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'short', 
-                      day: 'numeric' 
-                    })}
+                  <td style={{ padding: '16px', color: '#64748b' }}>
+                    {new Date(app.created_at).toLocaleDateString()}
                   </td>
                   <td style={{ padding: '16px', textAlign: 'center' }}>
                     <button
@@ -426,20 +497,16 @@ const ForbiddenApps = () => {
                       disabled={loading}
                       style={{
                         padding: '8px 14px',
-                        backgroundColor: loading ? '#cbd5e1' : '#ef4444',
+                        backgroundColor: '#ef4444',
                         color: '#fff',
                         border: 'none',
                         borderRadius: '6px',
-                        cursor: loading ? 'not-allowed' : 'pointer',
+                        cursor: 'pointer',
                         fontSize: '13px',
-                        fontWeight: '600',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s'
+                        gap: '6px'
                       }}
-                      onMouseEnter={(e) => !loading && (e.currentTarget.style.backgroundColor = '#dc2626')}
-                      onMouseLeave={(e) => !loading && (e.currentTarget.style.backgroundColor = '#ef4444')}
                     >
                       <Trash2 size={14} /> Remove
                     </button>
@@ -451,118 +518,11 @@ const ForbiddenApps = () => {
         )}
       </div>
 
-      {/* Results count */}
       {filteredApps.length > 0 && (
-        <div style={{ 
-          marginTop: '16px', 
-          textAlign: 'center', 
-          color: '#64748b', 
-          fontSize: '14px' 
-        }}>
+        <div style={{ marginTop: '16px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
           Showing {filteredApps.length} of {forbiddenApps.length} application{forbiddenApps.length !== 1 ? 's' : ''}
         </div>
-      )}    backgroundColor: '#10b981',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold'
-              }}
-            >
-              ✅ Add to Forbidden List
-            </button>
-          </form>
-        </div>
       )}
-
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{forbiddenApps.length}</div>
-          <div className="stat-label">Total Forbidden Apps</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">
-            {forbiddenApps.filter(a => a.severity === 'Critical').length}
-          </div>
-          <div className="stat-label">Critical</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">
-            {forbiddenApps.filter(a => a.severity === 'High').length}
-          </div>
-          <div className="stat-label">High</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">
-            {forbiddenApps.filter(a => a.severity === 'Medium').length}
-          </div>
-          <div className="stat-label">Medium</div>
-        </div>
-      </div>
-
-      <div className="table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Process Name</th>
-              <th>Description</th>
-              <th>Severity</th>
-              <th>Added</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {forbiddenApps.length === 0 ? (
-              <tr>
-                <td colSpan="5" style={{ textAlign: 'center', padding: '40px' }}>
-                  ℹ️ No forbidden apps configured
-                </td>
-              </tr>
-            ) : (
-              forbiddenApps.map((app) => (
-                <tr key={app.id}>
-                  <td style={{ fontWeight: 'bold', fontFamily: 'monospace' }}>
-                    {app.process_name}
-                  </td>
-                  <td>{app.description || '-'}</td>
-                  <td>
-                    <span
-                      style={{
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                        color: '#fff',
-                        backgroundColor: getSeverityColor(app.severity)
-                      }}
-                    >
-                      {app.severity}
-                    </span>
-                  </td>
-                  <td>{new Date(app.created_at).toLocaleDateString()}</td>
-                  <td>
-                    <button
-                      onClick={() => handleDeleteApp(app.id, app.process_name)}
-                      style={{
-                        padding: '6px 12px',
-                        backgroundColor: '#ef4444',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
-                      🗑️ Delete
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
     </div>
   );
 };
