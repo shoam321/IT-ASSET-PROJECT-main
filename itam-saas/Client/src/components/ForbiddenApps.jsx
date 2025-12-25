@@ -119,7 +119,14 @@ const ForbiddenApps = () => {
       showSuccessMessage(`Successfully added "${added.process_name}" to forbidden list`);
     } catch (err) {
       setError(err.message);
-      setTimeout(() => seAre you sure you want to remove "${processName}" from the forbidden list?\n\nThis will allow the application to run on monitored devices.`)) {
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteApp = async (id, processName) => {
+    if (!window.confirm(`Are you sure you want to remove "${processName}" from the forbidden list?\n\nThis will allow the application to run on monitored devices.`)) {
       return;
     }
 
@@ -141,14 +148,7 @@ const ForbiddenApps = () => {
       setError(err.message);
       setTimeout(() => setError(null), 5000);
     } finally {
-      setLoading(false
-
-      if (!response.ok) throw new Error('Failed to delete forbidden app');
-
-      setForbiddenApps(forbiddenApps.filter(app => app.id !== id));
-      alert(`✅ Removed: ${processName}`);
-    } catch (err) {
-      alert(`❌ Error: ${err.message}`);
+      setLoading(false);
     }
   };
 
