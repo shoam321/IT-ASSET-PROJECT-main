@@ -68,7 +68,7 @@ const AlertHistory = () => {
 
   const fetchAlerts = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/alerts?limit=100`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -88,7 +88,7 @@ const AlertHistory = () => {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/alerts/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -106,7 +106,7 @@ const AlertHistory = () => {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/alerts/${id}`, {
         method: 'PATCH',
         headers: {

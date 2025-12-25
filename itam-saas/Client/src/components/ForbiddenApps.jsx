@@ -20,7 +20,7 @@ const ForbiddenApps = () => {
 
   const fetchForbiddenApps = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/forbidden-apps`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -47,7 +47,7 @@ const ForbiddenApps = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/forbidden-apps`, {
         method: 'POST',
         headers: {
@@ -78,7 +78,7 @@ const ForbiddenApps = () => {
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/forbidden-apps/${id}`, {
         method: 'DELETE',
         headers: {
