@@ -13,11 +13,11 @@
     "windows": [
       {
         "title": "IT Asset Agent",
-        "width": 400,
-        "height": 300,
-        "resizable": false,
+        "width": 500,
+        "height": 600,
+        "resizable": true,
         "center": true,
-        "visible": false,
+        "visible": true,
         "decorations": true,
         "alwaysOnTop": false,
         "skipTaskbar": false
