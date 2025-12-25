@@ -1,0 +1,11 @@
+﻿Deployment Package Info
+========================
+Built: 2025-12-25 17:13
+Version: 0.1.0
+Size: 16.63 MB
+Platform: Windows x64
+
+API: https://it-asset-project-production.up.railway.app  
+Dashboard: https://it-asset-project.vercel.app
+
+Installation: Copy folder to target PC and run tauriagent.exe
