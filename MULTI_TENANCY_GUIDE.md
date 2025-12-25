@@ -240,7 +240,30 @@ export async function setCurrentUserId(userId) {
 
 ---
 
-### Bug #3: JWT Key Inconsistency
+### Bug #3: SET Command with Parameterized Queries ⚠️ CRITICAL
+**Problem:** Error: `syntax error at or near "$1"` when calling `setCurrentUserId()`
+
+**Cause:** PostgreSQL's `SET` command does NOT support parameterized queries like `SET app.current_user_id = $1`
+
+**Fix:** Use `set_config()` function instead:
+```javascript
+// WRONG - Causes syntax error:
+await pool.query('SET app.current_user_id = $1', [userId]);
+
+// CORRECT - Works perfectly:
+await pool.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
+```
+
+**Lesson:** 
+- `SET` command in PostgreSQL doesn't support `$1` placeholders
+- Use `set_config(setting_name, new_value, is_local)` function for dynamic values
+- `is_local=false` means variable persists for entire session (not just transaction)
+- Must convert userId to string with `.toString()` for set_config()
+- This was the FINAL fix that made multi-tenancy work in production!
+
+---
+
+### Bug #4: JWT Key Inconsistency
 **Problem:** Frontend couldn't read userId from JWT
 
 **Cause:** Backend used `{ id: user.id }`, frontend expected `{ userId: ... }`
@@ -251,7 +274,7 @@ export async function setCurrentUserId(userId) {
 
 ---
 
-### Bug #4: Missing user_id in Device Creation
+### Bug #5: Missing user_id in Device Creation
 **Problem:** Foreign key violation when creating devices
 
 **Cause:** Devices table now has `user_id NOT NULL`, but code didn't pass it
@@ -259,6 +282,18 @@ export async function setCurrentUserId(userId) {
 **Fix:** Added `user_id: userId` to all `upsertDevice()` and `insertUsageData()` calls
 
 **Lesson:** After schema changes, update ALL code paths that insert data
+
+---
+
+## Summary of All Bugs Fixed
+
+1. ❌ Wrong table name (`users` vs `auth_users`) → ✅ Verified schema first
+2. ❌ SET LOCAL doesn't work with pooling → ✅ Used SET instead  
+3. ❌ **SET command doesn't support $1 parameters** → ✅ **Used set_config() function** 🔑
+4. ❌ JWT key mismatch (`id` vs `userId`) → ✅ Consistent naming
+5. ❌ Missing user_id in inserts → ✅ Added to all device/usage creation
+
+**The Critical Fix:** Bug #3 was the final issue - PostgreSQL's `SET` command cannot be parameterized. Using `set_config('app.current_user_id', $1, false)` solved it!
 
 ---
 
