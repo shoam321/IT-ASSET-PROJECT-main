@@ -19,7 +19,45 @@ struct AgentConfig {
     poll_interval: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct LoginRequest {
+    username: String,
+    password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct LoginResponse {
+    token: String,
+}
+
 // Tauri commands
+#[tauri::command]
+async fn login_user(username: String, password: String) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let url = "https://it-asset-project-production.up.railway.app/api/auth/login";
+    
+    let login_data = LoginRequest { username, password };
+    
+    let response = client
+        .post(url)
+        .json(&login_data)
+        .send()
+        .await
+        .map_err(|e| format!("Network error: {}", e))?;
+    
+    if !response.status().is_success() {
+        let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
+        return Err(format!("Login failed: {}", error_text));
+    }
+    
+    let login_response: LoginResponse = response
+        .json()
+        .await
+        .map_err(|e| format!("Invalid response: {}", e))?;
+    
+    Ok(login_response.token)
+}
+
 #[tauri::command]
 fn get_agent_status() -> String {
     "Monitoring Active".to_string()
@@ -204,6 +242,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            login_user,
             get_agent_status,
             send_usage_data,
             send_heartbeat,

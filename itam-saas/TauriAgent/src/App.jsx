@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
 function App() {
@@ -17,23 +18,13 @@ function App() {
     setLoginError("");
 
     try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Login failed");
-      }
-
+      const token = await invoke('login_user', { username, password });
+      
       setIsAuthenticated(true);
       setLoginError("");
-      alert(`✅ Login successful! Token: ${data.token.substring(0, 20)}...`);
+      alert(`✅ Login successful! Token: ${token.substring(0, 20)}...`);
     } catch (err) {
-      setLoginError(err.message);
+      setLoginError(err);
     }
   };
 
