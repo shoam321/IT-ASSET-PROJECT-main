@@ -19,8 +19,10 @@ import pool from './db.js';
  * - Admins can create more users/admins via API (future feature)
  * 
  * IMPORTANT FIXES LEARNED:
- * - Use SET (not SET LOCAL) because SET LOCAL only works in transactions
- * - With connection pooling, SET persists for the connection session
+ * - Use set_config() function (not SET command) because SET doesn't support $1 parameters
+ * - SET command causes "syntax error at or near $1" 
+ * - set_config() is the proper way to set session variables with parameterized queries
+ * - With connection pooling, set_config(..., false) persists for the connection session
  * - Must call this BEFORE any database query that needs user filtering
  * 
  * SECURITY BENEFITS:
@@ -30,7 +32,10 @@ import pool from './db.js';
  */
 export async function setCurrentUserId(userId) {
   try {
-    await pool.query('SET app.current_user_id = $1', [userId]);
+    // Use set_config() function instead of SET command
+    // set_config(setting_name, new_value, is_local)
+    // is_local=false means it persists for the session (works with connection pooling)
+    await pool.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
   } catch (error) {
     console.error('Error setting current user ID:', error);
     throw error;
