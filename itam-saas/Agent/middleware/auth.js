@@ -36,15 +36,52 @@ export const requireAdmin = (req, res, next) => {
 };
 
 /**
+ * Get permissions for a role
+ */
+const getRolePermissions = (role) => {
+  const permissions = {
+    admin: ['read:all_devices', 'write:all_devices', 'manage:users', 'read:own_devices', 'write:own_devices'],
+    user: ['read:own_devices', 'write:own_devices']
+  };
+  return permissions[role] || permissions.user;
+};
+
+/**
+ * Middleware to check if user has required permissions
+ */
+export const authorize = (...allowedPermissions) => {
+  return (req, res, next) => {
+    const userPermissions = req.user.permissions || getRolePermissions(req.user.role);
+    
+    const hasPermission = allowedPermissions.some(permission =>
+      userPermissions.includes(permission)
+    );
+    
+    if (!hasPermission) {
+      return res.status(403).json({ 
+        error: 'Forbidden: Insufficient permissions',
+        required: allowedPermissions,
+        userHas: userPermissions
+      });
+    }
+    
+    next();
+  };
+};
+
+/**
  * Generate JWT token for a user
  */
 export const generateToken = (user) => {
+  const permissions = getRolePermissions(user.role);
+  
   return jwt.sign(
     {
-      id: user.id,
+      userId: user.id,
       username: user.username,
       email: user.email,
-      role: user.role
+      role: user.role,
+      permissions: permissions
     },
     JWT_SECRET,
     { expiresIn: '7d' } // Token expires in 7 days

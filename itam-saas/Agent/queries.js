@@ -1,6 +1,19 @@
 import pool from './db.js';
 
 /**
+ * Set the current user ID for PostgreSQL Row-Level Security
+ * This session variable is used by RLS policies to filter data
+ */
+export async function setCurrentUserId(userId) {
+  try {
+    await pool.query('SET LOCAL app.current_user_id = $1', [userId]);
+  } catch (error) {
+    console.error('Error setting current user ID:', error);
+    throw error;
+  }
+}
+
+/**
  * Verify database tables exist (no automatic creation)
  */
 export async function initDatabase() {
@@ -601,22 +614,23 @@ export async function searchContracts(query) {
  * Upsert device (insert or update)
  */
 export async function upsertDevice(deviceData) {
-  const { device_id, hostname, os_name, os_version } = deviceData;
+  const { device_id, hostname, os_name, os_version, user_id } = deviceData;
   
   try {
     const result = await pool.query(
-      `INSERT INTO devices (device_id, hostname, os_name, os_version, last_seen, status)
-       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, 'Active')
+      `INSERT INTO devices (device_id, hostname, os_name, os_version, user_id, last_seen, status)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, 'Active')
        ON CONFLICT (device_id) 
        DO UPDATE SET 
          hostname = COALESCE($2, devices.hostname),
          os_name = COALESCE($3, devices.os_name),
          os_version = COALESCE($4, devices.os_version),
+         user_id = COALESCE($5, devices.user_id),
          last_seen = CURRENT_TIMESTAMP,
          status = 'Active',
          updated_at = CURRENT_TIMESTAMP
        RETURNING *`,
-      [device_id, hostname, os_name, os_version]
+      [device_id, hostname, os_name, os_version, user_id]
     );
     return result.rows[0];
   } catch (error) {
@@ -629,14 +643,14 @@ export async function upsertDevice(deviceData) {
  * Insert usage data
  */
 export async function insertUsageData(usageData) {
-  const { device_id, app_name, window_title, duration, timestamp } = usageData;
+  const { device_id, app_name, window_title, duration, timestamp, user_id } = usageData;
   
   try {
     const result = await pool.query(
-      `INSERT INTO device_usage (device_id, app_name, window_title, duration, timestamp)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO device_usage (device_id, app_name, window_title, duration, timestamp, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [device_id, app_name, window_title || '', duration || 0, timestamp || Date.now()]
+      [device_id, app_name, window_title || '', duration || 0, timestamp || Date.now(), user_id]
     );
     return result.rows[0];
   } catch (error) {

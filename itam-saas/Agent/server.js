@@ -454,15 +454,20 @@ app.delete('/api/contracts/:id', authenticateToken, async (req, res) => {
 app.post('/api/agent/usage', authenticateToken, async (req, res) => {
   try {
     const { device_id, app_name, window_title, duration, timestamp } = req.body;
+    const { userId } = req.user; // Get from JWT token (secure)
     
     if (!device_id || !app_name) {
       return res.status(400).json({ error: 'device_id and app_name are required' });
     }
 
+    // Set PostgreSQL session variable for Row-Level Security
+    await db.setCurrentUserId(userId);
+
     // Ensure device exists first (auto-create if needed)
     await db.upsertDevice({
       device_id,
-      hostname: device_id, // Use device_id as hostname if not provided
+      user_id: userId, // Associate device with user
+      hostname: device_id,
       os_name: 'Unknown',
       os_version: 'Unknown',
       timestamp: Date.now()
@@ -470,6 +475,7 @@ app.post('/api/agent/usage', authenticateToken, async (req, res) => {
 
     const usageData = await db.insertUsageData({
       device_id,
+      user_id: userId, // Associate usage with user
       app_name,
       window_title: window_title || '',
       duration: duration || 0,
@@ -490,17 +496,22 @@ app.post('/api/agent/usage', authenticateToken, async (req, res) => {
 app.post('/api/agent/heartbeat', authenticateToken, async (req, res) => {
   try {
     const { device_id, timestamp, hostname, os_name, os_version } = req.body;
+    const { userId } = req.user; // From JWT
     
     if (!device_id) {
       return res.status(400).json({ error: 'device_id is required' });
     }
+
+    // Set PostgreSQL session variable for Row-Level Security
+    await db.setCurrentUserId(userId);
 
     // Update or create device
     await db.upsertDevice({
       device_id,
       hostname,
       os_name,
-      os_version
+      os_version,
+      user_id: userId
     });
 
     // Record heartbeat
@@ -544,9 +555,18 @@ app.post('/api/agent/apps', authenticateToken, async (req, res) => {
 // Get device usage statistics
 app.get('/api/agent/devices', authenticateToken, async (req, res) => {
   try {
+    const { userId, role } = req.user; // From JWT
+    
+    // Set PostgreSQL session variable for Row-Level Security
+    await db.setCurrentUserId(userId);
+    
+    // Row-Level Security will automatically filter based on user
+    // Admins see all, regular users see only theirs
     const devices = await db.getAllDevices();
+    
     res.json(devices);
   } catch (error) {
+    console.error('Error fetching devices:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -556,10 +576,16 @@ app.get('/api/agent/devices/:deviceId/usage', authenticateToken, async (req, res
   try {
     const { deviceId } = req.params;
     const { startDate, endDate } = req.query;
+    const { userId } = req.user; // From JWT
     
+    // Set PostgreSQL session variable for Row-Level Security
+    await db.setCurrentUserId(userId);
+    
+    // Row-Level Security will automatically filter - users can only see their own device usage
     const usage = await db.getDeviceUsageStats(deviceId, startDate, endDate);
     res.json(usage);
   } catch (error) {
+    console.error('Error fetching device usage:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -568,9 +594,16 @@ app.get('/api/agent/devices/:deviceId/usage', authenticateToken, async (req, res
 app.get('/api/agent/apps/usage', authenticateToken, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
+    const { userId } = req.user; // From JWT
+    
+    // Set PostgreSQL session variable for Row-Level Security
+    await db.setCurrentUserId(userId);
+    
+    // Row-Level Security will automatically filter - users see only their devices' apps
     const appUsage = await db.getAppUsageSummary(startDate, endDate);
     res.json(appUsage);
   } catch (error) {
+    console.error('Error fetching app usage:', error);
     res.status(500).json({ error: error.message });
   }
 });
