@@ -10,7 +10,7 @@ const UsageMonitor = () => {
   const [error, setError] = useState(null);
   const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app';
 
   // Fetch all devices
   const fetchDevices = async () => {
