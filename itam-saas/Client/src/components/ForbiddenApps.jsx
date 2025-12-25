@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Trash2, Search, Edit2 } from 'lucide-react';
+import { Plus, X, Trash2, Search } from 'lucide-react';
 
 const ForbiddenApps = () => {
   const [forbiddenApps, setForbiddenApps] = useState([]);

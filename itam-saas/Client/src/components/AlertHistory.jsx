@@ -99,7 +99,6 @@ const AlertHistory = () => {
 
       fetchAlerts();
       fetchStats();
-      toast.success(`✅ Alert marked as ${newStatus}`);
     } catch (err) {
       setError(err.message);
       setTimeout(() => setError(null), 3000);
