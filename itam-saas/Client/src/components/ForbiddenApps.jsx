@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Trash2, Search } from 'lucide-react';
+import { Plus, X, Trash2, Search, Edit2, Check, XCircle } from 'lucide-react';
 
 const ForbiddenApps = () => {
   const [forbiddenApps, setForbiddenApps] = useState([]);
@@ -8,6 +8,7 @@ const ForbiddenApps = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingApp, setEditingApp] = useState(null);
   const [newApp, setNewApp] = useState({
     process_name: '',
     description: '',
@@ -112,6 +113,48 @@ const ForbiddenApps = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpdateApp = async (id) => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_URL}/forbidden-apps/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          process_name: editingApp.process_name.trim().toLowerCase(),
+          description: editingApp.description,
+          severity: editingApp.severity
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update forbidden app');
+      }
+
+      const updated = await response.json();
+      setForbiddenApps(forbiddenApps.map(app => app.id === id ? updated : app));
+      setEditingApp(null);
+      showSuccessMessage(`Updated "${updated.process_name}"`);
+    } catch (err) {
+      setError(err.message);
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startEditing = (app) => {
+    setEditingApp({ ...app });
+  };
+
+  const cancelEditing = () => {
+    setEditingApp(null);
   };
 
   const getSeverityColor = (severity) => {
@@ -243,24 +286,93 @@ const ForbiddenApps = () => {
               ) : (
                 filteredApps.map((app) => (
                   <tr key={app.id} className="border-b border-slate-600 hover:bg-slate-600 transition">
-                    <td className="px-6 py-4 text-white font-medium font-mono">{app.process_name}</td>
-                    <td className="px-6 py-4 text-slate-300">{app.description || '-'}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(app.severity)}`}>
-                        {app.severity}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-slate-300">
-                      {new Date(app.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleDeleteApp(app.id, app.process_name)}
-                        className="text-red-400 hover:text-red-300 transition"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
+                    {editingApp && editingApp.id === app.id ? (
+                      // Edit mode
+                      <>
+                        <td className="px-6 py-4">
+                          <input
+                            type="text"
+                            value={editingApp.process_name}
+                            onChange={(e) => setEditingApp({ ...editingApp, process_name: e.target.value })}
+                            className="w-full px-2 py-1 bg-slate-700 border border-slate-500 rounded text-white font-mono text-sm"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <input
+                            type="text"
+                            value={editingApp.description || ''}
+                            onChange={(e) => setEditingApp({ ...editingApp, description: e.target.value })}
+                            className="w-full px-2 py-1 bg-slate-700 border border-slate-500 rounded text-white text-sm"
+                            placeholder="Description"
+                          />
+                        </td>
+                        <td className="px-6 py-4">
+                          <select
+                            value={editingApp.severity}
+                            onChange={(e) => setEditingApp({ ...editingApp, severity: e.target.value })}
+                            className="px-2 py-1 bg-slate-700 border border-slate-500 rounded text-white text-sm"
+                          >
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Critical">Critical</option>
+                          </select>
+                        </td>
+                        <td className="px-6 py-4 text-slate-300 text-sm">
+                          {new Date(app.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleUpdateApp(app.id)}
+                              className="text-green-400 hover:text-green-300 transition"
+                              title="Save"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={cancelEditing}
+                              className="text-slate-400 hover:text-slate-300 transition"
+                              title="Cancel"
+                            >
+                              <XCircle className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      // View mode
+                      <>
+                        <td className="px-6 py-4 text-white font-medium font-mono">{app.process_name}</td>
+                        <td className="px-6 py-4 text-slate-300">{app.description || '-'}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${getSeverityColor(app.severity)}`}>
+                            {app.severity}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-300">
+                          {new Date(app.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => startEditing(app)}
+                              className="text-blue-400 hover:text-blue-300 transition"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteApp(app.id, app.process_name)}
+                              className="text-red-400 hover:text-red-300 transition"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))
               )}
