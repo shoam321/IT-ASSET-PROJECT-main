@@ -8,9 +8,13 @@ import {
   useEdgesState,
   addEdge,
   Panel,
+  MarkerType,
 } from '@xyflow/react';
-import { Save, Download, Plus, Server, Monitor, Wifi, Shield } from 'lucide-react';
+import { Save, Download, Plus, Server, Monitor, Wifi, Shield, AlignLeft, Grid3x3 } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
+
+const SNAP_GRID = [20, 20]; // Snap to 20px grid
+const MIN_DISTANCE = 100; // Minimum distance between nodes
 
 const CustomDeviceNode = ({ data }) => {
   const getStatusColor = (status) => {
@@ -19,8 +23,10 @@ const CustomDeviceNode = ({ data }) => {
     return 'bg-red-500';
   };
 
+  const borderColor = data.overlapping ? 'border-red-500' : 'border-slate-600';
+
   return (
-    <div className="bg-slate-700 border-2 border-slate-600 rounded-lg p-4 min-w-[200px] shadow-xl hover:border-blue-500 transition-all">
+    <div className={`bg-slate-700 border-2 ${borderColor} rounded-lg p-4 min-w-[200px] shadow-xl hover:border-blue-500 transition-all`}>
       <div className="flex items-center gap-3 mb-2">
         <div className={`w-3 h-3 rounded-full ${getStatusColor(data.status)} shadow-lg`}></div>
         <span className="text-lg">{data.icon}</span>
@@ -47,12 +53,49 @@ const CustomDeviceNode = ({ data }) => {
           )}
         </div>
       )}
+      {data.overlapping && (
+        <div className="mt-2 text-xs text-red-400 font-semibold">⚠️ Overlapping!</div>
+      )}
     </div>
   );
 };
 
 const nodeTypes = {
   custom: CustomDeviceNode,
+};
+
+// Connection type styles
+const connectionTypes = {
+  ethernet: { 
+    label: '🔵 Ethernet', 
+    color: '#3b82f6', 
+    style: { strokeWidth: 2, stroke: '#3b82f6' },
+    animated: false
+  },
+  fiber: { 
+    label: '🟢 Fiber Optic', 
+    color: '#22c55e', 
+    style: { strokeWidth: 3, stroke: '#22c55e' },
+    animated: true
+  },
+  wifi: { 
+    label: '📡 WiFi', 
+    color: '#f97316', 
+    style: { strokeWidth: 2, stroke: '#f97316', strokeDasharray: '5,5' },
+    animated: false
+  },
+  vpn: { 
+    label: '🔒 VPN', 
+    color: '#a855f7', 
+    style: { strokeWidth: 2, stroke: '#a855f7' },
+    animated: true
+  },
+  power: { 
+    label: '⚡ Power', 
+    color: '#eab308', 
+    style: { strokeWidth: 2, stroke: '#eab308' },
+    animated: false
+  },
 };
 
 export default function NetworkTopology() {
@@ -62,6 +105,9 @@ export default function NetworkTopology() {
   const [savedTopologies, setSavedTopologies] = useState([]);
   const [currentTopologyName, setCurrentTopologyName] = useState('');
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [connectionType, setConnectionType] = useState('ethernet');
+  const [selectedEdge, setSelectedEdge] = useState(null);
+  const [showEdgePanel, setShowEdgePanel] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
@@ -69,6 +115,33 @@ export default function NetworkTopology() {
   useEffect(() => {
     fetchDevices();
   }, []);
+
+  // Check for overlapping nodes
+  useEffect(() => {
+    checkOverlaps();
+  }, [nodes]);
+
+  const checkOverlaps = () => {
+    const updatedNodes = nodes.map((node, idx) => {
+      const overlapping = nodes.some((otherNode, otherIdx) => {
+        if (idx === otherIdx) return false;
+        const distance = Math.sqrt(
+          Math.pow(node.position.x - otherNode.position.x, 2) +
+          Math.pow(node.position.y - otherNode.position.y, 2)
+        );
+        return distance < MIN_DISTANCE;
+      });
+      
+      return {
+        ...node,
+        data: { ...node.data, overlapping }
+      };
+    });
+
+    if (JSON.stringify(updatedNodes) !== JSON.stringify(nodes)) {
+      setNodes(updatedNodes);
+    }
+  };
 
   const fetchDevices = async () => {
     try {
@@ -90,9 +163,68 @@ export default function NetworkTopology() {
   };
 
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge({ ...params, animated: true }, eds)),
-    [setEdges]
+    (params) => {
+      const connectionStyle = connectionTypes[connectionType];
+      setEdges((eds) => addEdge({ 
+        ...params, 
+        animated: connectionStyle.animated,
+        style: connectionStyle.style,
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: connectionStyle.color,
+        },
+        data: { type: connectionType, label: '' }
+      }, eds));
+    },
+    [setEdges, connectionType]
   );
+
+  const onEdgeClick = useCallback((event, edge) => {
+    setSelectedEdge(edge);
+    setShowEdgePanel(true);
+  }, []);
+
+  const deleteEdge = () => {
+    if (selectedEdge) {
+      setEdges((eds) => eds.filter((e) => e.id !== selectedEdge.id));
+      setShowEdgePanel(false);
+      setSelectedEdge(null);
+    }
+  };
+
+  const updateEdgeLabel = (label) => {
+    if (selectedEdge) {
+      setEdges((eds) =>
+        eds.map((e) =>
+          e.id === selectedEdge.id ? { ...e, label, labelStyle: { fill: '#fff', fontWeight: 600 } } : e
+        )
+      );
+    }
+  };
+
+  const autoArrange = () => {
+    const arranged = nodes.map((node, idx) => {
+      const row = Math.floor(idx / 4);
+      const col = idx % 4;
+      return {
+        ...node,
+        position: { x: col * 250 + 100, y: row * 200 + 100 }
+      };
+    });
+    setNodes(arranged);
+  };
+
+  const alignHorizontally = () => {
+    if (nodes.length === 0) return;
+    const avgY = nodes.reduce((sum, n) => sum + n.position.y, 0) / nodes.length;
+    setNodes(nodes.map(n => ({ ...n, position: { ...n.position, y: avgY } })));
+  };
+
+  const alignVertically = () => {
+    if (nodes.length === 0) return;
+    const avgX = nodes.reduce((sum, n) => sum + n.position.x, 0) / nodes.length;
+    setNodes(nodes.map(n => ({ ...n, position: { ...n.position, x: avgX } })));
+  };
 
   const addDeviceNode = (type, icon, label) => {
     const newNode = {
@@ -163,8 +295,23 @@ export default function NetworkTopology() {
   return (
     <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex">
       {/* Sidebar */}
-      <div className="w-64 bg-slate-800 border-r border-slate-700 p-4 overflow-y-auto">
+      <div className="w-72 bg-slate-800 border-r border-slate-700 p-4 overflow-y-auto">
         <h2 className="text-white font-bold text-lg mb-4">Device Palette</h2>
+        
+        {/* Connection Type Selector */}
+        <div className="mb-6">
+          <h3 className="text-slate-400 text-sm font-semibold mb-3">Connection Type</h3>
+          <select
+            value={connectionType}
+            onChange={(e) => setConnectionType(e.target.value)}
+            className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm"
+          >
+            {Object.entries(connectionTypes).map(([key, value]) => (
+              <option key={key} value={key}>{value.label}</option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-400 mt-2">Draw connections with selected type</p>
+        </div>
         
         {/* Device Types */}
         <div className="mb-6">
@@ -229,7 +376,10 @@ export default function NetworkTopology() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onEdgeClick={onEdgeClick}
           nodeTypes={nodeTypes}
+          snapToGrid={true}
+          snapGrid={SNAP_GRID}
           fitView
           className="bg-slate-900"
         >
@@ -237,12 +387,42 @@ export default function NetworkTopology() {
           <MiniMap 
             className="bg-slate-800 border-slate-600" 
             nodeColor={(node) => {
+              if (node.data.overlapping) return '#ef4444';
               if (node.data.status === 'online') return '#22c55e';
               if (node.data.status === 'idle') return '#eab308';
               return '#ef4444';
             }}
           />
           <Background variant="dots" gap={16} size={1} color="#475569" />
+          
+          <Panel position="top-left" className="flex flex-col gap-2">
+            <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-lg">
+              <h3 className="text-white text-sm font-semibold mb-2">Layout Tools</h3>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={autoArrange}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-xs transition flex items-center gap-2"
+                >
+                  <Grid3x3 className="w-3 h-3" />
+                  Auto Arrange
+                </button>
+                <button
+                  onClick={alignHorizontally}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-xs transition flex items-center gap-2"
+                >
+                  <AlignLeft className="w-3 h-3" />
+                  Align Horizontal
+                </button>
+                <button
+                  onClick={alignVertically}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 py-2 rounded text-xs transition flex items-center gap-2"
+                >
+                  <AlignLeft className="w-3 h-3 rotate-90" />
+                  Align Vertical
+                </button>
+              </div>
+            </div>
+          </Panel>
           
           <Panel position="top-right" className="flex gap-2">
             <button
@@ -261,6 +441,44 @@ export default function NetworkTopology() {
             </button>
           </Panel>
         </ReactFlow>
+
+        {/* Edge Edit Panel */}
+        {showEdgePanel && selectedEdge && (
+          <div className="absolute top-4 right-4 bg-slate-800 border border-slate-600 rounded-lg p-4 w-80 z-50 shadow-2xl">
+            <h3 className="text-white font-bold mb-3">Connection Settings</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-slate-300 text-sm mb-1 block">Connection Label</label>
+                <input
+                  type="text"
+                  placeholder="e.g., 1 Gbps, VLAN 100"
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded px-3 py-2 text-sm"
+                  onChange={(e) => updateEdgeLabel(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-slate-300 text-sm mb-1 block">Connection Type</label>
+                <div className="text-sm text-slate-400">
+                  {connectionTypes[selectedEdge.data?.type || 'ethernet'].label}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={deleteEdge}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded transition"
+                >
+                  Delete
+                </button>
+                <button
+                  onClick={() => setShowEdgePanel(false)}
+                  className="flex-1 bg-slate-600 hover:bg-slate-500 text-white py-2 rounded transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Save Dialog */}
         {showSaveDialog && (
