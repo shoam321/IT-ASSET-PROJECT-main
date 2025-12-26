@@ -9,6 +9,7 @@ const AlertHistory = () => {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
   const [socket, setSocket] = useState(null);
+  const [wsError, setWsError] = useState(null);
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app';
 
@@ -26,6 +27,12 @@ const AlertHistory = () => {
 
     newSocket.on('connect', () => {
       console.log('🔌 Connected to alert WebSocket');
+      setWsError(null);
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('WebSocket connection error:', err);
+      setWsError('Failed to connect to real-time updates. Check your internet connection or try refreshing the page.');
     });
 
     newSocket.on('security-alert', (alert) => {
@@ -135,6 +142,27 @@ const AlertHistory = () => {
       {error && (
         <div className="mb-6 p-4 bg-red-900 border border-red-700 rounded-lg">
           <p className="text-red-200">{error}</p>
+        </div>
+      )}
+
+      {wsError && (
+        <div className="mb-6 p-4 bg-yellow-900 border border-yellow-700 rounded-lg">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <p className="text-yellow-200 font-semibold mb-2">Real-time Updates Unavailable</p>
+              <p className="text-yellow-300 text-sm mb-3">{wsError}</p>
+              <div className="text-xs text-yellow-400 bg-yellow-950 p-3 rounded border border-yellow-800">
+                <strong>💡 Troubleshooting Steps:</strong>
+                <ol className="mt-2 ml-4 list-decimal space-y-1">
+                  <li>Check your internet connection</li>
+                  <li>Refresh the page (F5)</li>
+                  <li>Clear browser cache and try again</li>
+                  <li>If issue persists, use the Refresh button to manually update alerts</li>
+                </ol>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
