@@ -365,42 +365,69 @@ export default function NetworkTopology() {
         
         {/* Device Types */}
         <div className="mb-6">
+          <h3 className="text-slate-400 text-sm font-semibold mb-3">End Devices</h3>
+          <div className="space-y-2">
+            <button
+              onClick={() => addDeviceNode('pc', '💻', 'PC')}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Monitor className="w-4 h-4" />
+              Add PC
+            </button>
+            <button
+              onClick={() => addDeviceNode('laptop', '💼', 'Laptop')}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Monitor className="w-4 h-4" />
+              Add Laptop
+            </button>
+            <button
+              onClick={() => addDeviceNode('printer', '🖨️', 'Printer')}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Printer
+            </button>
+            <button
+              onClick={() => addDeviceNode('scanner', '📷', 'Scanner')}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Scanner
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
           <h3 className="text-slate-400 text-sm font-semibold mb-3">Network Devices</h3>
           <div className="space-y-2">
             <button
+              onClick={() => addDeviceNode('lan-switch', '🔌', 'LAN Switch')}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Wifi className="w-4 h-4" />
+              Add LAN Switch
+            </button>
+            <button
+              onClick={() => addDeviceNode('wan-router', '🌐', 'WAN Router')}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Server className="w-4 h-4" />
+              Add WAN Router
+            </button>
+            <button
+              onClick={() => addDeviceNode('firewall', '🔒', 'Firewall')}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Shield className="w-4 h-4" />
+              Add Firewall
+            </button>
+            <button
               onClick={() => addDeviceNode('server', '🖥️', 'Server')}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2"
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
             >
               <Server className="w-4 h-4" />
               Add Server
-            </button>
-            <button
-              onClick={() => addDeviceNode('switch', '🔌', 'Switch')}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2"
-            >
-              <Wifi className="w-4 h-4" />
-              Add Switch
-            </button>
-            <button
-              onClick={() => addDeviceNode('workstation', '💻', 'Workstation')}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2"
-            >
-              <Monitor className="w-4 h-4" />
-              Add Workstation
-            </button>
-            <button
-              onClick={() => addDeviceNode('firewall', '🔒', 'Firewall')}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2"
-            >
-              <Shield className="w-4 h-4" />
-              Add Firewall
-            </button>
-            <button
-              onClick={() => addDeviceNode('firewall', '🔒', 'Firewall')}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2"
-            >
-              <Shield className="w-4 h-4" />
-              Add Firewall
             </button>
           </div>
         </div>
