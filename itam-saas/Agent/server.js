@@ -98,6 +98,24 @@ async function startServer() {
         console.error('⚠️ Alert Service failed to initialize:', alertError.message);
       }
       
+      // Set up automatic alert cleanup every 5 hours
+      const CLEANUP_INTERVAL = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
+      setInterval(async () => {
+        try {
+          await db.cleanupOldAlerts(5);
+        } catch (error) {
+          console.error('⚠️ Alert cleanup failed:', error.message);
+        }
+      }, CLEANUP_INTERVAL);
+      console.log('✅ Alert cleanup scheduled (every 5 hours)');
+      
+      // Run initial cleanup
+      try {
+        await db.cleanupOldAlerts(5);
+      } catch (error) {
+        console.error('⚠️ Initial alert cleanup failed:', error.message);
+      }
+      
       return;
     } catch (error) {
       retries--;

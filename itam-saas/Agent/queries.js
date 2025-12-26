@@ -1104,3 +1104,25 @@ export async function getDeviceAlerts(device_id, limit = 50) {
     throw error;
   }
 }
+
+/**
+ * Cleanup old alerts (older than specified hours)
+ * Prevents database from growing too large and slowing down queries
+ */
+export async function cleanupOldAlerts(hoursOld = 5) {
+  try {
+    const result = await pool.query(
+      `DELETE FROM security_alerts 
+       WHERE created_at < NOW() - INTERVAL '${hoursOld} hours'
+       RETURNING id`,
+    );
+    const deletedCount = result.rowCount;
+    if (deletedCount > 0) {
+      console.log(`🧹 Cleaned up ${deletedCount} alerts older than ${hoursOld} hours`);
+    }
+    return deletedCount;
+  } catch (error) {
+    console.error('Error cleaning up old alerts:', error);
+    throw error;
+  }
+}
