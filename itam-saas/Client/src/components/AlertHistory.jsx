@@ -19,7 +19,7 @@ const AlertHistory = () => {
     // Connect to WebSocket for real-time alerts
     const newSocket = io(API_URL, {
       auth: {
-        token: localStorage.getItem('token')
+        token: localStorage.getItem('authToken')
       },
       transports: ['websocket', 'polling']
     });
@@ -160,9 +160,14 @@ const AlertHistory = () => {
           </select>
         </div>
         <div className="flex items-center gap-3">
-          <span className={`text-xs px-2 py-1 rounded ${socket?.connected ? 'bg-green-900 text-green-200' : 'bg-red-900 text-red-200'}`}>
-            {socket?.connected ? '● Live' : '● Offline'}
-          </span>
+          <div className="flex flex-col items-end gap-1">
+            <span className={`text-xs px-3 py-1.5 rounded-lg font-semibold ${socket?.connected ? 'bg-green-900 text-green-200 border border-green-700' : 'bg-red-900 text-red-200 border border-red-700'}`}>
+              {socket?.connected ? '● Live Updates' : '● Offline'}
+            </span>
+            <span className="text-xs text-slate-400">
+              {socket?.connected ? 'Real-time monitoring active' : 'Auto-refresh disabled - click Refresh'}
+            </span>
+          </div>
           <button
             onClick={fetchAlerts}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
