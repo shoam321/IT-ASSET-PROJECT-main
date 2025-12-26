@@ -12,13 +12,15 @@ const AlertHistory = () => {
   const [wsError, setWsError] = useState(null);
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app';
+  const WS_URL = API_URL.replace('/api', ''); // Remove /api for WebSocket connection
 
   useEffect(() => {
     fetchAlerts();
     fetchStats();
 
     // Connect to WebSocket for real-time alerts
-    const newSocket = io(API_URL, {
+    const newSocket = io(WS_URL, {
+      path: '/socket.io/',
       auth: {
         token: localStorage.getItem('authToken')
       },
