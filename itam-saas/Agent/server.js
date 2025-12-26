@@ -23,14 +23,22 @@ const io = new Server(httpServer, {
       if (!origin) return callback(null, true);
       const allowedOrigins = process.env.REACT_APP_URL 
         ? process.env.REACT_APP_URL.split(',').map(o => o.trim())
-        : ['https://it-asset-project.vercel.app'];
-      if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        : [
+            'https://it-asset-project.vercel.app',
+            'http://localhost:3000',
+            'http://localhost:5000'
+          ];
+      
+      // Allow any Vercel deployment
+      if (origin.endsWith('.vercel.app') || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.warn('❌ CORS blocked origin:', origin);
         callback(new Error('Not allowed by CORS'));
       }
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST']
   }
 });
 

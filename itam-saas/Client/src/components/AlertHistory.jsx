@@ -22,7 +22,10 @@ const AlertHistory = () => {
       auth: {
         token: localStorage.getItem('authToken')
       },
-      transports: ['websocket', 'polling']
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5
     });
 
     newSocket.on('connect', () => {
