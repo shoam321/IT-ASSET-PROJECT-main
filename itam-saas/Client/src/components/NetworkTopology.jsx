@@ -51,6 +51,11 @@ const CustomDeviceNode = ({ data }) => {
           )}
         </div>
       )}
+      {/* Connection handles */}
+      <div className="absolute top-1/2 left-0 w-3 h-3 -ml-1.5 -mt-1.5 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute top-1/2 right-0 w-3 h-3 -mr-1.5 -mt-1.5 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute top-0 left-1/2 w-3 h-3 -mt-1.5 -ml-1.5 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className="absolute bottom-0 left-1/2 w-3 h-3 -mb-1.5 -ml-1.5 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
     </div>
   );
 };
@@ -184,18 +189,21 @@ export default function NetworkTopology() {
   const onConnect = useCallback(
     (params) => {
       const connectionStyle = connectionTypes[connectionType];
-      setEdges((eds) => addEdge({ 
+      const newEdge = {
         ...params, 
+        id: `edge-${params.source}-${params.target}-${Date.now()}`,
+        type: 'default',
         animated: connectionStyle.animated,
-        style: connectionStyle.style,
+        style: { ...connectionStyle.style },
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: connectionStyle.color,
         },
         data: { type: connectionType, label: '' }
-      }, eds));
+      };
+      setEdges((eds) => addEdge(newEdge, eds));
     },
-    [setEdges, connectionType]
+    [connectionType]
   );
 
   const onEdgeClick = useCallback((event, edge) => {
@@ -395,8 +403,8 @@ export default function NetworkTopology() {
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onEdgeClick={onEdgeClick}
-          nodeTypes={nodeTypes}
-          snapToGrid={true}
+          nodeTyp          connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
+          connectionMode="loose"          snapToGrid={true}
           snapGrid={SNAP_GRID}
           fitView
           className="bg-slate-900"
