@@ -179,9 +179,13 @@ const UsageMonitor = () => {
   if (loading) {
     return (
       <div className="usage-monitor">
-        <div className="usage-header">
-          <h1>📊 Device Usage Monitor</h1>
-          <p className="subtitle">Real-time application usage tracking across all devices</p>
+        <div className="usage-header-enhanced">
+          <div className="header-content">
+            <div className="header-title-section">
+              <h1>📊 Device Usage Monitor</h1>
+              <p className="subtitle">Real-time application usage tracking across all devices</p>
+            </div>
+          </div>
         </div>
         <div className="loading" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
           <div style={{ fontSize: '24px', marginBottom: '10px' }}>⏳</div>
@@ -194,9 +198,13 @@ const UsageMonitor = () => {
   if (error) {
     return (
       <div className="usage-monitor">
-        <div className="usage-header">
-          <h1>📊 Device Usage Monitor</h1>
-          <p className="subtitle">Real-time application usage tracking across all devices</p>
+        <div className="usage-header-enhanced">
+          <div className="header-content">
+            <div className="header-title-section">
+              <h1>📊 Device Usage Monitor</h1>
+              <p className="subtitle">Real-time application usage tracking across all devices</p>
+            </div>
+          </div>
         </div>
         <div className="error" style={{ textAlign: 'center', padding: '40px', color: '#f87171', background: '#1e293b', borderRadius: '12px', border: '1px solid #334155' }}>
           <div style={{ fontSize: '24px', marginBottom: '10px' }}>⚠️</div>
@@ -211,9 +219,23 @@ const UsageMonitor = () => {
 
   return (
     <div className="usage-monitor">
-      <div className="usage-header">
-        <h1>📊 Device Usage Monitor</h1>
-        <p className="subtitle">Real-time application usage tracking across all devices</p>
+      {/* Enhanced Header */}
+      <div className="usage-header-enhanced">
+        <div className="header-content">
+          <div className="header-title-section">
+            <h1>📊 Device Usage Monitor</h1>
+            <p className="subtitle">Real-time application usage tracking across all devices</p>
+          </div>
+          <div className="header-actions">
+            <span className="live-indicator">
+              <span className="pulse-dot"></span>
+              Live
+            </span>
+            <button onClick={fetchDevices} className="refresh-btn-header">
+              🔄 Refresh All
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="usage-grid">
