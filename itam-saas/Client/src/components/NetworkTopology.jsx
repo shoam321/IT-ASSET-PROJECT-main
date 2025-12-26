@@ -9,12 +9,14 @@ import {
   addEdge,
   Panel,
   MarkerType,
+  Handle,
+  Position,
 } from '@xyflow/react';
-import { Save, Download, Plus, Server, Monitor, Wifi, Shield, AlignLeft, Grid3x3 } from 'lucide-react';
+import { Save, Download, Plus, Server, Monitor, Wifi, Shield, AlignLeft, Grid3x3, FolderOpen } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 
 const SNAP_GRID = [20, 20]; // Snap to 20px grid
-const MIN_DISTANCE = 100; // Minimum distance between nodes
+const MIN_DISTANCE = 150; // Minimum distance between nodes (increased padding)
 
 const CustomDeviceNode = ({ data }) => {
   const getStatusColor = (status) => {
@@ -51,11 +53,15 @@ const CustomDeviceNode = ({ data }) => {
           )}
         </div>
       )}
-      {/* Connection handles */}
-      <div className="absolute top-1/2 left-0 w-3 h-3 -ml-1.5 -mt-1.5 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="absolute top-1/2 right-0 w-3 h-3 -mr-1.5 -mt-1.5 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="absolute top-0 left-1/2 w-3 h-3 -mt-1.5 -ml-1.5 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      <div className="absolute bottom-0 left-1/2 w-3 h-3 -mb-1.5 -ml-1.5 bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+      {/* Connection handles - React Flow Handle components */}
+      <Handle type="source" position={Position.Left} id="left" className="w-3 h-3 bg-blue-500" />
+      <Handle type="source" position={Position.Right} id="right" className="w-3 h-3 bg-blue-500" />
+      <Handle type="source" position={Position.Top} id="top" className="w-3 h-3 bg-blue-500" />
+      <Handle type="source" position={Position.Bottom} id="bottom" className="w-3 h-3 bg-blue-500" />
+      <Handle type="target" position={Position.Left} id="left-target" className="w-3 h-3 bg-blue-500" />
+      <Handle type="target" position={Position.Right} id="right-target" className="w-3 h-3 bg-blue-500" />
+      <Handle type="target" position={Position.Top} id="top-target" className="w-3 h-3 bg-blue-500" />
+      <Handle type="target" position={Position.Bottom} id="bottom-target" className="w-3 h-3 bg-blue-500" />
     </div>
   );
 };
@@ -108,12 +114,15 @@ export default function NetworkTopology() {
   const [connectionType, setConnectionType] = useState('ethernet');
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [showEdgePanel, setShowEdgePanel] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
-  // Fetch monitored devices
+  // Fetch monitored devices and load saved topologies
   useEffect(() => {
     fetchDevices();
+    const saved = JSON.parse(localStorage.getItem('networkTopologies') || '[]');
+    setSavedTopologies(saved);
   }, []);
 
   // Custom node change handler with collision prevention
@@ -319,6 +328,20 @@ export default function NetworkTopology() {
     alert('Export feature coming soon!');
   };
 
+  const loadTopology = (topology) => {
+    setNodes(topology.nodes);
+    setEdges(topology.edges);
+    setCurrentTopologyName(topology.name);
+    setShowLoadDialog(false);
+  };
+
+  const deleteTopology = (index) => {
+    const saved = [...savedTopologies];
+    saved.splice(index, 1);
+    localStorage.setItem('networkTopologies', JSON.stringify(saved));
+    setSavedTopologies(saved);
+  };
+
   return (
     <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex">
       {/* Sidebar */}
@@ -461,6 +484,13 @@ export default function NetworkTopology() {
           
           <Panel position="top-right" className="flex gap-2">
             <button
+              onClick={() => setShowLoadDialog(true)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg"
+            >
+              <FolderOpen className="w-4 h-4" />
+              Load ({savedTopologies.length})
+            </button>
+            <button
               onClick={() => setShowSaveDialog(true)}
               className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg"
             >
@@ -541,6 +571,56 @@ export default function NetworkTopology() {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Load Dialog */}
+        {showLoadDialog && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 w-[500px] max-h-[600px] overflow-y-auto">
+              <h3 className="text-white font-bold text-lg mb-4">Saved Topologies</h3>
+              {savedTopologies.length === 0 ? (
+                <p className="text-slate-400 text-center py-8">No saved topologies yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {savedTopologies.map((topology, index) => (
+                    <div key={index} className="bg-slate-700 border border-slate-600 rounded-lg p-4 hover:border-purple-500 transition">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="text-white font-semibold">{topology.name}</h4>
+                          <p className="text-slate-400 text-xs mt-1">
+                            {new Date(topology.timestamp).toLocaleString()}
+                          </p>
+                          <p className="text-slate-400 text-xs mt-1">
+                            {topology.nodes.length} devices, {topology.edges.length} connections
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => loadTopology(topology)}
+                            className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition"
+                          >
+                            Load
+                          </button>
+                          <button
+                            onClick={() => deleteTopology(index)}
+                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setShowLoadDialog(false)}
+                className="w-full mt-4 bg-slate-600 hover:bg-slate-500 text-white py-2 rounded-lg transition"
+              >
+                Close
+              </button>
             </div>
           </div>
         )}
