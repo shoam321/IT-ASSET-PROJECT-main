@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogIn, User, Lock, AlertCircle, Loader } from 'lucide-react';
+import { LogIn, User, Lock, AlertCircle, Loader, Download } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
@@ -150,6 +150,21 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
               </button>
             </p>
           </div>
+        </div>
+
+        {/* Download Agent Button */}
+        <div className="mt-6">
+          <a
+            href="/tauriagent.exe"
+            download="ITAssetAgent.exe"
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2 shadow-lg"
+          >
+            <Download className="w-5 h-5" />
+            Download IT Asset Agent
+          </a>
+          <p className="text-slate-400 text-xs text-center mt-2">
+            Install the agent on your PC to enable monitoring
+          </p>
         </div>
 
         {/* Demo Credentials */}
