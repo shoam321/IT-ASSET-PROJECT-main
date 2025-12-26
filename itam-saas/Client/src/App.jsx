@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network } from 'lucide-react';
 import * as dbService from './services/db';
 import { useAuth } from './context/AuthContext';
 import UsageMonitor from './components/UsageMonitor';
 import ForbiddenApps from './components/ForbiddenApps';
 import AlertHistory from './components/AlertHistory';
+import NetworkTopology from './components/NetworkTopology';
 
 // Helper function to format dates in a user-friendly way
 const formatDate = (dateString) => {
@@ -1725,6 +1726,8 @@ export default function App() {
         return <ForbiddenApps />;
       case 'alerts':
         return <AlertHistory />;
+      case 'topology':
+        return <NetworkTopology />;
       default:
         return renderHomeScreen();
     }
@@ -1896,6 +1899,18 @@ export default function App() {
           >
             <AlertTriangle className="w-5 h-5" />
             <span>Security Alerts</span>
+          </button>
+
+          <button
+            onClick={() => { setCurrentScreen('topology'); setShowForm(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+              currentScreen === 'topology' 
+                ? 'bg-blue-600 text-white' 
+                : 'text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            <Network className="w-5 h-5" />
+            <span>Network Topology</span>
           </button>
         </nav>
 
