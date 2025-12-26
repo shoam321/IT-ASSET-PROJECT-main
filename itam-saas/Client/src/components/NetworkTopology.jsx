@@ -23,10 +23,8 @@ const CustomDeviceNode = ({ data }) => {
     return 'bg-red-500';
   };
 
-  const borderColor = data.overlapping ? 'border-red-500' : 'border-slate-600';
-
   return (
-    <div className={`bg-slate-700 border-2 ${borderColor} rounded-lg p-4 min-w-[200px] shadow-xl hover:border-blue-500 transition-all`}>
+    <div className="bg-slate-700 border-2 border-slate-600 rounded-lg p-4 min-w-[200px] shadow-xl hover:border-blue-500 transition-all">
       <div className="flex items-center gap-3 mb-2">
         <div className={`w-3 h-3 rounded-full ${getStatusColor(data.status)} shadow-lg`}></div>
         <span className="text-lg">{data.icon}</span>
@@ -52,9 +50,6 @@ const CustomDeviceNode = ({ data }) => {
             </div>
           )}
         </div>
-      )}
-      {data.overlapping && (
-        <div className="mt-2 text-xs text-red-400 font-semibold">⚠️ Overlapping!</div>
       )}
     </div>
   );
@@ -116,32 +111,56 @@ export default function NetworkTopology() {
     fetchDevices();
   }, []);
 
-  // Check for overlapping nodes
-  useEffect(() => {
-    checkOverlaps();
-  }, [nodes]);
-
-  const checkOverlaps = () => {
-    const updatedNodes = nodes.map((node, idx) => {
-      const overlapping = nodes.some((otherNode, otherIdx) => {
-        if (idx === otherIdx) return false;
-        const distance = Math.sqrt(
-          Math.pow(node.position.x - otherNode.position.x, 2) +
-          Math.pow(node.position.y - otherNode.position.y, 2)
-        );
-        return distance < MIN_DISTANCE;
+  // Custom node change handler with collision prevention
+  const handleNodesChange = useCallback((changes) => {
+    onNodesChange(changes);
+    
+    // After position changes, check and resolve collisions
+    if (changes.some(change => change.type === 'position' && !change.dragging)) {
+      setNodes((currentNodes) => {
+        const adjustedNodes = [...currentNodes];
+        
+        // Check each node against others
+        for (let i = 0; i < adjustedNodes.length; i++) {
+          for (let j = i + 1; j < adjustedNodes.length; j++) {
+            const node1 = adjustedNodes[i];
+            const node2 = adjustedNodes[j];
+            
+            if (!node1.position || !node2.position) continue;
+            
+            const dx = node1.position.x - node2.position.x;
+            const dy = node1.position.y - node2.position.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // If too close, push them apart
+            if (distance < MIN_DISTANCE) {
+              const angle = Math.atan2(dy, dx);
+              const pushDistance = (MIN_DISTANCE - distance) / 2;
+              
+              // Push both nodes away from each other
+              adjustedNodes[i] = {
+                ...node1,
+                position: {
+                  x: node1.position.x + Math.cos(angle) * pushDistance,
+                  y: node1.position.y + Math.sin(angle) * pushDistance,
+                }
+              };
+              
+              adjustedNodes[j] = {
+                ...node2,
+                position: {
+                  x: node2.position.x - Math.cos(angle) * pushDistance,
+                  y: node2.position.y - Math.sin(angle) * pushDistance,
+                }
+              };
+            }
+          }
+        }
+        
+        return adjustedNodes;
       });
-      
-      return {
-        ...node,
-        data: { ...node.data, overlapping }
-      };
-    });
-
-    if (JSON.stringify(updatedNodes) !== JSON.stringify(nodes)) {
-      setNodes(updatedNodes);
     }
-  };
+  }, [onNodesChange]);
 
   const fetchDevices = async () => {
     try {
@@ -349,21 +368,20 @@ export default function NetworkTopology() {
         </div>
 
         {/* Monitored Devices */}
-        {devices.length > 0 && (
-          <div>
-            <h3 className="text-slate-400 text-sm font-semibold mb-3">Your Monitored Devices</h3>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {devices.map((device) => (
-                <button
-                  key={device.device_id}
-                  onClick={() => addMonitoredDevice(device)}
-                  className="w-full bg-blue-900 hover:bg-blue-800 text-white p-2 rounded text-xs transition text-left"
-                >
-                  <div className="font-medium">{device.hostname || device.device_id}</div>
-                  <div className="text-blue-300 text-xs">{device.os_name}</div>
-                </button>
-              ))}
-            </div>
+        {devices.length >handleNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onEdgeClick={onEdgeClick}
+          nodeTypes={nodeTypes}
+          snapToGrid={true}
+          snapGrid={SNAP_GRID}
+          fitView
+          className="bg-slate-900"
+        >
+          <Controls className="bg-slate-700 border-slate-600" />
+          <MiniMap 
+            className="bg-slate-800 border-slate-600" 
+            nodeColor={(node) => {
           </div>
         )}
       </div>
