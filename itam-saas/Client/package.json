@@ -4,6 +4,7 @@
   "description": "IT Asset Tracker SaaS Client - React Frontend",
   "private": true,
   "dependencies": {
+    "@xyflow/react": "^12.3.5",
     "autoprefixer": "^10.4.17",
     "firebase": "^11.6.1",
     "lucide-react": "^0.302.0",
