@@ -1,11 +1,32 @@
 use tauri::{AppHandle, Emitter, Manager, menu::{MenuBuilder, MenuItemBuilder}, tray::{TrayIconBuilder, TrayIconEvent}};
 use tauri_plugin_single_instance::init as single_instance_init;
 use std::{thread, time::{Duration, SystemTime}};
+use std::sync::{Arc, Mutex};
 use sysinfo::System;
 use serde::{Deserialize, Serialize};
+use lazy_static::lazy_static;
 
 mod forbidden;
 use forbidden::{ForbiddenApp, ViolationReport, sync_forbidden_list, scan_processes, report_violation};
+
+// ============================================================================
+// GLOBAL STATE: Authentication Token for Forbidden App Monitoring
+// ============================================================================
+// This global state allows sharing the authentication token between:
+// 1. The React frontend (via set_monitoring_token command)
+// 2. The background monitoring thread (start_forbidden_app_monitoring)
+//
+// Why Arc<Mutex<String>>?
+// - Arc: Allows multiple threads to own the same data (cheap cloning)
+// - Mutex: Ensures thread-safe read/write access (prevents data races)
+// - lazy_static: Initializes once, lives for entire program lifetime
+//
+// Flow: React login -> invoke('set_monitoring_token') -> AUTH_TOKEN updated ->
+//       Background thread reads token -> Makes authenticated API calls
+// ============================================================================
+lazy_static! {
+    static ref AUTH_TOKEN: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct UsageData {
@@ -224,17 +245,43 @@ fn start_process_monitoring(handle: AppHandle) {
     });
 }
 
-// Forbidden app monitoring and alerting
+// ============================================================================
+// Background Thread: Forbidden App Monitoring and Alerting
+// ============================================================================
+// This function spawns a background thread that:
+// 1. Waits for auth token to be set (via set_monitoring_token command)
+// 2. Syncs forbidden app list from API every 5 minutes
+// 3. Scans running processes every 60 seconds
+// 4. Reports violations to backend API
+// 5. Emits events to React frontend for local notifications
+//
+// Thread Safety:
+// - Clones AUTH_TOKEN Arc (increments reference count, doesn't copy data)
+// - Locks mutex only during token read (minimizes lock time)
+// - Uses tokio runtime for async API calls within sync thread
+//
+// Error Handling:
+// - Falls back to cached list if API fetch fails
+// - Continues monitoring even if reporting fails
+// - Logs errors to console for debugging
+// ============================================================================
 fn start_forbidden_app_monitoring(handle: AppHandle) {
+    let token_arc = AUTH_TOKEN.clone(); // Clone Arc pointer, not the String
     thread::spawn(move || {
         let api_url = "https://it-asset-project-production.up.railway.app";
         let mut forbidden_list: Vec<ForbiddenApp> = Vec::new();
         let mut last_sync = SystemTime::UNIX_EPOCH;
-        let mut auth_token = String::new();
         
         loop {
-            // Get auth token from app state/storage
-            // For now, we'll wait for it to be set via Tauri command
+            // ================================================================
+            // STEP 1: Read auth token from global state (thread-safe)
+            // ================================================================
+            let auth_token = {
+                let token = token_arc.lock().unwrap(); // Acquire lock
+                token.clone() // Clone the String value
+            }; // Lock automatically released here
+            
+            // Wait for token to be set by React frontend
             if auth_token.is_empty() {
                 thread::sleep(Duration::from_secs(10));
                 continue;
@@ -293,13 +340,34 @@ fn start_forbidden_app_monitoring(handle: AppHandle) {
     });
 }
 
-// Tauri command to set auth token for forbidden app monitoring
+// ============================================================================
+// Tauri Command: Set Authentication Token for Monitoring
+// ============================================================================
+// Called by React frontend after successful login to enable monitoring.
+//
+// Flow:
+// 1. User logs in via React UI
+// 2. React calls: await invoke('set_monitoring_token', { token })
+// 3. This function writes token to global AUTH_TOKEN
+// 4. Background monitoring thread detects non-empty token
+// 5. Monitoring activates and starts scanning processes
+//
+// Security:
+// - Token printed to console is truncated (first 10 chars only)
+// - Full token stored in memory, never written to disk
+// - Token cleared on app restart (requires re-login)
+//
+// Thread Safety:
+// - Locks AUTH_TOKEN mutex during write
+// - Lock released automatically when function returns
+// ============================================================================
 #[tauri::command]
 fn set_monitoring_token(token: String) -> Result<String, String> {
-    // Store token in app state
-    // For simplicity, we'll use a global or pass through app handle
+    let mut auth_token = AUTH_TOKEN.lock().unwrap(); // Acquire write lock
+    *auth_token = token.clone(); // Dereference and assign
+    println!("✅ Monitoring token set: {}...", &token.chars().take(10).collect::<String>());
     Ok("Token set successfully".to_string())
-}
+} // Lock automatically released here
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

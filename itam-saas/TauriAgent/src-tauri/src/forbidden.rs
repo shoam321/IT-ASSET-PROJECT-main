@@ -1,15 +1,24 @@
+// ============================================================================
 // Forbidden App Detection Module
+// ============================================================================
 // This module handles:
 // - Fetching forbidden app list from API
-// - Caching the list locally
-// - Scanning running processes
-// - Reporting violations
+// - Caching the list locally for offline operation
+// - Scanning running processes against forbidden list
+// - Reporting violations to backend API
+// - Preventing duplicate alerts (PID tracking)
+//
+// DEPENDENCY NOTE: Uses sysinfo v0.30.13
+// - API changed from v0.29: ProcessExt/SystemExt traits removed
+// - process.name() now returns &str directly (not OsStr)
+// - No need to import ProcessExt/SystemExt anymore
+// ============================================================================
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
-use sysinfo::{ProcessExt, System, SystemExt};
+use sysinfo::System; // v0.30 API: System struct only
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForbiddenApp {
@@ -44,9 +53,18 @@ fn get_cache_path() -> PathBuf {
     path
 }
 
-/// Fetch forbidden apps list from API
+// ============================================================================
+// Fetch forbidden apps list from backend API
+// ============================================================================
+// Endpoint: GET /api/forbidden-apps
+// Auth: Bearer token in Authorization header
+// Returns: JSON array of ForbiddenApp objects
+//
+// FIXED: Changed from incorrect /api/forbidden-apps/list to /api/forbidden-apps
+// The backend server.js only has /api/forbidden-apps route, not /list variant
+// ============================================================================
 pub async fn fetch_forbidden_list(api_url: &str, token: &str) -> Result<Vec<ForbiddenApp>, String> {
-    let url = format!("{}/api/forbidden-apps/list", api_url);
+    let url = format!("{}/api/forbidden-apps", api_url); // Correct endpoint
     
     let client = reqwest::Client::new();
     let response = client
@@ -105,6 +123,18 @@ pub fn load_from_cache() -> Result<Vec<ForbiddenApp>, String> {
 }
 
 /// Scan running processes for forbidden apps
+/// 
+/// SYSINFO v0.30 API COMPATIBILITY:
+/// - process.name() returns &str (not OsStr like in v0.29)
+/// - Use .to_string() to convert &str to owned String
+/// - No need for ProcessExt trait imports
+/// 
+/// DUPLICATE PREVENTION:
+/// - Uses static mut REPORTED_PIDS to track already-reported PIDs
+/// - Only reports each PID once to avoid spam
+/// - Warnings about static mut are expected (Rust 2024 edition warning)
+/// 
+/// Returns: Vec of ViolationReport structs for newly detected violations
 pub fn scan_processes(forbidden_list: &[ForbiddenApp]) -> Vec<ViolationReport> {
     let mut violations = Vec::new();
     let mut sys = System::new_all();
@@ -118,7 +148,8 @@ pub fn scan_processes(forbidden_list: &[ForbiddenApp]) -> Vec<ViolationReport> {
     }
     
     for (pid, process) in sys.processes() {
-        let process_name = process.name().to_lowercase();
+        // SYSINFO v0.30: process.name() returns &str, convert to String
+        let process_name = process.name().to_string().to_lowercase();
         
         // Check if this process is forbidden
         for forbidden in forbidden_list {

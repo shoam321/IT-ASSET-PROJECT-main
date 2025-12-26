@@ -93,6 +93,26 @@ function App() {
       setIsAuthenticated(true);
       setLoginError("");
       
+      // ====================================================================
+      // CRITICAL: Set token for forbidden app monitoring
+      // ====================================================================
+      // This activates the background monitoring thread in Rust.
+      // Without this call, the monitoring thread waits indefinitely.
+      // 
+      // Flow:
+      // 1. User logs in successfully
+      // 2. invoke('set_monitoring_token') writes token to Rust global state
+      // 3. Background thread detects non-empty token
+      // 4. Monitoring activates: syncs forbidden list, scans processes
+      // 5. Violations reported to API and displayed in dashboard
+      // ====================================================================
+      try {
+        await invoke('set_monitoring_token', { token });
+        console.log('✅ Monitoring token set successfully');
+      } catch (err) {
+        console.error('⚠️ Failed to set monitoring token:', err);
+      }
+      
       // Auto-minimize to tray after 2 seconds
       setTimeout(() => {
         minimizeToTray();
