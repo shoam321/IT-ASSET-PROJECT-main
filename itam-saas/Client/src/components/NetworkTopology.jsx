@@ -372,24 +372,32 @@ export default function NetworkTopology() {
               <Shield className="w-4 h-4" />
               Add Firewall
             </button>
+            <button
+              onClick={() => addDeviceNode('firewall', '🔒', 'Firewall')}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2"
+            >
+              <Shield className="w-4 h-4" />
+              Add Firewall
+            </button>
           </div>
         </div>
 
         {/* Monitored Devices */}
-        {devices.length >handleNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onEdgeClick={onEdgeClick}
-          nodeTypes={nodeTypes}
-          snapToGrid={true}
-          snapGrid={SNAP_GRID}
-          fitView
-          className="bg-slate-900"
-        >
-          <Controls className="bg-slate-700 border-slate-600" />
-          <MiniMap 
-            className="bg-slate-800 border-slate-600" 
-            nodeColor={(node) => {
+        {devices.length > 0 && (
+          <div>
+            <h3 className="text-slate-400 text-sm font-semibold mb-3">Your Monitored Devices</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {devices.map((device) => (
+                <button
+                  key={device.device_id}
+                  onClick={() => addMonitoredDevice(device)}
+                  className="w-full bg-blue-900 hover:bg-blue-800 text-white p-2 rounded text-xs transition text-left"
+                >
+                  <div className="font-medium">{device.hostname || device.device_id}</div>
+                  <div className="text-blue-300 text-xs">{device.os_name}</div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -399,21 +407,22 @@ export default function NetworkTopology() {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
+          onNodesChange={handleNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onEdgeClick={onEdgeClick}
-          nodeTyp          connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
-          connectionMode="loose"          snapToGrid={true}
+          nodeTypes={nodeTypes}
+          snapToGrid={true}
           snapGrid={SNAP_GRID}
           fitView
+          connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
+          connectionMode="loose"
           className="bg-slate-900"
         >
           <Controls className="bg-slate-700 border-slate-600" />
           <MiniMap 
             className="bg-slate-800 border-slate-600" 
             nodeColor={(node) => {
-              if (node.data.overlapping) return '#ef4444';
               if (node.data.status === 'online') return '#22c55e';
               if (node.data.status === 'idle') return '#eab308';
               return '#ef4444';
