@@ -15,10 +15,17 @@ export default function AuditTrail() {
     endDate: '',
     limit: 100
   });
+  const [appliedFilters, setAppliedFilters] = useState({
+    table: '',
+    action: '',
+    startDate: '',
+    endDate: '',
+    limit: 100
+  });
 
   useEffect(() => {
     fetchAuditLogs();
-  }, []);
+  }, [appliedFilters]);
 
   const fetchAuditLogs = async () => {
     try {
@@ -26,11 +33,11 @@ export default function AuditTrail() {
       const token = localStorage.getItem('authToken');
       
       const queryParams = new URLSearchParams();
-      if (filters.table) queryParams.append('table', filters.table);
-      if (filters.action) queryParams.append('action', filters.action);
-      if (filters.startDate) queryParams.append('startDate', filters.startDate);
-      if (filters.endDate) queryParams.append('endDate', filters.endDate);
-      queryParams.append('limit', filters.limit);
+      if (appliedFilters.table) queryParams.append('table', appliedFilters.table);
+      if (appliedFilters.action) queryParams.append('action', appliedFilters.action);
+      if (appliedFilters.startDate) queryParams.append('startDate', appliedFilters.startDate);
+      if (appliedFilters.endDate) queryParams.append('endDate', appliedFilters.endDate);
+      queryParams.append('limit', appliedFilters.limit);
 
       const response = await fetch(`${API_URL}/audit-logs?${queryParams}`, {
         headers: {
@@ -58,7 +65,7 @@ export default function AuditTrail() {
 
   const handleFilter = (e) => {
     e.preventDefault();
-    fetchAuditLogs();
+    setAppliedFilters({...filters});
   };
 
   const getActionIcon = (action) => {
@@ -227,21 +234,52 @@ export default function AuditTrail() {
           </div>
         </div>
 
-        <button 
-          type="submit"
-          style={{
-            marginTop: '15px',
-            padding: '10px 20px',
-            background: '#3b82f6',
-            color: 'white',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontWeight: '500'
-          }}
-        >
-          Apply Filters
-        </button>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '15px' }}>
+          <button 
+            type="submit"
+            style={{
+              padding: '10px 20px',
+              background: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            Apply Filters
+          </button>
+          <button 
+            type="button"
+            onClick={() => {
+              setFilters({
+                table: '',
+                action: '',
+                startDate: '',
+                endDate: '',
+                limit: 100
+              });
+              setAppliedFilters({
+                table: '',
+                action: '',
+                startDate: '',
+                endDate: '',
+                limit: 100
+              });
+            }}
+            style={{
+              padding: '10px 20px',
+              background: '#6b7280',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            Clear Filters
+          </button>
+        </div>
       </form>
 
       {/* Audit Logs Table */}
