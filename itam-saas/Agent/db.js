@@ -1,3 +1,8 @@
+// [2025-12-27] Google SSO Fix:
+// Ensured the 'users' table exists in the Railway Postgres database with all required columns, including 'username'.
+// This resolves errors where the backend could not insert or find users due to missing columns.
+// Schema validated and updated using DBeaver with the correct Railway connection settings.
+
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 
