@@ -37,13 +37,20 @@ export default function AuditTrail() {
         }
       });
 
-      if (!response.ok) throw new Error('Failed to fetch audit logs');
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error('Failed to fetch audit logs');
+      }
 
       const data = await response.json();
-      setAuditLogs(data);
+      setAuditLogs(Array.isArray(data) ? data : []);
       setLoading(false);
     } catch (err) {
+      console.error('Audit log fetch error:', err);
       setError(err.message);
+      setAuditLogs([]);
       setLoading(false);
     }
   };
