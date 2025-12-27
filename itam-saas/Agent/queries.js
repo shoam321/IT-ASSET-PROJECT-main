@@ -32,6 +32,11 @@ import pool from './db.js';
  */
 export async function setCurrentUserId(userId) {
   try {
+    // Handle undefined or null userId gracefully
+    if (userId === undefined || userId === null) {
+      console.warn('setCurrentUserId called with undefined/null userId, using 0');
+      userId = 0;
+    }
     // Use set_config() function instead of SET command
     // set_config(setting_name, new_value, is_local)
     // is_local=false means it persists for the session (works with connection pooling)

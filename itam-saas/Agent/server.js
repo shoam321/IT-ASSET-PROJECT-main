@@ -314,7 +314,13 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
 // Get audit logs with filters
 app.get('/api/audit-logs', authenticateToken, async (req, res) => {
   try {
-    await db.setCurrentUserId(req.user.userId);
+    // Use userId from JWT token, fallback to id if userId not present
+    const userId = req.user?.userId || req.user?.id;
+    if (!userId) {
+      console.error('No userId found in token:', req.user);
+      return res.status(401).json({ error: 'Invalid token structure' });
+    }
+    await db.setCurrentUserId(userId);
     
     const filters = {
       tableName: req.query.table,
