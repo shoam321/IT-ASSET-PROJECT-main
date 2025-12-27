@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, User, FileEdit, Trash2, PlusCircle, Filter } from 'lucide-react';
+import InfoButton from './InfoButton';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
@@ -123,9 +124,22 @@ export default function AuditTrail() {
   return (
     <div className="audit-trail-container" style={{ padding: '20px' }}>
       <div style={{ marginBottom: '30px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '10px' }}>
-          📜 Audit Trail
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: 0 }}>
+            📜 Audit Trail
+          </h1>
+          <InfoButton
+            title="Audit Trail"
+            description="The Audit Trail keeps a complete record of every change made in your system. Think of it as a security camera for your data - it shows who did what, when they did it, and what changed."
+            examples={[
+              "See who created, updated, or deleted assets, licenses, users, and contracts",
+              "View before and after values for every change (what it was vs. what it became)",
+              "Filter by date range to find changes during specific time periods",
+              "Track user activity for compliance audits and security investigations",
+              "Identify when and why data was modified for troubleshooting"
+            ]}
+          />
+        </div>
         <p style={{ color: '#64748b' }}>
           Complete history of all system changes for compliance and security
         </p>
