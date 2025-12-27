@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, X, Trash2, Search, Edit2, Check, XCircle } from 'lucide-react';
+import InfoButton from './InfoButton';
 
 const ForbiddenApps = () => {
   const [forbiddenApps, setForbiddenApps] = useState([]);
@@ -199,6 +200,24 @@ const ForbiddenApps = () => {
           <p className="text-blue-200">Loading...</p>
         </div>
       )}
+
+      <div className="mb-6">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+          <h1 className="text-3xl font-bold text-white m-0">🚫 Forbidden Apps</h1>
+          <InfoButton
+            title="Forbidden Apps Monitor"
+            description="Protect your organization by defining which applications are not allowed to run. The system automatically detects when forbidden apps are launched and creates security alerts to help you respond quickly."
+            examples={[
+              "Block unauthorized or dangerous software (malware, hacking tools)",
+              "Prevent use of personal apps that violate company policy",
+              "Get instant alerts when forbidden apps are detected",
+              "Set severity levels (Low, Medium, High, Critical) for different apps",
+              "Track which users attempted to run forbidden software"
+            ]}
+          />
+        </div>
+        <p className="text-slate-400">Define and monitor forbidden applications across your organization</p>
+      </div>
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div className="relative flex-1 w-full md:max-w-md">

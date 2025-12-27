@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { RefreshCw, Filter } from 'lucide-react';
+import InfoButton from './InfoButton';
 
 const AlertHistory = () => {
   const [alerts, setAlerts] = useState([]);
@@ -176,6 +177,24 @@ const AlertHistory = () => {
           <p className="text-blue-200">Loading alerts...</p>
         </div>
       )}
+
+      <div className="mb-6">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+          <h1 className="text-3xl font-bold text-white m-0">🔔 Security Alerts</h1>
+          <InfoButton
+            title="Security Alerts"
+            description="Real-time security notifications that automatically trigger when forbidden applications are detected on monitored devices. Stay informed about potential security threats and policy violations."
+            examples={[
+              "Receive instant alerts when forbidden apps are launched",
+              "See which device and user triggered the alert",
+              "Filter alerts by status: New, Acknowledged, Resolved, or False Positive",
+              "Track alert history to identify repeat offenders or patterns",
+              "Get real-time WebSocket updates without needing to refresh"
+            ]}
+          />
+        </div>
+        <p className="text-slate-400">Monitor security events and policy violations in real-time</p>
+      </div>
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div className="flex items-center gap-3">

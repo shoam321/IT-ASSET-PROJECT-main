@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './UsageMonitor.css';
+import InfoButton from './InfoButton';
 
 const UsageMonitor = () => {
   const [devices, setDevices] = useState([]);
@@ -223,7 +224,20 @@ const UsageMonitor = () => {
       <div className="usage-header-enhanced">
         <div className="header-content">
           <div className="header-title-section">
-            <h1>📊 Device Usage Monitor</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h1>📊 Device Usage Monitor</h1>
+              <InfoButton
+                title="Device Usage Monitor"
+                description="Track what applications your team is using in real-time. See which apps are running on each device, how long they've been used, and identify productivity patterns or potential security risks."
+                examples={[
+                  "See which applications are currently running on any device",
+                  "Monitor application usage time to understand productivity",
+                  "Identify unauthorized or suspicious software",
+                  "Track usage patterns across all monitored devices",
+                  "Get real-time updates as applications start and stop"
+                ]}
+              />
+            </div>
             <p className="subtitle">Real-time application usage tracking across all devices</p>
           </div>
           <div className="header-actions">

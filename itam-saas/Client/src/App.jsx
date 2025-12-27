@@ -7,6 +7,7 @@ import ForbiddenApps from './components/ForbiddenApps';
 import AlertHistory from './components/AlertHistory';
 import NetworkTopology from './components/NetworkTopology';
 import AuditTrail from './components/AuditTrail';
+import InfoButton from './components/InfoButton';
 
 // Helper function to format dates in a user-friendly way
 const formatDate = (dateString) => {
