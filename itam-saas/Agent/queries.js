@@ -1359,47 +1359,36 @@ export async function deleteReceipt(id) {
 export async function findOrCreateGoogleUser(profile) {
   try {
     const email = profile.emails[0].value;
-    const googleId = profile.id;
     
-    // First, try to find user by Google ID
+    // Check auth_users by email (primary source of truth for authentication)
     let result = await pool.query(
-      'SELECT * FROM users WHERE google_id = $1',
-      [googleId]
+      'SELECT * FROM auth_users WHERE email = $1',
+      [email]
     );
     
     if (result.rows.length > 0) {
       return result.rows[0];
     }
     
-    // If not found by Google ID, try to find by email
-    result = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
-    );
-    
-    if (result.rows.length > 0) {
-      // Link Google account to existing user
-      const user = result.rows[0];
-      await pool.query(
-        'UPDATE users SET google_id = $1, profile_picture = $2, auth_provider = $3 WHERE id = $4',
-        [googleId, profile.photos[0]?.value, 'google', user.id]
-      );
-      return { ...user, google_id: googleId, auth_provider: 'google' };
+    // Create new user in auth_users
+    // Handle username collision
+    let username = profile.displayName || email.split('@')[0];
+    const checkUsername = await pool.query('SELECT 1 FROM auth_users WHERE username = $1', [username]);
+    if (checkUsername.rows.length > 0) {
+        username = `${username}_${Math.floor(Math.random() * 10000)}`;
     }
-    
-    // Create new user
+
     result = await pool.query(
-      `INSERT INTO users (username, email, google_id, profile_picture, auth_provider, role, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO auth_users (username, email, password_hash, full_name, role, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
       [
-        profile.displayName || profile.emails[0].value.split('@')[0],
+        username,
         email,
-        googleId,
-        profile.photos[0]?.value,
-        'google',
-        'User', // Default role
-        'Active'
+        'GOOGLE_SSO_NO_PASSWORD', // Dummy hash, password login disabled for this user
+        profile.displayName,
+        'user',
+        true
       ]
     );
     
