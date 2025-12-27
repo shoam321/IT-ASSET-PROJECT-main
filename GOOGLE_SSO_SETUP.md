@@ -8,13 +8,18 @@ Google Single Sign-On (OAuth 2.0) has been integrated into your IT Asset Managem
 
 Add these environment variables to **Railway**:
 
+
 ```env
-GOOGLE_CLIENT_ID=774261831030-cb0f5sbq0ip497jfgoq7suj0ietmdi9c.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=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
+GOOGLE_CLIENT_ID=your-google-client-id-here
+GOOGLE_CLIENT_SECRET=your-google-client-secret-here
 GOOGLE_CALLBACK_URL=https://it-asset-project-production.up.railway.app/api/auth/google/callback
 FRONTEND_URL=https://it-asset-project.vercel.app
 SESSION_SECRET=your-random-secret-here
 ```
+
+**Do NOT commit your actual Google OAuth credentials to source control.**
+
+Add your real credentials directly to the Railway environment variables dashboard. Never store secrets in this file or in the repository.
 
 ### How to Add in Railway:
 1. Go to https://railway.app/project/your-project
