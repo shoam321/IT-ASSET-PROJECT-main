@@ -361,7 +361,8 @@ app.get('/api/auth/google/callback',
 // Get current user info (protected route)
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
-    const user = await authQueries.findUserById(req.user.id);
+    const userId = req.user?.userId || req.user?.id;
+    const user = await authQueries.findUserById(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }

@@ -20,7 +20,21 @@ export const authenticateToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // Add user info to request
+
+    // Normalize token payload for backwards/forwards compatibility.
+    // Many routes historically use req.user.id, while tokens carry userId.
+    const normalized = { ...decoded };
+    if (normalized.id === undefined && normalized.userId !== undefined) {
+      normalized.id = normalized.userId;
+    }
+    if (normalized.userId === undefined && normalized.id !== undefined) {
+      normalized.userId = normalized.id;
+    }
+    if (typeof normalized.role === 'string') {
+      normalized.role = normalized.role.toLowerCase();
+    }
+
+    req.user = normalized; // Add user info to request
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
