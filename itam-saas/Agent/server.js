@@ -274,7 +274,7 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
 // Get audit logs with filters
 app.get('/api/audit-logs', authenticateToken, async (req, res) => {
   try {
-    await db.setCurrentUserId(req.user.id);
+    await db.setCurrentUserId(req.user.userId);
     
     const filters = {
       tableName: req.query.table,
@@ -298,7 +298,7 @@ app.get('/api/audit-logs', authenticateToken, async (req, res) => {
 // Get history for a specific record
 app.get('/api/audit-logs/:table/:id', authenticateToken, async (req, res) => {
   try {
-    await db.setCurrentUserId(req.user.id);
+    await db.setCurrentUserId(req.user.userId);
     
     const { table, id } = req.params;
     const history = await db.getRecordHistory(table, parseInt(id));
