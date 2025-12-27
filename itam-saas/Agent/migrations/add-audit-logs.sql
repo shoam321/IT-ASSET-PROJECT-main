@@ -25,14 +25,30 @@ CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_logs(user_id);
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can only see audit logs for their own data
-CREATE POLICY audit_logs_select_policy ON audit_logs
-  FOR SELECT
-  USING (user_id = current_setting('app.current_user_id', TRUE)::INTEGER);
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'audit_logs' AND policyname = 'audit_logs_select_policy'
+  ) THEN
+    CREATE POLICY audit_logs_select_policy ON audit_logs
+      FOR SELECT
+      USING (user_id = current_setting('app.current_user_id', TRUE)::INTEGER);
+  END IF;
+END $$;
 
 -- Policy: System can insert audit logs
-CREATE POLICY audit_logs_insert_policy ON audit_logs
-  FOR INSERT
-  WITH CHECK (true);
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'audit_logs' AND policyname = 'audit_logs_insert_policy'
+  ) THEN
+    CREATE POLICY audit_logs_insert_policy ON audit_logs
+      FOR INSERT
+      WITH CHECK (true);
+  END IF;
+END $$;
 
 COMMENT ON TABLE audit_logs IS 'Tracks all CRUD operations across the system for compliance and security';
 COMMENT ON COLUMN audit_logs.old_data IS 'JSON snapshot of record before change (NULL for CREATE)';
