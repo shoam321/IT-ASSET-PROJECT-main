@@ -1,5 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 
+const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
+
 const AuthContext = createContext(null);
 
 export const useAuth = () => {
@@ -19,11 +21,40 @@ export const AuthProvider = ({ children }) => {
     // Check for stored token on mount
     const storedToken = localStorage.getItem('authToken');
     const storedUser = localStorage.getItem('authUser');
-    
-    if (storedToken && storedUser) {
+
+    if (storedToken) {
       setToken(storedToken);
-      setUser(JSON.parse(storedUser));
     }
+
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        // Ignore malformed user payloads
+        setUser(null);
+      }
+    }
+    // If we have a token but no user payload (common after OAuth callback),
+    // fetch current user to hydrate state.
+    const hydrateUserFromToken = async () => {
+      if (!storedToken || storedUser) return;
+      try {
+        const response = await fetch(`${API_URL}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${storedToken}`
+          }
+        });
+        if (!response.ok) return;
+        const userData = await response.json();
+        localStorage.setItem('authUser', JSON.stringify(userData));
+        setUser(userData);
+      } catch {
+        // Ignore failures; user can still use token-authenticated API calls.
+      }
+    };
+
+    // Don't block initial render on this network call.
+    hydrateUserFromToken();
     setLoading(false);
   }, []);
 
