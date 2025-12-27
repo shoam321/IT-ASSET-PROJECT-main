@@ -11,6 +11,9 @@ const pool = new Pool({
     rejectUnauthorized: false,
   },
   application_name: 'itam_tracker',
+  max: 20, // Maximum pool size
+  idleTimeoutMillis: 30000, // Close idle connections after 30s
+  connectionTimeoutMillis: 10000, // Fail fast if can't connect in 10s
 });
 
 pool.on('error', (err) => {

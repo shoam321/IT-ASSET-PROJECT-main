@@ -1,6 +1,11 @@
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-this-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('❌ FATAL: JWT_SECRET environment variable not set!');
+  console.error('Set JWT_SECRET in your environment before starting the server.');
+  process.exit(1);
+}
 
 /**
  * Middleware to verify JWT token and protect routes

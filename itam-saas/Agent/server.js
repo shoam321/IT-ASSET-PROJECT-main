@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { body, validationResult } from 'express-validator';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import rateLimit from 'express-rate-limit';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
 import { authenticateToken, generateToken } from './middleware/auth.js';
@@ -49,6 +50,21 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('🔌 WebSocket client disconnected:', socket.id);
   });
+});
+
+// Rate limiting for authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 requests per window per IP
+  message: 'Too many authentication attempts. Please try again in 15 minutes.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    console.warn(`⚠️ Rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json({
+      error: 'Too many authentication attempts. Please try again in 15 minutes.'
+    });
+  }
 });
 
 // CORS configuration
@@ -140,7 +156,7 @@ app.get('/health', (req, res) => {
 // ===== AUTHENTICATION ROUTES =====
 
 // Register new user
-app.post('/api/auth/register', [
+app.post('/api/auth/register', authLimiter, [
   body('username').trim().isLength({ min: 3, max: 100 }).withMessage('Username must be 3-100 characters'),
   body('email').trim().isEmail().withMessage('Invalid email address'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
@@ -178,7 +194,7 @@ app.post('/api/auth/register', [
 });
 
 // Login
-app.post('/api/auth/login', [
+app.post('/api/auth/login', authLimiter, [
   body('username').trim().notEmpty().withMessage('Username is required'),
   body('password').notEmpty().withMessage('Password is required')
 ], async (req, res) => {
