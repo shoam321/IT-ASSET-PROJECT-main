@@ -13,6 +13,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { randomBytes } from 'crypto';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
 import { authenticateToken, generateToken } from './middleware/auth.js';
@@ -165,6 +166,43 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
+async function findOrCreateAuthUserFromGoogleProfile(profile) {
+  const email = profile?.emails?.[0]?.value;
+  if (!email) {
+    throw new Error('Google profile missing email');
+  }
+
+  const existing = await authQueries.findUserByEmail(email);
+  if (existing) {
+    return existing;
+  }
+
+  const fullName = profile?.displayName || null;
+  const baseUsername = (email.split('@')[0] || 'user')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '')
+    .slice(0, 50) || 'user';
+
+  const randomPassword = randomBytes(24).toString('base64url');
+
+  // Username must be unique in auth_users; try a few suffixes.
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const suffix = attempt === 0 ? '' : `-${Math.floor(1000 + Math.random() * 9000)}`;
+    const username = `${baseUsername}${suffix}`;
+    try {
+      return await authQueries.createAuthUser(username, email, randomPassword, fullName, 'user');
+    } catch (error) {
+      // Retry on username collision; surface other errors.
+      if (error?.message?.toLowerCase()?.includes('username already exists')) {
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw new Error('Failed to create auth user for Google login');
+}
+
 // Google OAuth Strategy
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -173,8 +211,12 @@ passport.use(new GoogleStrategy({
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
-      const user = await db.findOrCreateGoogleUser(profile);
-      return done(null, user);
+      // Keep the legacy/users-table record for the app's Users directory.
+      await db.findOrCreateGoogleUser(profile);
+
+      // Use auth_users as the canonical identity for JWT + RLS.
+      const authUser = await findOrCreateAuthUserFromGoogleProfile(profile);
+      return done(null, authUser);
     } catch (error) {
       return done(error, null);
     }
@@ -362,7 +404,11 @@ app.get('/api/auth/google/callback',
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.userId || req.user?.id;
-    const user = await authQueries.findUserById(userId);
+    let user = await authQueries.findUserById(userId);
+    // Fallback for older tokens (or Google tokens issued before auth_users alignment)
+    if (!user && req.user?.email) {
+      user = await authQueries.findUserByEmail(req.user.email);
+    }
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
