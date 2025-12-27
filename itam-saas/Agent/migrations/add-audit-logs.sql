@@ -1,11 +1,23 @@
 -- Audit Trail Migration
 -- Tracks all changes to assets, licenses, users, and contracts
 
+
+-- Drop and re-add the constraint to ensure it is correct and idempotent
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'audit_logs' AND constraint_name = 'audit_logs_action_check'
+  ) THEN
+    EXECUTE 'ALTER TABLE audit_logs DROP CONSTRAINT audit_logs_action_check';
+  END IF;
+END $$;
+
 CREATE TABLE IF NOT EXISTS audit_logs (
   id SERIAL PRIMARY KEY,
   table_name VARCHAR(50) NOT NULL,
   record_id INTEGER NOT NULL,
-  action VARCHAR(20) NOT NULL CHECK (action IN ('CREATE', 'UPDATE', 'DELETE')),
+  action VARCHAR(20) NOT NULL,
   old_data JSONB,
   new_data JSONB,
   user_id INTEGER,
@@ -15,7 +27,17 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   user_agent TEXT
 );
 
--- Indexes for fast querying
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE table_name = 'audit_logs' AND constraint_name = 'audit_logs_action_check'
+  ) THEN
+    EXECUTE 'ALTER TABLE audit_logs ADD CONSTRAINT audit_logs_action_check CHECK (action IN (''LOGIN'', ''LOGOUT'', ''CREATE'', ''UPDATE'', ''DELETE''))';
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_audit_table_name ON audit_logs(table_name);
 CREATE INDEX IF NOT EXISTS idx_audit_record_id ON audit_logs(record_id);
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp DESC);
