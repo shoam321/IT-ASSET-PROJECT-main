@@ -86,6 +86,36 @@ export async function verifyPassword(plainPassword, passwordHash) {
 }
 
 /**
+ * Authenticate user
+ */
+export async function authenticateUser(username, password) {
+  try {
+    const user = await findUserByUsername(username);
+    if (!user) {
+      throw new Error('Invalid username or password');
+    }
+
+    const isValid = await verifyPassword(password, user.password_hash);
+    if (!isValid) {
+      throw new Error('Invalid username or password');
+    }
+
+    if (!user.is_active) {
+      throw new Error('Account is disabled');
+    }
+
+    await updateLastLogin(user.id);
+    
+    // Return user without password hash
+    const { password_hash, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  } catch (error) {
+    console.error('Authentication error:', error.message);
+    throw error;
+  }
+}
+
+/**
  * Update last login time
  */
 export async function updateLastLogin(userId) {
