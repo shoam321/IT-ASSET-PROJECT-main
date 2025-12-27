@@ -480,13 +480,13 @@ export async function getAllUsers() {
  * Create user
  */
 export async function createUser(userData) {
-  const { user_name, email, department, phone, role, status, notes } = userData;
+  const { username, email, department, phone, role, status, notes } = userData;
   try {
     const result = await pool.query(
-      `INSERT INTO users (user_name, email, department, phone, role, status, notes)
+      `INSERT INTO users (username, email, department, phone, role, status, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [user_name, email, department, phone, role, status || 'Active', notes]
+      [username, email, department, phone, role, status || 'Active', notes]
     );
     return result.rows[0];
   } catch (error) {
@@ -564,7 +564,7 @@ export async function searchUsers(query) {
     const searchTerm = `%${query}%`;
     const result = await pool.query(
       `SELECT * FROM users 
-       WHERE user_name ILIKE $1 
+      WHERE username ILIKE $1
           OR email ILIKE $1 
           OR department ILIKE $1 
           OR phone ILIKE $1
