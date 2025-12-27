@@ -11,15 +11,32 @@ const AlertHistory = () => {
   const [filter, setFilter] = useState('all');
   const [socket, setSocket] = useState(null);
   const [wsError, setWsError] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(true); // Enable auto-refresh by default
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app';
   const WS_URL = API_URL.replace('/api', ''); // Remove /api for WebSocket connection
 
+  // Fetch alerts on mount and set up auto-refresh
   useEffect(() => {
     fetchAlerts();
     fetchStats();
 
-    // Connect to WebSocket for real-time alerts
+    // Set up polling fallback (every 30 seconds)
+    let pollInterval;
+    if (autoRefresh) {
+      pollInterval = setInterval(() => {
+        fetchAlerts();
+        fetchStats();
+      }, 30000); // 30 seconds
+    }
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [autoRefresh]);
+
+  // WebSocket connection for real-time updates
+  useEffect(() => {
     const newSocket = io(WS_URL, {
       path: '/socket.io/',
       auth: {
@@ -213,19 +230,25 @@ const AlertHistory = () => {
         </div>
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-end gap-1">
-            <span className={`text-xs px-3 py-1.5 rounded-lg font-semibold ${socket?.connected ? 'bg-green-900 text-green-200 border border-green-700' : 'bg-red-900 text-red-200 border border-red-700'}`}>
-              {socket?.connected ? '● Live Updates' : '● Offline'}
+            <span className={`text-xs px-3 py-1.5 rounded-lg font-semibold ${socket?.connected ? 'bg-green-900 text-green-200 border border-green-700' : autoRefresh ? 'bg-blue-900 text-blue-200 border border-blue-700' : 'bg-red-900 text-red-200 border border-red-700'}`}>
+              {socket?.connected ? '● Live (WebSocket)' : autoRefresh ? '● Auto-Refresh (30s)' : '● Manual Only'}
             </span>
             <span className="text-xs text-slate-400">
-              {socket?.connected ? 'Real-time monitoring active' : 'Auto-refresh disabled - click Refresh'}
+              {socket?.connected ? 'Real-time updates active' : autoRefresh ? 'Polling every 30 seconds' : 'Click Refresh to update'}
             </span>
           </div>
           <button
-            onClick={fetchAlerts}
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${autoRefresh ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-500'} text-white`}
+          >
+            {autoRefresh ? '✓ Auto-Refresh On' : 'Auto-Refresh Off'}
+          </button>
+          <button
+            onClick={() => { fetchAlerts(); fetchStats(); }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
           >
             <RefreshCw className="w-4 h-4" />
-            Refresh
+            Refresh Now
           </button>
         </div>
       </div>
@@ -267,8 +290,26 @@ const AlertHistory = () => {
             <tbody>
               {filteredAlerts.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-8 text-center text-slate-400">
-                    {filter === 'all' ? 'No security alerts' : `No ${filter} alerts`}
+                  <td colSpan="6" className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="text-6xl">🛡️</div>
+                      <div>
+                        <p className="text-slate-300 text-lg font-medium">
+                          {filter === 'all' ? 'No security alerts' : `No ${filter} alerts`}
+                        </p>
+                        <p className="text-slate-500 text-sm mt-2">
+                          {filter === 'all' 
+                            ? 'Your system is secure. Alerts will appear here when forbidden apps are detected.'
+                            : `Change the filter to see alerts with other statuses.`
+                          }
+                        </p>
+                        {!loading && alerts.length === 0 && (
+                          <p className="text-slate-400 text-xs mt-3 bg-slate-700 p-3 rounded border border-slate-600">
+                            💡 Tip: Make sure the TauriAgent is running on devices to monitor for forbidden apps
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : (
