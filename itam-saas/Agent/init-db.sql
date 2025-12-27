@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS licenses (
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
-  user_name VARCHAR(255) NOT NULL,
+  username VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE,
   department VARCHAR(255),
   phone VARCHAR(50),
@@ -74,6 +74,13 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+-- Rename user_name to username if needed for legacy DBs
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='user_name') THEN
+    EXECUTE 'ALTER TABLE users RENAME COLUMN user_name TO username';
+  END IF;
+END $$;
 
 -- Contracts Table
 CREATE TABLE IF NOT EXISTS contracts (
