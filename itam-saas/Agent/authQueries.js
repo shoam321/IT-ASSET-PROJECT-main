@@ -149,11 +149,12 @@ export async function getAllAuthUsers() {
  */
 export async function ensureDefaultAdmin() {
   try {
-    const result = await pool.query('SELECT count(*) FROM auth_users');
+    // Check if any admin exists
+    const result = await pool.query("SELECT count(*) FROM auth_users WHERE role = 'admin'");
     const count = parseInt(result.rows[0].count);
     
     if (count === 0) {
-      console.log('⚠️ No users found. Creating default admin user...');
+      console.log('⚠️ No admin users found. Creating default admin user...');
       await createAuthUser(
         'admin',
         'admin@itasset.local',
