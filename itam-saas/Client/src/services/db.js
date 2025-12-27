@@ -16,12 +16,13 @@ function getAuthHeaders() {
  * Handle API response and check for auth errors
  */
 async function handleResponse(response) {
-  if (response.status === 401) {
-    // Token expired or invalid - logout user
+  if (response.status === 401 || response.status === 403) {
+    // Token expired, invalid, or forbidden - logout user
     localStorage.removeItem('authToken');
     localStorage.removeItem('authUser');
-    window.location.reload();
-    throw new Error('Session expired. Please login again.');
+    console.log('🔒 Invalid token detected - logging out...');
+    window.location.href = '/';
+    throw new Error('Session expired or invalid. Please login again.');
   }
   
   if (!response.ok) {
