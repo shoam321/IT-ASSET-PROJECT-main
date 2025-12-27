@@ -8,6 +8,7 @@ import AlertHistory from './components/AlertHistory';
 import NetworkTopology from './components/NetworkTopology';
 import AuditTrail from './components/AuditTrail';
 import InfoButton from './components/InfoButton';
+import DigitalReceipts from './components/DigitalReceipts';
 
 // Helper function to format dates in a user-friendly way
 const formatDate = (dateString) => {
@@ -945,6 +946,10 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {editingId && (
+        <DigitalReceipts assetId={editingId} />
       )}
 
       <div className="mb-8">
