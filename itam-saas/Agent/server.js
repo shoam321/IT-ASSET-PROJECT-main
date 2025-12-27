@@ -6,6 +6,9 @@ import { body, validationResult } from 'express-validator';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import rateLimit from 'express-rate-limit';
+import session from 'express-session';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -131,6 +134,52 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Session configuration for Passport
+app.use(session({
+  secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'fallback-secret-change-me',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Passport serialization
+passport.serializeUser((user, done) => {
+  done(null, user.id);
+});
+
+passport.deserializeUser(async (id, done) => {
+  try {
+    const users = await db.getAllUsers();
+    const user = users.find(u => u.id === id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+// Google OAuth Strategy
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL || 'https://it-asset-project-production.up.railway.app/api/auth/google/callback'
+  },
+  async (accessToken, refreshToken, profile, done) => {
+    try {
+      const user = await db.findOrCreateGoogleUser(profile);
+      return done(null, user);
+    } catch (error) {
+      return done(error, null);
+    }
+  }
+));
+
 // Logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
@@ -239,6 +288,77 @@ app.post('/api/auth/login', authLimiter, [
   body('password').notEmpty().withMessage('Password is required')
 ], async (req, res) => {
   const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const { username, password } = req.body;
+    const user = await authQueries.authenticateUser(username, password);
+    
+    const token = generateToken(user);
+    
+    // Log audit event
+    await db.logAuditEvent('users', user.id, 'LOGIN', null, { logged_in: true }, {
+      userId: user.id,
+      username: user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.full_name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Google OAuth Routes
+app.get('/api/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+app.get('/api/auth/google/callback',
+  passport.authenticate('google', { 
+    failureRedirect: process.env.FRONTEND_URL || 'https://it-asset-project.vercel.app',
+    session: false 
+  }),
+  async (req, res) => {
+    try {
+      // Generate JWT token
+      const token = generateToken(req.user);
+      
+      // Log audit event
+      await db.logAuditEvent('users', req.user.id, 'LOGIN', null, { logged_in_via: 'google' }, {
+        userId: req.user.id,
+        username: req.user.username,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent']
+      });
+      
+      // Redirect to frontend with token
+      const frontendUrl = process.env.FRONTEND_URL || 'https://it-asset-project.vercel.app';
+      res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+    } catch (error) {
+      console.error('Google OAuth callback error:', error);
+      const frontendUrl = process.env.FRONTEND_URL || 'https://it-asset-project.vercel.app';
+      res.redirect(`${frontendUrl}?error=auth_failed`);
+    }
+  }
+);
+
+// Get current user info (protected route)
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }

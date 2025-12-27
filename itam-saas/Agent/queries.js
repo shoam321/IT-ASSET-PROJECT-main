@@ -1352,3 +1352,61 @@ export async function deleteReceipt(id) {
     throw error;
   }
 }
+
+/**
+ * Find or create user by Google profile
+ */
+export async function findOrCreateGoogleUser(profile) {
+  try {
+    const email = profile.emails[0].value;
+    const googleId = profile.id;
+    
+    // First, try to find user by Google ID
+    let result = await pool.query(
+      'SELECT * FROM users WHERE google_id = $1',
+      [googleId]
+    );
+    
+    if (result.rows.length > 0) {
+      return result.rows[0];
+    }
+    
+    // If not found by Google ID, try to find by email
+    result = await pool.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
+    
+    if (result.rows.length > 0) {
+      // Link Google account to existing user
+      const user = result.rows[0];
+      await pool.query(
+        'UPDATE users SET google_id = $1, profile_picture = $2, auth_provider = $3 WHERE id = $4',
+        [googleId, profile.photos[0]?.value, 'google', user.id]
+      );
+      return { ...user, google_id: googleId, auth_provider: 'google' };
+    }
+    
+    // Create new user
+    result = await pool.query(
+      `INSERT INTO users (username, email, google_id, profile_picture, auth_provider, role, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        profile.displayName || profile.emails[0].value.split('@')[0],
+        email,
+        googleId,
+        profile.photos[0]?.value,
+        'google',
+        'User', // Default role
+        'Active'
+      ]
+    );
+    
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error finding/creating Google user:', error);
+    throw error;
+  }
+}
+
