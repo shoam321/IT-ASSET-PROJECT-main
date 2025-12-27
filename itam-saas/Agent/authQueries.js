@@ -143,3 +143,27 @@ export async function getAllAuthUsers() {
     throw error;
   }
 }
+
+/**
+ * Ensure default admin exists
+ */
+export async function ensureDefaultAdmin() {
+  try {
+    const result = await pool.query('SELECT count(*) FROM auth_users');
+    const count = parseInt(result.rows[0].count);
+    
+    if (count === 0) {
+      console.log('⚠️ No users found. Creating default admin user...');
+      await createAuthUser(
+        'admin',
+        'admin@itasset.local',
+        'admin123',
+        'System Administrator',
+        'admin'
+      );
+      console.log('✅ Default admin created: admin / admin123');
+    }
+  } catch (error) {
+    console.error('Error ensuring default admin:', error);
+  }
+}

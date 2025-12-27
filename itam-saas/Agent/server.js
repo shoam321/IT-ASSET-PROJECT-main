@@ -220,6 +220,13 @@ async function startServer() {
       } catch (error) {
         console.error('⚠️ Initial alert cleanup failed:', error.message);
       }
+
+      // Ensure default admin exists
+      try {
+        await authQueries.ensureDefaultAdmin();
+      } catch (error) {
+        console.error('⚠️ Failed to ensure default admin:', error.message);
+      }
       
       return;
     } catch (error) {
@@ -318,7 +325,10 @@ app.post('/api/auth/login', authLimiter, [
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login error:', error.message);
+    if (error.message === 'Invalid username or password' || error.message === 'Account is disabled') {
+      return res.status(401).json({ error: error.message });
+    }
     res.status(500).json({ error: 'Login failed' });
   }
 });
