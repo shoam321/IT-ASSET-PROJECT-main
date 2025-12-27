@@ -6,6 +6,10 @@ import { body, validationResult } from 'express-validator';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import rateLimit from 'express-rate-limit';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
 import { authenticateToken, generateToken } from './middleware/auth.js';
@@ -13,9 +17,45 @@ import { initializeAlertService, shutdownAlertService } from './alertService.js'
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads', 'receipts');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|pdf|doc|docx|xls|xlsx/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (extname && mimetype) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Allowed: images, PDF, Word, Excel'));
+    }
+  }
+});
 
 // Socket.IO configuration
 const io = new Server(httpServer, {
@@ -685,6 +725,76 @@ app.delete('/api/contracts/:id', authenticateToken, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// ===== DIGITAL RECEIPTS ROUTES =====
+
+// Upload receipt for an asset
+app.post('/api/assets/:id/receipts', authenticateToken, upload.single('receipt'), async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const assetId = parseInt(req.params.id);
+    const receipt = await db.createReceipt(assetId, {
+      file_name: req.file.originalname,
+      file_path: `/uploads/receipts/${req.file.filename}`,
+      file_size: req.file.size,
+      file_type: req.file.mimetype,
+      description: req.body.description || null,
+      uploaded_by: req.user.userId,
+      uploaded_by_name: req.user.username,
+      user_id: req.user.userId
+    });
+
+    res.status(201).json(receipt);
+  } catch (error) {
+    console.error('Receipt upload error:', error);
+    res.status(500).json({ error: 'Failed to upload receipt' });
+  }
+});
+
+// Get all receipts for an asset
+app.get('/api/assets/:id/receipts', authenticateToken, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    
+    const assetId = parseInt(req.params.id);
+    const receipts = await db.getReceiptsByAssetId(assetId);
+    res.json(receipts);
+  } catch (error) {
+    console.error('Get receipts error:', error);
+    res.status(500).json({ error: 'Failed to fetch receipts' });
+  }
+});
+
+// Delete a receipt
+app.delete('/api/receipts/:id', authenticateToken, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    
+    const receipt = await db.deleteReceipt(req.params.id);
+    if (!receipt) {
+      return res.status(404).json({ error: 'Receipt not found' });
+    }
+
+    // Delete file from filesystem
+    const filePath = path.join(__dirname, receipt.file_path);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    res.json({ message: 'Receipt deleted', receipt });
+  } catch (error) {
+    console.error('Delete receipt error:', error);
+    res.status(500).json({ error: 'Failed to delete receipt' });
+  }
+});
+
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ===== AGENT ROUTES =====
 

@@ -1291,3 +1291,59 @@ export async function getRecordHistory(tableName, recordId) {
     throw error;
   }
 }
+
+/**
+ * DIGITAL RECEIPTS FUNCTIONS
+ */
+
+/**
+ * Upload a receipt for an asset
+ */
+export async function createReceipt(assetId, receiptData) {
+  try {
+    const { file_name, file_path, file_size, file_type, description, uploaded_by, uploaded_by_name, user_id } = receiptData;
+    
+    const result = await pool.query(
+      `INSERT INTO receipts (asset_id, file_name, file_path, file_size, file_type, description, uploaded_by, uploaded_by_name, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [assetId, file_name, file_path, file_size, file_type, description || null, uploaded_by, uploaded_by_name, user_id]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error creating receipt:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all receipts for an asset
+ */
+export async function getReceiptsByAssetId(assetId) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM receipts WHERE asset_id = $1 ORDER BY upload_date DESC',
+      [assetId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching receipts:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a receipt
+ */
+export async function deleteReceipt(id) {
+  try {
+    const result = await pool.query(
+      'DELETE FROM receipts WHERE id = $1 RETURNING *',
+      [id]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error deleting receipt:', error);
+    throw error;
+  }
+}
