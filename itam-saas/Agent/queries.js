@@ -422,6 +422,19 @@ export async function deleteLicense(id) {
 }
 
 /**
+ * Get license by ID (for audit logging)
+ */
+export async function getLicenseById(id) {
+  try {
+    const result = await pool.query('SELECT * FROM licenses WHERE id = $1', [id]);
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error fetching license by ID:', error);
+    throw error;
+  }
+}
+
+/**
  * Search licenses
  */
 export async function searchLicenses(query) {
@@ -521,6 +534,19 @@ export async function deleteUser(id) {
     return result.rows[0];
   } catch (error) {
     console.error('Error deleting user:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get user by ID (for audit logging)
+ */
+export async function getUserById(id) {
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error fetching user by ID:', error);
     throw error;
   }
 }
@@ -629,6 +655,19 @@ export async function deleteContract(id) {
     return result.rows[0];
   } catch (error) {
     console.error('Error deleting contract:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get contract by ID (for audit logging)
+ */
+export async function getContractById(id) {
+  try {
+    const result = await pool.query('SELECT * FROM contracts WHERE id = $1', [id]);
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error fetching contract by ID:', error);
     throw error;
   }
 }

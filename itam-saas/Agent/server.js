@@ -446,6 +446,15 @@ app.post('/api/licenses', authenticateToken, async (req, res) => {
     console.log('📝 Creating license with data:', req.body);
     const license = await db.createLicense(req.body);
     console.log('✅ License created:', license);
+    
+    // Audit log
+    await db.logAuditEvent('licenses', license.id, 'CREATE', null, license, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.status(201).json(license);
   } catch (error) {
     console.error('❌ License creation error:', error.message);
@@ -457,11 +466,23 @@ app.post('/api/licenses', authenticateToken, async (req, res) => {
 app.put('/api/licenses/:id', authenticateToken, async (req, res) => {
   try {
     console.log('📝 Updating license', req.params.id, 'with data:', req.body);
+    
+    // Get old license for audit
+    const oldLicense = await db.getLicenseById(req.params.id);
     const license = await db.updateLicense(req.params.id, req.body);
     if (!license) {
       return res.status(404).json({ error: 'License not found' });
     }
     console.log('✅ License updated:', license);
+    
+    // Audit log
+    await db.logAuditEvent('licenses', license.id, 'UPDATE', oldLicense, license, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.json(license);
   } catch (error) {
     console.error('❌ License update error:', error.message);
@@ -476,6 +497,15 @@ app.delete('/api/licenses/:id', authenticateToken, async (req, res) => {
     if (!license) {
       return res.status(404).json({ error: 'License not found' });
     }
+    
+    // Audit log
+    await db.logAuditEvent('licenses', license.id, 'DELETE', license, null, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.json({ message: 'License deleted', license });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -508,6 +538,15 @@ app.get('/api/users/search/:query', authenticateToken, async (req, res) => {
 app.post('/api/users', authenticateToken, async (req, res) => {
   try {
     const user = await db.createUser(req.body);
+    
+    // Audit log
+    await db.logAuditEvent('users', user.id, 'CREATE', null, user, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.status(201).json(user);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -517,10 +556,21 @@ app.post('/api/users', authenticateToken, async (req, res) => {
 // Update user
 app.put('/api/users/:id', authenticateToken, async (req, res) => {
   try {
+    // Get old user for audit
+    const oldUser = await db.getUserById(req.params.id);
     const user = await db.updateUser(req.params.id, req.body);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+    
+    // Audit log
+    await db.logAuditEvent('users', user.id, 'UPDATE', oldUser, user, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.json(user);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -534,6 +584,15 @@ app.delete('/api/users/:id', authenticateToken, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
+    
+    // Audit log
+    await db.logAuditEvent('users', user.id, 'DELETE', user, null, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.json({ message: 'User deleted', user });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -566,6 +625,15 @@ app.get('/api/contracts/search/:query', authenticateToken, async (req, res) => {
 app.post('/api/contracts', authenticateToken, async (req, res) => {
   try {
     const contract = await db.createContract(req.body);
+    
+    // Audit log
+    await db.logAuditEvent('contracts', contract.id, 'CREATE', null, contract, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.status(201).json(contract);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -575,10 +643,21 @@ app.post('/api/contracts', authenticateToken, async (req, res) => {
 // Update contract
 app.put('/api/contracts/:id', authenticateToken, async (req, res) => {
   try {
+    // Get old contract for audit
+    const oldContract = await db.getContractById(req.params.id);
     const contract = await db.updateContract(req.params.id, req.body);
     if (!contract) {
       return res.status(404).json({ error: 'Contract not found' });
     }
+    
+    // Audit log
+    await db.logAuditEvent('contracts', contract.id, 'UPDATE', oldContract, contract, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.json(contract);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -592,6 +671,15 @@ app.delete('/api/contracts/:id', authenticateToken, async (req, res) => {
     if (!contract) {
       return res.status(404).json({ error: 'Contract not found' });
     }
+    
+    // Audit log
+    await db.logAuditEvent('contracts', contract.id, 'DELETE', contract, null, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.json({ message: 'Contract deleted', contract });
   } catch (error) {
     res.status(500).json({ error: error.message });

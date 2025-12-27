@@ -6,6 +6,7 @@ import UsageMonitor from './components/UsageMonitor';
 import ForbiddenApps from './components/ForbiddenApps';
 import AlertHistory from './components/AlertHistory';
 import NetworkTopology from './components/NetworkTopology';
+import AuditTrail from './components/AuditTrail';
 
 // Helper function to format dates in a user-friendly way
 const formatDate = (dateString) => {
@@ -1728,6 +1729,8 @@ export default function App() {
         return <AlertHistory />;
       case 'topology':
         return <NetworkTopology />;
+      case 'audit':
+        return <AuditTrail />;
       default:
         return renderHomeScreen();
     }
@@ -1911,6 +1914,18 @@ export default function App() {
           >
             <Network className="w-5 h-5" />
             <span>Network Topology</span>
+          </button>
+
+          <button
+            onClick={() => { setCurrentScreen('audit'); setShowForm(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+              currentScreen === 'audit' 
+                ? 'bg-blue-600 text-white' 
+                : 'text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            <FileCheck className="w-5 h-5" />
+            <span>Audit Trail</span>
           </button>
         </nav>
 
