@@ -157,8 +157,7 @@ passport.serializeUser((user, done) => {
 
 passport.deserializeUser(async (id, done) => {
   try {
-    const users = await db.getAllUsers();
-    const user = users.find(u => u.id === id);
+    const user = await authQueries.findUserById(id);
     done(null, user);
   } catch (error) {
     done(error, null);
