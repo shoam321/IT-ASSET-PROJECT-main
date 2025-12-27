@@ -269,6 +269,46 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
+// --- AUDIT TRAIL ENDPOINTS ---
+
+// Get audit logs with filters
+app.get('/api/audit-logs', authenticateToken, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.id);
+    
+    const filters = {
+      tableName: req.query.table,
+      recordId: req.query.recordId ? parseInt(req.query.recordId) : null,
+      userId: req.query.userId ? parseInt(req.query.userId) : null,
+      action: req.query.action,
+      startDate: req.query.startDate,
+      endDate: req.query.endDate,
+      limit: req.query.limit ? parseInt(req.query.limit) : 100,
+      offset: req.query.offset ? parseInt(req.query.offset) : 0
+    };
+
+    const logs = await db.getAuditLogs(filters);
+    res.json(logs);
+  } catch (error) {
+    console.error('Get audit logs error:', error);
+    res.status(500).json({ error: 'Failed to fetch audit logs' });
+  }
+});
+
+// Get history for a specific record
+app.get('/api/audit-logs/:table/:id', authenticateToken, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.id);
+    
+    const { table, id } = req.params;
+    const history = await db.getRecordHistory(table, parseInt(id));
+    res.json(history);
+  } catch (error) {
+    console.error('Get record history error:', error);
+    res.status(500).json({ error: 'Failed to fetch record history' });
+  }
+});
+
 // ===== ASSET ROUTES (Protected) =====
 
 // Get all assets
@@ -318,6 +358,15 @@ app.get('/api/stats', async (req, res) => {
 app.post('/api/assets', authenticateToken, async (req, res) => {
   try {
     const asset = await db.createAsset(req.body);
+    
+    // Log audit event
+    await db.logAuditEvent('assets', asset.id, 'CREATE', null, asset, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.status(201).json(asset);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -327,10 +376,20 @@ app.post('/api/assets', authenticateToken, async (req, res) => {
 // Update asset
 app.put('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
+    const oldAsset = await db.getAssetById(req.params.id);
     const asset = await db.updateAsset(req.params.id, req.body);
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }
+    
+    // Log audit event
+    await db.logAuditEvent('assets', asset.id, 'UPDATE', oldAsset, asset, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.json(asset);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -344,6 +403,15 @@ app.delete('/api/assets/:id', authenticateToken, async (req, res) => {
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }
+    
+    // Log audit event
+    await db.logAuditEvent('assets', asset.id, 'DELETE', asset, null, {
+      userId: req.user.id,
+      username: req.user.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
     res.json({ message: 'Asset deleted', asset });
   } catch (error) {
     res.status(500).json({ error: error.message });

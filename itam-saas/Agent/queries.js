@@ -1127,3 +1127,128 @@ export async function cleanupOldAlerts(hoursOld = 5) {
     throw error;
   }
 }
+
+/**
+ * ============================================================================
+ * AUDIT TRAIL - Track all system changes for compliance and security
+ * ============================================================================
+ */
+
+/**
+ * Log an audit event (CREATE, UPDATE, DELETE)
+ * @param {string} tableName - Name of the table being modified
+ * @param {number} recordId - ID of the record
+ * @param {string} action - CREATE, UPDATE, or DELETE
+ * @param {object} oldData - Data before change (null for CREATE)
+ * @param {object} newData - Data after change (null for DELETE)
+ * @param {object} userInfo - {userId, username, ipAddress, userAgent}
+ */
+export async function logAuditEvent(tableName, recordId, action, oldData, newData, userInfo = {}) {
+  try {
+    await pool.query(
+      `INSERT INTO audit_logs 
+       (table_name, record_id, action, old_data, new_data, user_id, username, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        tableName,
+        recordId,
+        action,
+        oldData ? JSON.stringify(oldData) : null,
+        newData ? JSON.stringify(newData) : null,
+        userInfo.userId || null,
+        userInfo.username || null,
+        userInfo.ipAddress || null,
+        userInfo.userAgent || null
+      ]
+    );
+  } catch (error) {
+    // Don't throw - audit logging should never break the main operation
+    console.error('Failed to log audit event:', error);
+  }
+}
+
+/**
+ * Get audit logs with filters
+ * @param {object} filters - {tableName, recordId, userId, startDate, endDate, action, limit, offset}
+ */
+export async function getAuditLogs(filters = {}) {
+  try {
+    let query = 'SELECT * FROM audit_logs WHERE 1=1';
+    const params = [];
+    let paramCount = 1;
+
+    if (filters.tableName) {
+      query += ` AND table_name = $${paramCount}`;
+      params.push(filters.tableName);
+      paramCount++;
+    }
+
+    if (filters.recordId) {
+      query += ` AND record_id = $${paramCount}`;
+      params.push(filters.recordId);
+      paramCount++;
+    }
+
+    if (filters.userId) {
+      query += ` AND user_id = $${paramCount}`;
+      params.push(filters.userId);
+      paramCount++;
+    }
+
+    if (filters.action) {
+      query += ` AND action = $${paramCount}`;
+      params.push(filters.action);
+      paramCount++;
+    }
+
+    if (filters.startDate) {
+      query += ` AND timestamp >= $${paramCount}`;
+      params.push(filters.startDate);
+      paramCount++;
+    }
+
+    if (filters.endDate) {
+      query += ` AND timestamp <= $${paramCount}`;
+      params.push(filters.endDate);
+      paramCount++;
+    }
+
+    query += ` ORDER BY timestamp DESC`;
+
+    if (filters.limit) {
+      query += ` LIMIT $${paramCount}`;
+      params.push(filters.limit);
+      paramCount++;
+    }
+
+    if (filters.offset) {
+      query += ` OFFSET $${paramCount}`;
+      params.push(filters.offset);
+      paramCount++;
+    }
+
+    const result = await pool.query(query, params);
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching audit logs:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get audit history for a specific record
+ */
+export async function getRecordHistory(tableName, recordId) {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM audit_logs 
+       WHERE table_name = $1 AND record_id = $2 
+       ORDER BY timestamp DESC`,
+      [tableName, recordId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching record history:', error);
+    throw error;
+  }
+}

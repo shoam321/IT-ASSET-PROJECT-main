@@ -1,0 +1,39 @@
+-- Audit Trail Migration
+-- Tracks all changes to assets, licenses, users, and contracts
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id SERIAL PRIMARY KEY,
+  table_name VARCHAR(50) NOT NULL,
+  record_id INTEGER NOT NULL,
+  action VARCHAR(20) NOT NULL CHECK (action IN ('CREATE', 'UPDATE', 'DELETE')),
+  old_data JSONB,
+  new_data JSONB,
+  user_id INTEGER,
+  username VARCHAR(255),
+  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  ip_address VARCHAR(45),
+  user_agent TEXT
+);
+
+-- Indexes for fast querying
+CREATE INDEX IF NOT EXISTS idx_audit_table_name ON audit_logs(table_name);
+CREATE INDEX IF NOT EXISTS idx_audit_record_id ON audit_logs(record_id);
+CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_user_id ON audit_logs(user_id);
+
+-- Enable Row-Level Security for multi-tenancy
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only see audit logs for their own data
+CREATE POLICY audit_logs_select_policy ON audit_logs
+  FOR SELECT
+  USING (user_id = current_setting('app.current_user_id', TRUE)::INTEGER);
+
+-- Policy: System can insert audit logs
+CREATE POLICY audit_logs_insert_policy ON audit_logs
+  FOR INSERT
+  WITH CHECK (true);
+
+COMMENT ON TABLE audit_logs IS 'Tracks all CRUD operations across the system for compliance and security';
+COMMENT ON COLUMN audit_logs.old_data IS 'JSON snapshot of record before change (NULL for CREATE)';
+COMMENT ON COLUMN audit_logs.new_data IS 'JSON snapshot of record after change (NULL for DELETE)';
