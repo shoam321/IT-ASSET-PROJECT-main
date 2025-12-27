@@ -11,6 +11,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Secret setup files
+GOOGLE_SSO_SETUP.md
+
 # React build
 build/
 dist/
