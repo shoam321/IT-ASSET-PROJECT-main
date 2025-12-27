@@ -1113,9 +1113,9 @@ export async function cleanupOldAlerts(hoursOld = 5) {
   try {
     const result = await pool.query(
       `DELETE FROM security_alerts 
-       WHERE created_at < NOW() - INTERVAL $1
+       WHERE created_at < NOW() - ($1 || ' hours')::INTERVAL
        RETURNING id`,
-      [`${hoursOld} hours`]
+      [hoursOld]
     );
     const deletedCount = result.rowCount;
     if (deletedCount > 0) {
