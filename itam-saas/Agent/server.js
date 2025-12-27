@@ -360,49 +360,6 @@ app.get('/api/auth/google/callback',
 
 // Get current user info (protected route)
 app.get('/api/auth/me', authenticateToken, async (req, res) => {
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
-  }
-
-  try {
-    const { username, password } = req.body;
-    
-    const user = await authQueries.findUserByUsername(username);
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid username or password' });
-    }
-
-    if (!user.is_active) {
-      return res.status(403).json({ error: 'Account is deactivated' });
-    }
-
-    const isValidPassword = await authQueries.verifyPassword(password, user.password_hash);
-    if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid username or password' });
-    }
-
-    await authQueries.updateLastLogin(user.id);
-    const token = generateToken(user);
-
-    res.json({
-      message: 'Login successful',
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        fullName: user.full_name,
-        role: user.role
-      }
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
-  }
-});
-
-// Get current user info (protected route)
-app.get('/api/auth/me', authenticateToken, async (req, res) => {
   try {
     const user = await authQueries.findUserById(req.user.id);
     if (!user) {
