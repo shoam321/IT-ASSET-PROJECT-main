@@ -1326,6 +1326,7 @@ export async function createReceipt(assetId, receiptData) {
  */
 export async function getReceiptsByAssetId(assetId) {
   try {
+    console.log('Fetching receipts for assetId:', assetId); // Debugging log
     const result = await pool.query(
       'SELECT * FROM receipts WHERE asset_id = $1 ORDER BY upload_date DESC',
       [assetId]
