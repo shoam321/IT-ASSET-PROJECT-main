@@ -9,6 +9,7 @@ async function testForbiddenAppsAPI() {
   // Test 1: Login to get token
   console.log('Test 1: Login to get authentication token');
   try {
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123'; // Use environment variable for admin password
     const loginResponse = await fetch(`${API_URL}/api/auth/login`, {
       method: 'POST',
       headers: {
@@ -16,7 +17,7 @@ async function testForbiddenAppsAPI() {
       },
       body: JSON.stringify({
         username: 'admin',
-        password: 'admin123'
+        password: adminPassword,
       })
     });
     
@@ -29,7 +30,7 @@ async function testForbiddenAppsAPI() {
     
     const loginData = await loginResponse.json();
     console.log('✅ Login successful');
-    console.log(`Token received: ${loginData.token.substring(0, 20)}...`);
+    console.log('Token received'); // Removed sensitive token logging
     console.log('');
     
     const token = loginData.token;

@@ -18,7 +18,6 @@ const CONFIG = {
 // You must convert your Service Account JSON file into a string 
 // and store it in an environment variable (e.g., on Render).
 const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-
 if (!serviceAccountKey) {
   console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.");
   process.exit(1);

@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
  */
 export async function createAuthUser(username, email, password, fullName = null, role = 'user') {
   try {
-    const salt = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(12); // Increased salt rounds from 10 to 12
     const passwordHash = await bcrypt.hash(password, salt);
 
     const result = await pool.query(
