@@ -1207,26 +1207,28 @@ app.post('/api/agent/usage', authenticateToken, async (req, res) => {
     const canonicalDeviceId = canonicalizeAgentDeviceId(rawDeviceId, userId);
     logAgentDeviceIdMapping('/api/agent/usage', rawDeviceId, canonicalDeviceId, userId);
 
-    // Set PostgreSQL session variable for Row-Level Security
-    await db.setCurrentUserId(userId);
+    // Use withRLSContext to ensure RLS variable and queries use the SAME database connection
+    // This fixes the connection pooling issue where setCurrentUserId and queries could use different connections
+    const usageData = await db.withRLSContext(userId, async (client) => {
+      // Ensure device exists first (auto-create if needed)
+      await db.upsertDevice({
+        device_id: canonicalDeviceId,
+        user_id: userId, // Associate device with user
+        hostname: rawDeviceId,
+        os_name: 'Unknown',
+        os_version: 'Unknown',
+        timestamp: Date.now()
+      }, client);
 
-    // Ensure device exists first (auto-create if needed)
-    await db.upsertDevice({
-      device_id: canonicalDeviceId,
-      user_id: userId, // Associate device with user
-      hostname: rawDeviceId,
-      os_name: 'Unknown',
-      os_version: 'Unknown',
-      timestamp: Date.now()
-    });
-
-    const usageData = await db.insertUsageData({
-      device_id: canonicalDeviceId,
-      user_id: userId, // Associate usage with user
-      app_name,
-      window_title: window_title || '',
-      duration: duration || 0,
-      timestamp: timestamp || Date.now()
+      // Insert usage data using the same client
+      return await db.insertUsageData({
+        device_id: canonicalDeviceId,
+        user_id: userId, // Associate usage with user
+        app_name,
+        window_title: window_title || '',
+        duration: duration || 0,
+        timestamp: timestamp || Date.now()
+      }, client);
     });
 
     res.status(201).json({ 

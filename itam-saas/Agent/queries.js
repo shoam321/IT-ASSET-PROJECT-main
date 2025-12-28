@@ -58,6 +58,46 @@ export async function setCurrentUserId(userId) {
 }
 
 /**
+ * Execute a query with RLS context properly set using a dedicated client from the pool
+ * This ensures that the session variable and the query execute on the same connection
+ * 
+ * CRITICAL FIX FOR CONNECTION POOLING ISSUE:
+ * - Connection pooling can cause different queries to use different connections
+ * - setCurrentUserId() might set the variable on connection A
+ * - But the actual query might execute on connection B (which doesn't have the variable set!)
+ * - This function solves it by getting ONE client and using it for both operations
+ * 
+ * @param {number} userId - User ID to set for RLS context
+ * @param {Function} callback - Async function that receives the client and executes queries
+ * @returns {Promise} Result of the callback function
+ */
+export async function withRLSContext(userId, callback) {
+  const client = await pool.connect();
+  try {
+    // Handle undefined or null userId gracefully
+    if (userId === undefined || userId === null) {
+      console.warn('⚠️ withRLSContext called with undefined/null userId, using 0');
+      userId = 0;
+    }
+    
+    console.log(`🔐 Setting app.current_user_id = ${userId}`);
+    
+    // Set the session variable on THIS specific client connection
+    await client.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
+    
+    // Verify it was set (on the same connection)
+    const verify = await client.query("SELECT current_setting('app.current_user_id', true) as value");
+    console.log(`✅ Verified app.current_user_id = ${verify.rows[0].value}`);
+    
+    // Execute the callback with the same client
+    return await callback(client);
+  } finally {
+    // Always release the client back to the pool
+    client.release();
+  }
+}
+
+/**
  * Verify database tables exist (no automatic creation)
  */
 export async function initDatabase() {
@@ -897,12 +937,15 @@ export async function searchContracts(query) {
 
 /**
  * Upsert device (insert or update)
+ * @param {Object} deviceData - Device data to upsert
+ * @param {Object} client - Optional: PostgreSQL client with RLS context already set
  */
-export async function upsertDevice(deviceData) {
+export async function upsertDevice(deviceData, client = null) {
   const { device_id, hostname, os_name, os_version, user_id } = deviceData;
   
   try {
-    const result = await pool.query(
+    const queryClient = client || pool;
+    const result = await queryClient.query(
       `INSERT INTO devices (device_id, hostname, os_name, os_version, user_id, last_seen, status)
        VALUES (
          $1,
@@ -947,12 +990,15 @@ export async function upsertDevice(deviceData) {
 
 /**
  * Insert usage data
+ * @param {Object} usageData - Usage data to insert
+ * @param {Object} client - Optional: PostgreSQL client with RLS context already set
  */
-export async function insertUsageData(usageData) {
+export async function insertUsageData(usageData, client = null) {
   const { device_id, app_name, window_title, duration, timestamp, user_id } = usageData;
   
   try {
-    const result = await pool.query(
+    const queryClient = client || pool;
+    const result = await queryClient.query(
       `INSERT INTO device_usage (device_id, app_name, window_title, duration, timestamp, user_id)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
