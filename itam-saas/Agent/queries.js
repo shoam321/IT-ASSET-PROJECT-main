@@ -148,14 +148,75 @@ export async function getAllAssets() {
   }
 }
 
+let _assetsHasUserIdColumn;
+async function assetsHasUserIdColumn() {
+  if (typeof _assetsHasUserIdColumn === 'boolean') return _assetsHasUserIdColumn;
+  try {
+    const result = await pool.query(
+      `SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'assets'
+         AND column_name = 'user_id'
+       LIMIT 1`
+    );
+    _assetsHasUserIdColumn = result.rowCount > 0;
+    return _assetsHasUserIdColumn;
+  } catch (e) {
+    // Fail open to legacy schema behavior if information_schema isn't accessible.
+    _assetsHasUserIdColumn = false;
+    return _assetsHasUserIdColumn;
+  }
+}
+
+async function getUserIdentityById(userId) {
+  const result = await pool.query(
+    'SELECT username, full_name, email FROM auth_users WHERE id = $1',
+    [userId]
+  );
+  return result.rows[0] || null;
+}
+
+function normalizeIdentityValues(identity) {
+  const values = [];
+  if (!identity) return values;
+  for (const v of [identity.username, identity.full_name, identity.email]) {
+    if (typeof v === 'string' && v.trim()) values.push(v.trim());
+  }
+  // De-dup case-insensitively
+  const seen = new Set();
+  return values.filter(v => {
+    const k = v.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 /**
  * Get assets for a specific user (defense-in-depth alongside RLS)
  */
 export async function getAssetsForUser(userId) {
   try {
+    if (await assetsHasUserIdColumn()) {
+      const result = await pool.query(
+        'SELECT * FROM assets WHERE user_id = $1 ORDER BY created_at DESC',
+        [userId]
+      );
+      return result.rows;
+    }
+
+    // Legacy schema fallback: assets has assigned_user_name but no user_id.
+    const identity = await getUserIdentityById(userId);
+    const values = normalizeIdentityValues(identity);
+    if (values.length === 0) return [];
+
     const result = await pool.query(
-      'SELECT * FROM assets WHERE user_id = $1 ORDER BY created_at DESC',
-      [userId]
+      `SELECT *
+       FROM assets
+       WHERE lower(assigned_user_name) = ANY ($1)
+       ORDER BY created_at DESC`,
+      [values.map(v => v.toLowerCase())]
     );
     return result.rows;
   } catch (error) {
@@ -182,9 +243,24 @@ export async function getAssetById(id) {
  */
 export async function getAssetByIdForUser(id, userId) {
   try {
+    if (await assetsHasUserIdColumn()) {
+      const result = await pool.query(
+        'SELECT * FROM assets WHERE id = $1 AND user_id = $2',
+        [id, userId]
+      );
+      return result.rows[0];
+    }
+
+    const identity = await getUserIdentityById(userId);
+    const values = normalizeIdentityValues(identity);
+    if (values.length === 0) return null;
+
     const result = await pool.query(
-      'SELECT * FROM assets WHERE id = $1 AND user_id = $2',
-      [id, userId]
+      `SELECT *
+       FROM assets
+       WHERE id = $1
+         AND lower(assigned_user_name) = ANY ($2)`,
+      [id, values.map(v => v.toLowerCase())]
     );
     return result.rows[0];
   } catch (error) {
@@ -213,11 +289,28 @@ export async function createAsset(assetData) {
   const { asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id } = assetData;
   
   try {
+    if (await assetsHasUserIdColumn()) {
+      const result = await pool.query(
+        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
+        [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id]
+      );
+      return result.rows[0];
+    }
+
+    // Legacy schema fallback: store ownership in assigned_user_name.
+    let assignedName = assigned_user_name;
+    if ((!assignedName || !String(assignedName).trim()) && user_id) {
+      const identity = await getUserIdentityById(user_id);
+      assignedName = identity?.username || identity?.full_name || identity?.email || null;
+    }
+
     const result = await pool.query(
-      `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id]
+      [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false]
     );
     return result.rows[0];
   } catch (error) {
@@ -231,6 +324,19 @@ export async function createAsset(assetData) {
  * Update asset
  */
 export async function updateAsset(id, assetData) {
+  // Legacy schema compatibility: translate user_id updates into assigned_user_name.
+  if (!(await assetsHasUserIdColumn()) && assetData && Object.prototype.hasOwnProperty.call(assetData, 'user_id')) {
+    const newUserId = assetData.user_id;
+    delete assetData.user_id;
+    if (newUserId) {
+      const identity = await getUserIdentityById(newUserId);
+      const assignedName = identity?.username || identity?.full_name || identity?.email || null;
+      if (assignedName) {
+        assetData.assigned_user_name = assignedName;
+      }
+    }
+  }
+
   const fields = [];
   const values = [];
   let paramCount = 1;
@@ -302,9 +408,30 @@ export async function searchAssets(query) {
 export async function searchAssetsForUser(query, userId) {
   try {
     const searchTerm = `%${query}%`;
+    if (await assetsHasUserIdColumn()) {
+      const result = await pool.query(
+        `SELECT * FROM assets
+         WHERE user_id = $2
+           AND (
+             asset_tag ILIKE $1
+             OR manufacturer ILIKE $1
+             OR model ILIKE $1
+             OR assigned_user_name ILIKE $1
+           )
+         ORDER BY created_at DESC`,
+        [searchTerm, userId]
+      );
+      return result.rows;
+    }
+
+    const identity = await getUserIdentityById(userId);
+    const values = normalizeIdentityValues(identity);
+    if (values.length === 0) return [];
+
     const result = await pool.query(
-      `SELECT * FROM assets
-       WHERE user_id = $2
+      `SELECT *
+       FROM assets
+       WHERE lower(assigned_user_name) = ANY ($2)
          AND (
            asset_tag ILIKE $1
            OR manufacturer ILIKE $1
@@ -312,7 +439,7 @@ export async function searchAssetsForUser(query, userId) {
            OR assigned_user_name ILIKE $1
          )
        ORDER BY created_at DESC`,
-      [searchTerm, userId]
+      [searchTerm, values.map(v => v.toLowerCase())]
     );
     return result.rows;
   } catch (error) {

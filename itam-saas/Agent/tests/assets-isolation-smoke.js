@@ -41,6 +41,11 @@ function normalizeToken(raw) {
   if (typeof raw !== 'string') return null;
   let token = raw.trim();
 
+  if (!token) return null;
+
+  // Common accidental values when copying from console/PowerShell.
+  if (token === 'undefined' || token === 'null') return null;
+
   // PowerShell / clipboard copies can include quotes.
   if ((token.startsWith('"') && token.endsWith('"')) || (token.startsWith("'") && token.endsWith("'"))) {
     token = token.slice(1, -1).trim();
@@ -52,6 +57,20 @@ function normalizeToken(raw) {
   }
 
   return token;
+}
+
+function looksLikeJwt(token) {
+  if (typeof token !== 'string') return false;
+  const parts = token.split('.');
+  return parts.length === 3 && parts.every(p => p.length > 10);
+}
+
+function tokenHint(token) {
+  if (typeof token !== 'string') return '(missing)';
+  const t = token;
+  const head = t.slice(0, 12);
+  const tail = t.slice(-8);
+  return `${t.length} chars, ${head}…${tail}`;
 }
 
 async function request(method, path, { token, body } = {}) {
@@ -139,9 +158,34 @@ async function main() {
   console.log(`MODE=${mode}`);
 
   if (mode === 'read-only') {
-    const userTokenRaw = process.env.TEST_USER_TOKEN;
-    const userToken = normalizeToken(userTokenRaw);
-    assert(typeof userToken === 'string' && userToken.length > 20, 'TEST_USER_TOKEN is required in read-only mode');
+    const testUsername = (process.env.TEST_USERNAME || '').trim();
+    const testPassword = process.env.TEST_PASSWORD || '';
+
+    let userToken = normalizeToken(process.env.TEST_USER_TOKEN);
+
+    // If creds are provided, prefer them (avoids env-var/clipboard token confusion).
+    if (testUsername && testPassword) {
+      // Only use TEST_USER_TOKEN if it's clearly a JWT.
+      if (!userToken || !looksLikeJwt(userToken)) {
+        const loginResult = await login(testUsername, testPassword);
+        userToken = normalizeToken(loginResult.token);
+      }
+    }
+
+    if (!userToken) {
+      throw new Error(
+        'Missing auth for read-only mode. Provide either TEST_USER_TOKEN=<jwt> or TEST_USERNAME/TEST_PASSWORD for an existing non-admin account.'
+      );
+    }
+
+    assert(typeof userToken === 'string' && userToken.length > 20, 'Could not obtain a valid token for read-only mode');
+
+    if (!looksLikeJwt(userToken)) {
+      throw new Error(
+        `TEST_USER_TOKEN does not look like a JWT (expected 3 dot-separated parts). Got: ${tokenHint(userToken)}. ` +
+        `If you're not using tokens, clear it with: Remove-Item Env:TEST_USER_TOKEN (PowerShell) and re-run with TEST_USERNAME/TEST_PASSWORD.`
+      );
+    }
 
     let me;
     try {
@@ -149,7 +193,8 @@ async function main() {
     } catch (e) {
       if (String(e?.message || '').includes('Invalid token')) {
         throw new Error(
-          `GET /auth/me failed: Invalid token. Common causes: copied token includes a trailing newline (fixed by trimming), token is from a different environment than API_BASE_URL, or token is expired.`
+          `GET /auth/me failed: Invalid token. Token hint: ${tokenHint(userToken)}. ` +
+          `Common causes: token is from a different environment than API_BASE_URL, token is expired, or JWT_SECRET differs on that backend.`
         );
       }
       throw e;
@@ -159,9 +204,24 @@ async function main() {
     const assets = await request('GET', '/assets', { token: userToken });
     assert(Array.isArray(assets), 'GET /assets should return an array');
 
-    // Strict: every returned asset must belong to current user.
-    const foreign = assets.filter(a => a?.user_id !== me.id);
-    assert(foreign.length === 0, `User can see assets not owned by them (found ${foreign.length})`);
+    const anyHasUserId = assets.some(a => Object.prototype.hasOwnProperty.call(a || {}, 'user_id'));
+    if (anyHasUserId) {
+      // Strict: every returned asset must belong to current user.
+      const foreign = assets.filter(a => a?.user_id !== me.id);
+      assert(foreign.length === 0, `User can see assets not owned by them (found ${foreign.length})`);
+    } else {
+      // Legacy schema fallback: no user_id column, so validate assigned_user_name matches user identity.
+      const allowed = new Set(
+        [me.username, me.fullName, me.email]
+          .filter(v => typeof v === 'string' && v.trim())
+          .map(v => v.trim().toLowerCase())
+      );
+      const foreign = assets.filter(a => {
+        const assigned = typeof a?.assigned_user_name === 'string' ? a.assigned_user_name.trim().toLowerCase() : '';
+        return assigned && !allowed.has(assigned);
+      });
+      assert(foreign.length === 0, `User can see assets not assigned to them (legacy schema check, found ${foreign.length})`);
+    }
 
     console.log(`✅ PASS: read-only isolation (userId=${me.id}, assets=${assets.length})`);
     return;

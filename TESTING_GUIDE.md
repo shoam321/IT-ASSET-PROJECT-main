@@ -71,8 +71,21 @@ $env:TEST_USER_TOKEN = "<paste-user-jwt-token>"
 npm run test:assets-isolation
 ```
 
+Alternative (no JWT copying):
+```powershell
+cd itam-saas/Agent
+$env:API_BASE_URL = "https://it-asset-project-production.up.railway.app/api"
+$env:MODE = "read-only"
+$env:TEST_USERNAME = "<existing-non-admin-username>"
+$env:TEST_PASSWORD = "<password>"
+npm run test:assets-isolation
+```
+
 Tip: if you're logged into the web UI, you can grab the JWT from DevTools:
 - Console: `copy(localStorage.getItem('authToken'))` (it copies to clipboard; `copy(...)` returns `undefined`)
+  - Make sure you're doing this on the same environment as `API_BASE_URL` (production site for production API)
+  - If clipboard is flaky, you can also print it: `console.log(localStorage.getItem('authToken'))`
+  - If it prints `undefined`, you're either not logged in, or you're running the console on a different origin (common mistake: opening the `/api` URL instead of the web app)
 
 Notes:
 - In `MODE=read-only`, the test logs in via `TEST_USER_TOKEN` and verifies `GET /assets` only returns rows where `user_id` matches the caller.
