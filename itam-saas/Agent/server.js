@@ -19,6 +19,7 @@ import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
 import { authenticateToken, generateToken, requireAdmin } from './middleware/auth.js';
 import { initializeAlertService, shutdownAlertService } from './alertService.js';
+import { getCached, invalidateCache } from './redis.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1270,6 +1271,9 @@ app.post('/api/agent/heartbeat', authenticateToken, async (req, res) => {
       timestamp: timestamp || Date.now()
     });
 
+    // Invalidate device cache for this user
+    await invalidateCache(`devices:user:${userId}`);
+
     res.json({ 
       message: 'Heartbeat received',
       device_id: rawDeviceId,
@@ -1315,9 +1319,11 @@ app.get('/api/agent/devices', authenticateToken, async (req, res) => {
     // Set PostgreSQL session variable for Row-Level Security
     await db.setCurrentUserId(userId);
     
-    // Row-Level Security will automatically filter based on user
-    // Admins see all, regular users see only theirs
-    const devices = await db.getAllDevices();
+    // Cache devices per user (5 minutes TTL)
+    const cacheKey = `devices:user:${userId}`;
+    const devices = await getCached(cacheKey, async () => {
+      return await db.getAllDevices();
+    }, 300); // 5 minutes cache
     
     res.json(devices);
   } catch (error) {
