@@ -37,10 +37,28 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function normalizeToken(raw) {
+  if (typeof raw !== 'string') return null;
+  let token = raw.trim();
+
+  // PowerShell / clipboard copies can include quotes.
+  if ((token.startsWith('"') && token.endsWith('"')) || (token.startsWith("'") && token.endsWith("'"))) {
+    token = token.slice(1, -1).trim();
+  }
+
+  // Allow callers to pass the whole Authorization header value by mistake.
+  if (/^bearer\s+/i.test(token)) {
+    token = token.replace(/^bearer\s+/i, '').trim();
+  }
+
+  return token;
+}
+
 async function request(method, path, { token, body } = {}) {
+  const normalizedToken = normalizeToken(token);
   const headers = {
     ...(body ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {})
+    ...(normalizedToken ? { Authorization: `Bearer ${normalizedToken}` } : {})
   };
 
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -84,9 +102,19 @@ async function register(username, email, password) {
 }
 
 async function createAsset(adminToken, asset) {
-  const created = await request('POST', '/assets', { token: adminToken, body: asset });
-  assert(typeof created?.id === 'number', 'Asset create did not return id');
-  return created;
+  try {
+    const created = await request('POST', '/assets', { token: adminToken, body: asset });
+    assert(typeof created?.id === 'number', 'Asset create did not return id');
+    return created;
+  } catch (e) {
+    const msg = String(e?.message || '');
+    if (msg.includes('column "user_id"') && msg.includes('assets') && msg.includes('does not exist')) {
+      throw new Error(
+        'Asset create failed because the database is missing assets.user_id. Apply itam-saas/Agent/migrations/add-user-asset-ownership.sql (script: npm run migrate:user-asset-ownership) before running MODE=full.'
+      );
+    }
+    throw e;
+  }
 }
 
 async function deleteAsset(adminToken, id) {
@@ -111,10 +139,21 @@ async function main() {
   console.log(`MODE=${mode}`);
 
   if (mode === 'read-only') {
-    const userToken = process.env.TEST_USER_TOKEN;
+    const userTokenRaw = process.env.TEST_USER_TOKEN;
+    const userToken = normalizeToken(userTokenRaw);
     assert(typeof userToken === 'string' && userToken.length > 20, 'TEST_USER_TOKEN is required in read-only mode');
 
-    const me = await request('GET', '/auth/me', { token: userToken });
+    let me;
+    try {
+      me = await request('GET', '/auth/me', { token: userToken });
+    } catch (e) {
+      if (String(e?.message || '').includes('Invalid token')) {
+        throw new Error(
+          `GET /auth/me failed: Invalid token. Common causes: copied token includes a trailing newline (fixed by trimming), token is from a different environment than API_BASE_URL, or token is expired.`
+        );
+      }
+      throw e;
+    }
     assert(typeof me?.id === 'number', 'GET /auth/me did not return id');
 
     const assets = await request('GET', '/assets', { token: userToken });

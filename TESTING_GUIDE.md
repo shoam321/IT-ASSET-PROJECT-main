@@ -49,6 +49,7 @@ Run this after any major backend/security change. It will **FAIL** if a non-admi
 - Backend is running
 - For **local/full** mode: you have an **admin** username/password (local/dev default is often `admin` / `admin123`)
 - For **production/read-only** mode: you have a valid **user JWT token**
+- For **local/full** mode: DB schema includes `assets.user_id` (apply `migrations/add-user-asset-ownership.sql` if missing)
 
 ```powershell
 cd itam-saas/Agent
