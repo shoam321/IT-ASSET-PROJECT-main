@@ -963,6 +963,22 @@ export async function getForbiddenAppsList() {
 }
 
 /**
+ * Get forbidden app by id
+ */
+export async function getForbiddenAppById(id) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM forbidden_apps WHERE id = $1',
+      [id]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error fetching forbidden app by id:', error);
+    throw error;
+  }
+}
+
+/**
  * Create forbidden app
  */
 export async function createForbiddenApp(appData) {
@@ -1399,77 +1415,6 @@ export async function findOrCreateGoogleUser(profile) {
     return result.rows[0];
   } catch (error) {
     console.error('Error finding/creating Google user:', error);
-    throw error;
-  }
-}
-
-/**
- * Add a forbidden app
- */
-export async function addForbiddenApp(appData, adminId) {
-  try {
-    const { process_name, description, severity } = appData;
-
-    const result = await pool.query(
-      `INSERT INTO forbidden_apps (process_name, description, severity, created_by)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [process_name, description, severity, adminId]
-    );
-
-    // Log to audit trail
-    const auditResult = await pool.query(
-      `INSERT INTO audit_trail (action, details, performed_by)
-       VALUES ($1, $2, $3) RETURNING *`,
-      ['Add Forbidden App', `App: ${process_name}, Severity: ${severity}`, adminId]
-    );
-
-    console.log('Audit trail entry created:', auditResult.rows[0]); // Debugging log
-
-    return result.rows[0];
-  } catch (error) {
-    console.error('Error adding forbidden app:', error);
-    throw error;
-  }
-}
-
-/**
- * Remove a forbidden app
- */
-export async function removeForbiddenApp(appId, adminId) {
-  try {
-    const result = await pool.query(
-      `DELETE FROM forbidden_apps WHERE id = $1 RETURNING *`,
-      [appId]
-    );
-
-    // Log to audit trail
-    const auditResult = await pool.query(
-      `INSERT INTO audit_trail (action, details, performed_by)
-       VALUES ($1, $2, $3) RETURNING *`,
-      ['Remove Forbidden App', `App ID: ${appId}`, adminId]
-    );
-
-    console.log('Audit trail entry created:', auditResult.rows[0]); // Debugging log
-
-    return result.rows[0];
-  } catch (error) {
-    console.error('Error removing forbidden app:', error);
-    throw error;
-  }
-}
-
-/**
- * Get audit trail entries for forbidden apps
- */
-export async function getAuditTrailForForbiddenApps() {
-  try {
-    const result = await pool.query(
-      `SELECT * FROM audit_trail WHERE action IN ('Add Forbidden App', 'Remove Forbidden App') ORDER BY created_at DESC`
-    );
-    return result.rows;
-  } catch (error) {
-    console.error('Error fetching audit trail for forbidden apps:', error);
     throw error;
   }
 }

@@ -1093,6 +1093,8 @@ app.post('/api/forbidden-apps', [
 
   try {
     const { userId, role } = req.user;
+    const actorUserId = req.user?.userId || req.user?.id;
+    const actorUsername = req.user?.username;
     
     // Check if user is admin
     if (role !== 'admin') {
@@ -1109,6 +1111,14 @@ app.post('/api/forbidden-apps', [
     };
     
     const newApp = await db.createForbiddenApp(appData);
+
+    await db.logAuditEvent('forbidden_apps', newApp.id, 'CREATE', null, newApp, {
+      userId: actorUserId,
+      username: actorUsername,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
     res.status(201).json(newApp);
   } catch (error) {
     console.error('Error creating forbidden app:', error);
@@ -1120,6 +1130,8 @@ app.post('/api/forbidden-apps', [
 app.put('/api/forbidden-apps/:id', authenticateToken, async (req, res) => {
   try {
     const { userId, role } = req.user;
+    const actorUserId = req.user?.userId || req.user?.id;
+    const actorUsername = req.user?.username;
     
     if (role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
@@ -1128,11 +1140,19 @@ app.put('/api/forbidden-apps/:id', authenticateToken, async (req, res) => {
     await db.setCurrentUserId(userId);
     
     const { id } = req.params;
+    const oldApp = await db.getForbiddenAppById(parseInt(id));
     const updatedApp = await db.updateForbiddenApp(id, req.body);
     
     if (!updatedApp) {
       return res.status(404).json({ error: 'Forbidden app not found' });
     }
+
+    await db.logAuditEvent('forbidden_apps', updatedApp.id, 'UPDATE', oldApp || null, updatedApp, {
+      userId: actorUserId,
+      username: actorUsername,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
     
     res.json(updatedApp);
   } catch (error) {
@@ -1145,6 +1165,8 @@ app.put('/api/forbidden-apps/:id', authenticateToken, async (req, res) => {
 app.delete('/api/forbidden-apps/:id', authenticateToken, async (req, res) => {
   try {
     const { userId, role } = req.user;
+    const actorUserId = req.user?.userId || req.user?.id;
+    const actorUsername = req.user?.username;
     
     if (role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
@@ -1153,11 +1175,19 @@ app.delete('/api/forbidden-apps/:id', authenticateToken, async (req, res) => {
     await db.setCurrentUserId(userId);
     
     const { id } = req.params;
+    const oldApp = await db.getForbiddenAppById(parseInt(id));
     const deleted = await db.deleteForbiddenApp(id);
     
     if (!deleted) {
       return res.status(404).json({ error: 'Forbidden app not found' });
     }
+
+    await db.logAuditEvent('forbidden_apps', deleted.id, 'DELETE', oldApp || deleted, null, {
+      userId: actorUserId,
+      username: actorUsername,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
     
     res.json({ message: 'Forbidden app deleted successfully', deleted });
   } catch (error) {
@@ -1276,19 +1306,6 @@ app.get('/api/alerts/device/:deviceId', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching device alerts:', error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-// Get audit trail entries for forbidden apps
-app.get('/audit-trail', async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT * FROM audit_trail ORDER BY created_at DESC`
-    );
-    res.json(result.rows);
-  } catch (error) {
-    console.error('Error fetching audit trail:', error);
-    res.status(500).send('Internal Server Error');
   }
 });
 
