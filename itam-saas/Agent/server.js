@@ -182,9 +182,10 @@ app.use('/api', async (req, res, next) => {
   res.on('finish', release);
   res.on('close', release);
 
-  dbAsyncLocalStorage.run({ client }, () => {
-    next();
-  });
+  // Use enterWith() (more reliable with Express) so all downstream async work
+  // for this request sees the same store/client.
+  dbAsyncLocalStorage.enterWith({ client });
+  next();
 });
 
 // Session configuration for Passport
