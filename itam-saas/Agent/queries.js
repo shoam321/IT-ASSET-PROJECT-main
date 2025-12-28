@@ -36,13 +36,21 @@ export async function setCurrentUserId(userId) {
   try {
     // Handle undefined or null userId gracefully
     if (userId === undefined || userId === null) {
-      console.warn('setCurrentUserId called with undefined/null userId, using 0');
+      console.warn('⚠️ setCurrentUserId called with undefined/null userId, using 0');
       userId = 0;
     }
+    
+    console.log(`🔐 Setting app.current_user_id = ${userId}`); // DEBUG
+    
     // Use set_config() function instead of SET command
     // set_config(setting_name, new_value, is_local)
     // is_local=false means it persists for the session (works with connection pooling)
     await pool.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
+    
+    // Verify it was set
+    const verify = await pool.query("SELECT current_setting('app.current_user_id', true) as value");
+    console.log(`✅ Verified app.current_user_id = ${verify.rows[0].value}`); // DEBUG
+    
   } catch (error) {
     console.error('Error setting current user ID:', error);
     throw error;
