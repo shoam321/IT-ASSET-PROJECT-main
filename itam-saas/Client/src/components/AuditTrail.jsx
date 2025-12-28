@@ -109,6 +109,58 @@ export default function AuditTrail() {
     return changes;
   };
 
+  const normalizeJson = (value) => {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  };
+
+  const getEntitySummary = (log) => {
+    const newData = normalizeJson(log.new_data);
+    const oldData = normalizeJson(log.old_data);
+    const data = newData || oldData;
+    if (!data) return null;
+
+    switch (log.table_name) {
+      case 'forbidden_apps': {
+        const name = data.process_name || data.app_detected || data.name;
+        const sev = data.severity;
+        const desc = data.description;
+        const parts = [];
+        if (name) parts.push(String(name));
+        if (sev) parts.push(String(sev));
+        const title = parts.length ? parts.join(' • ') : 'Forbidden app';
+        return desc ? `${title} — ${String(desc)}` : title;
+      }
+      case 'assets': {
+        const tag = data.asset_tag;
+        const type = data.asset_type;
+        if (tag && type) return `${tag} • ${type}`;
+        return tag || type || 'Asset';
+      }
+      case 'licenses': {
+        return data.license_name || data.vendor || 'License';
+      }
+      case 'contracts': {
+        return data.contract_name || data.vendor || 'Contract';
+      }
+      case 'users': {
+        return data.username || data.email || 'User';
+      }
+      default: {
+        // Fallback: try a couple common fields.
+        return data.name || data.title || data.process_name || null;
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="audit-trail-container" style={{ padding: '40px', textAlign: 'center' }}>
@@ -331,19 +383,35 @@ export default function AuditTrail() {
                   <td style={{ padding: '12px', fontFamily: 'monospace' }}>#{log.record_id}</td>
                   <td style={{ padding: '12px' }}>{log.username || 'System'}</td>
                   <td style={{ padding: '12px', fontSize: '12px', color: '#64748b' }}>
-                    {log.action === 'UPDATE' && log.old_data && log.new_data ? (
-                      <div>
-                        {getDiff(log.old_data, log.new_data)?.slice(0, 3).map((change, i) => (
-                          <div key={i} style={{ marginBottom: '5px' }}>
-                            <strong>{change.field}:</strong> {String(change.from)} → {String(change.to)}
-                          </div>
-                        ))}
-                      </div>
-                    ) : log.action === 'CREATE' ? (
-                      <span>Record created</span>
-                    ) : (
-                      <span>Record deleted</span>
-                    )}
+                    <div>
+                      {getEntitySummary(log) && (
+                        <div style={{ marginBottom: '6px', color: '#0f172a' }}>
+                          <strong>{getEntitySummary(log)}</strong>
+                        </div>
+                      )}
+
+                      {log.action === 'UPDATE' && log.old_data && log.new_data ? (
+                        <div>
+                          {getDiff(normalizeJson(log.old_data) || log.old_data, normalizeJson(log.new_data) || log.new_data)
+                            ?.slice(0, 3)
+                            .map((change, i) => (
+                              <div key={i} style={{ marginBottom: '5px' }}>
+                                <strong>{change.field}:</strong> {String(change.from)} → {String(change.to)}
+                              </div>
+                            ))}
+                        </div>
+                      ) : log.action === 'CREATE' ? (
+                        <span>Record created</span>
+                      ) : (
+                        <span>Record deleted</span>
+                      )}
+
+                      {(log.ip_address || log.user_agent) && (
+                        <div style={{ marginTop: '6px', color: '#94a3b8' }}>
+                          {log.ip_address ? <span>IP: {log.ip_address}</span> : null}
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
