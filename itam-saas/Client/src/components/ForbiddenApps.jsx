@@ -15,6 +15,7 @@ const ForbiddenApps = () => {
     description: '',
     severity: 'Medium'
   });
+  const [filter, setFilter] = useState('');
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app';
 
@@ -173,6 +174,8 @@ const ForbiddenApps = () => {
       app.process_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (app.description && app.description.toLowerCase().includes(searchTerm.toLowerCase()))
     : true
+  ).filter(app => 
+    filter ? app.process_name === filter : true
   );
 
   return (

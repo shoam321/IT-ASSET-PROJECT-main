@@ -1403,3 +1403,55 @@ export async function findOrCreateGoogleUser(profile) {
   }
 }
 
+/**
+ * Add a forbidden app
+ */
+export async function addForbiddenApp(appData, adminId) {
+  try {
+    const { process_name, description, severity } = appData;
+
+    const result = await pool.query(
+      `INSERT INTO forbidden_apps (process_name, description, severity, created_by)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [process_name, description, severity, adminId]
+    );
+
+    // Log to audit trail
+    await pool.query(
+      `INSERT INTO audit_trail (action, details, performed_by)
+       VALUES ($1, $2, $3)`,
+      ['Add Forbidden App', `App: ${process_name}, Severity: ${severity}`, adminId]
+    );
+
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error adding forbidden app:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove a forbidden app
+ */
+export async function removeForbiddenApp(appId, adminId) {
+  try {
+    const result = await pool.query(
+      `DELETE FROM forbidden_apps WHERE id = $1 RETURNING *`,
+      [appId]
+    );
+
+    // Log to audit trail
+    await pool.query(
+      `INSERT INTO audit_trail (action, details, performed_by)
+       VALUES ($1, $2, $3)`,
+      ['Remove Forbidden App', `App ID: ${appId}`, adminId]
+    );
+
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error removing forbidden app:', error);
+    throw error;
+  }
+}
+
