@@ -18,7 +18,7 @@ async function runMigration() {
   try {
     console.log('🔄 Running tighten-assets-rls migration...\n');
     
-    const sql = readFileSync(join(__dirname, 'migrations', 'enable-rls-complete.sql'), 'utf8');
+    const sql = readFileSync(join(__dirname, 'migrations', 'fix-devices-rls.sql'), 'utf8');
     
     await pool.query(sql);
     
