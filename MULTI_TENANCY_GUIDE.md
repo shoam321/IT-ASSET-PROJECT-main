@@ -129,6 +129,10 @@ SELECT * FROM devices WHERE user_id = <current_user_id>
 - Can't be tampered with (signature verification fails)
 - Expires after 7 days
 
+**Important:** The JWT `role` claim is treated as a convenience, not a source of truth.
+Admin-only actions and "admin sees all" behavior are verified against the database (`auth_users.role`) at request time.
+This prevents stale/incorrect tokens from retaining admin access until expiry.
+
 #### Layer 2: Permission-Based Authorization
 - `authorize()` middleware checks permissions array
 - Example: `authorize('read:all_devices')` → Only admins pass
@@ -139,6 +143,9 @@ SELECT * FROM devices WHERE user_id = <current_user_id>
 - Even if app code has bugs, database blocks unauthorized queries
 - Uses session variable: `app.current_user_id`
 - Zero-trust model: Every query is filtered
+
+**Policy caveat (assets/licenses):** If your RLS policies allow `user_id IS NULL` reads ("unassigned" rows), regular users may see more than intended when many rows are unassigned.
+If you want strict isolation (users only see rows explicitly assigned to them), apply: `itam-saas/Agent/migrations/tighten-assets-rls.sql`.
 
 ### Permissions by Role
 

@@ -17,12 +17,17 @@ PostgreSQL RLS policies automatically filter data based on user role:
 |-------|-------------|--------------|
 | `devices` | Own devices only | All devices |
 | `device_usage` | Own usage only | All usage data |
-| `assets` | Own assets + unassigned | All assets |
-| `licenses` | Own licenses + unassigned | All licenses |
+| `assets` | Own assets only | All assets |
+| `licenses` | Own licenses only | All licenses |
 | `contracts` | No access | Full access |
 | `users` | Own record only | All users |
 | `security_alerts` | Own alerts only | All alerts |
 | `forbidden_apps` | Read-only list | Full CRUD |
+
+**Important policy note (unassigned rows):**
+- Earlier RLS policies allowed reading rows where `user_id IS NULL` ("unassigned"), which can unintentionally expose *all* assets/licenses if many rows are unassigned.
+- Current API behavior is defense-in-depth: non-admin asset endpoints use `WHERE user_id = <current user>`.
+- If you also want database-level strictness, apply the optional migration `itam-saas/Agent/migrations/tighten-assets-rls.sql`.
 
 ### 2. User Authentication Flow
 
@@ -76,6 +81,11 @@ All endpoints use `authenticateToken` middleware which:
 2. Extracts `userId` and `role`
 3. Calls `setCurrentUserId(userId)` to set PostgreSQL session variable
 4. RLS policies automatically filter queries
+
+**Admin verification (defense-in-depth):**
+- Sensitive admin-only endpoints do not rely on the JWT `role` claim alone.
+- Admin rights are verified against the `auth_users` table at request time.
+- This prevents stale/incorrect tokens from granting admin access for the full token lifetime.
 
 ### Agent Data Flow
 

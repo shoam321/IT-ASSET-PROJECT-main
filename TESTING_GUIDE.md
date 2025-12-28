@@ -41,6 +41,37 @@ cd itam-saas/Agent
 npm start
 ```
 
+#### Multi-Tenancy Regression Smoke Test (Assets Isolation)
+
+Run this after any major backend/security change. It will **FAIL** if a non-admin user can see assets assigned to another user or admin.
+
+**Prereqs:**
+- Backend is running
+- You have an **admin** username/password (local/dev default is often `admin` / `admin123`)
+
+```powershell
+cd itam-saas/Agent
+
+# Local
+$env:API_BASE_URL = "http://localhost:5000/api"
+$env:ADMIN_USERNAME = "admin"
+$env:ADMIN_PASSWORD = "admin123"
+npm run test:assets-isolation
+```
+
+**Against production (use with care):**
+```powershell
+cd itam-saas/Agent
+$env:API_BASE_URL = "https://it-asset-project-production.up.railway.app/api"
+$env:ADMIN_USERNAME = "<your-admin-username>"
+$env:ADMIN_PASSWORD = "<your-admin-password>"
+npm run test:assets-isolation
+```
+
+Notes:
+- The test creates a couple of temporary users and a few test assets, then deletes the assets.
+- If this test fails, treat it as a **security regression**.
+
 #### Test Agent Endpoints
 
 **A. Heartbeat Endpoint**

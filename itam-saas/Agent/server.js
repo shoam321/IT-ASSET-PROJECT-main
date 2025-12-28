@@ -654,7 +654,11 @@ app.get('/api/audit-logs/:table/:id', authenticateToken, async (req, res) => {
 // Get all assets (RLS: users see only their own, admins see all)
 app.get('/api/assets', authenticateToken, async (req, res) => {
   try {
-    const { userId, role } = req.user;
+    const userId = req.user?.userId ?? req.user?.id;
+    const role = req.user?.role;
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token structure' });
+    }
     await db.setCurrentUserId(userId);
 
     // Defense-in-depth: do not trust JWT role alone for "admin sees all".
@@ -677,7 +681,11 @@ app.get('/api/assets', authenticateToken, async (req, res) => {
 // Get asset by ID (RLS: users see only their own, admins see all)
 app.get('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
-    const { userId, role } = req.user;
+    const userId = req.user?.userId ?? req.user?.id;
+    const role = req.user?.role;
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token structure' });
+    }
     await db.setCurrentUserId(userId);
 
     let isAdmin = role === 'admin';
@@ -701,7 +709,11 @@ app.get('/api/assets/:id', authenticateToken, async (req, res) => {
 // Search assets (RLS: users see only their own, admins see all)
 app.get('/api/assets/search/:query', authenticateToken, async (req, res) => {
   try {
-    const { userId, role } = req.user;
+    const userId = req.user?.userId ?? req.user?.id;
+    const role = req.user?.role;
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token structure' });
+    }
     await db.setCurrentUserId(userId);
 
     let isAdmin = role === 'admin';

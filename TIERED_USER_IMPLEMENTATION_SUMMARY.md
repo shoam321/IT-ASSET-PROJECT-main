@@ -82,6 +82,7 @@ SELECT * FROM devices;
 
 ### New Files:
 - ✅ `itam-saas/Agent/migrations/add-user-asset-ownership.sql` - RLS migration
+- ✅ `itam-saas/Agent/migrations/tighten-assets-rls.sql` - Optional: disallow non-admin reads of unassigned assets/licenses
 - ✅ `itam-saas/Agent/migrations/run-user-asset-ownership-migration.js` - Migration runner
 - ✅ `TIERED_USER_SYSTEM_GUIDE.md` - Complete documentation
 - ✅ `test-tiered-system.ps1` - Automated test script
@@ -90,6 +91,7 @@ SELECT * FROM devices;
 ### Modified Files:
 - ✅ `itam-saas/Agent/server.js` - Updated asset routes to use RLS
 - ✅ `itam-saas/Agent/queries.js` - Updated createAsset to accept user_id
+ - ✅ `itam-saas/Agent/middleware/auth.js` - Admin checks verified against DB (defense-in-depth)
 
 ### Already Implemented (No Changes Needed):
 - ✅ `itam-saas/Agent/middleware/auth.js` - JWT validation and RLS context
