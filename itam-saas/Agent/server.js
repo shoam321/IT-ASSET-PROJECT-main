@@ -14,9 +14,10 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import pool, { dbAsyncLocalStorage } from './db.js';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
-import { authenticateToken, generateToken } from './middleware/auth.js';
+import { authenticateToken, generateToken, requireAdmin } from './middleware/auth.js';
 import { initializeAlertService, shutdownAlertService } from './alertService.js';
 
 dotenv.config();
@@ -155,6 +156,36 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Bind a single DB connection to each /api request.
+// Needed for PostgreSQL RLS that relies on session variables (set_config).
+app.use('/api', async (req, res, next) => {
+  let client;
+  try {
+    client = await pool.connect();
+  } catch (error) {
+    console.error('Failed to acquire DB client:', error);
+    return res.status(500).json({ error: 'Database connection error' });
+  }
+
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    try {
+      client.release();
+    } catch {
+      // ignore
+    }
+  };
+
+  res.on('finish', release);
+  res.on('close', release);
+
+  dbAsyncLocalStorage.run({ client }, () => {
+    next();
+  });
+});
 
 // Session configuration for Passport
 app.use(session({
@@ -483,7 +514,7 @@ function buildAuditFiltersFromQuery(query) {
 }
 
 // Export audit logs (CSV/JSON) using the same filters as GET /api/audit-logs
-app.get('/api/audit-logs/export', authenticateToken, async (req, res) => {
+app.get('/api/audit-logs/export', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const userId = req.user?.userId || req.user?.id;
     if (!userId) {
@@ -547,7 +578,7 @@ app.get('/api/audit-logs/export', authenticateToken, async (req, res) => {
 });
 
 // Get audit logs with filters
-app.get('/api/audit-logs', authenticateToken, async (req, res) => {
+app.get('/api/audit-logs', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // Use userId from JWT token, fallback to id if userId not present
     const userId = req.user?.userId || req.user?.id;
@@ -584,7 +615,7 @@ app.get('/api/audit-logs/:table/:id', authenticateToken, async (req, res) => {
 // ===== ASSET ROUTES (Protected) =====
 
 // Get all assets
-app.get('/api/assets', authenticateToken, async (req, res) => {
+app.get('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const assets = await db.getAllAssets();
     res.json(assets);
@@ -627,7 +658,7 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // Create new asset
-app.post('/api/assets', authenticateToken, async (req, res) => {
+app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const asset = await db.createAsset(req.body);
     
@@ -646,7 +677,7 @@ app.post('/api/assets', authenticateToken, async (req, res) => {
 });
 
 // Update asset
-app.put('/api/assets/:id', authenticateToken, async (req, res) => {
+app.put('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const oldAsset = await db.getAssetById(req.params.id);
     const asset = await db.updateAsset(req.params.id, req.body);
@@ -669,7 +700,7 @@ app.put('/api/assets/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete asset
-app.delete('/api/assets/:id', authenticateToken, async (req, res) => {
+app.delete('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const asset = await db.deleteAsset(req.params.id);
     if (!asset) {
@@ -693,7 +724,7 @@ app.delete('/api/assets/:id', authenticateToken, async (req, res) => {
 // --- LICENSES ROUTES ---
 
 // Get all licenses
-app.get('/api/licenses', authenticateToken, async (req, res) => {
+app.get('/api/licenses', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const licenses = await db.getAllLicenses();
     res.json(licenses);
@@ -713,7 +744,7 @@ app.get('/api/licenses/search/:query', authenticateToken, async (req, res) => {
 });
 
 // Create new license
-app.post('/api/licenses', authenticateToken, async (req, res) => {
+app.post('/api/licenses', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log('📝 Creating license with data:', req.body);
     const license = await db.createLicense(req.body);
@@ -735,7 +766,7 @@ app.post('/api/licenses', authenticateToken, async (req, res) => {
 });
 
 // Update license
-app.put('/api/licenses/:id', authenticateToken, async (req, res) => {
+app.put('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     console.log('📝 Updating license', req.params.id, 'with data:', req.body);
     
@@ -763,7 +794,7 @@ app.put('/api/licenses/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete license
-app.delete('/api/licenses/:id', authenticateToken, async (req, res) => {
+app.delete('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const license = await db.deleteLicense(req.params.id);
     if (!license) {
@@ -787,7 +818,7 @@ app.delete('/api/licenses/:id', authenticateToken, async (req, res) => {
 // --- USERS ROUTES ---
 
 // Get all users
-app.get('/api/users', authenticateToken, async (req, res) => {
+app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const users = await db.getAllUsers();
     res.json(users);
@@ -807,7 +838,7 @@ app.get('/api/users/search/:query', authenticateToken, async (req, res) => {
 });
 
 // Create new user
-app.post('/api/users', authenticateToken, async (req, res) => {
+app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const user = await db.createUser(req.body);
     
@@ -826,7 +857,7 @@ app.post('/api/users', authenticateToken, async (req, res) => {
 });
 
 // Update user
-app.put('/api/users/:id', authenticateToken, async (req, res) => {
+app.put('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // Get old user for audit
     const oldUser = await db.getUserById(req.params.id);
@@ -850,7 +881,7 @@ app.put('/api/users/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete user
-app.delete('/api/users/:id', authenticateToken, async (req, res) => {
+app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const user = await db.deleteUser(req.params.id);
     if (!user) {
@@ -874,7 +905,7 @@ app.delete('/api/users/:id', authenticateToken, async (req, res) => {
 // --- CONTRACTS ROUTES ---
 
 // Get all contracts
-app.get('/api/contracts', authenticateToken, async (req, res) => {
+app.get('/api/contracts', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const contracts = await db.getAllContracts();
     res.json(contracts);
@@ -894,7 +925,7 @@ app.get('/api/contracts/search/:query', authenticateToken, async (req, res) => {
 });
 
 // Create new contract
-app.post('/api/contracts', authenticateToken, async (req, res) => {
+app.post('/api/contracts', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const contract = await db.createContract(req.body);
     
@@ -913,7 +944,7 @@ app.post('/api/contracts', authenticateToken, async (req, res) => {
 });
 
 // Update contract
-app.put('/api/contracts/:id', authenticateToken, async (req, res) => {
+app.put('/api/contracts/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // Get old contract for audit
     const oldContract = await db.getContractById(req.params.id);
@@ -937,7 +968,7 @@ app.put('/api/contracts/:id', authenticateToken, async (req, res) => {
 });
 
 // Delete contract
-app.delete('/api/contracts/:id', authenticateToken, async (req, res) => {
+app.delete('/api/contracts/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const contract = await db.deleteContract(req.params.id);
     if (!contract) {
@@ -961,7 +992,7 @@ app.delete('/api/contracts/:id', authenticateToken, async (req, res) => {
 // ===== DIGITAL RECEIPTS ROUTES =====
 
 // Upload receipt for an asset
-app.post('/api/assets/:id/receipts', authenticateToken, upload.single('receipt'), async (req, res) => {
+app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.single('receipt'), async (req, res) => {
   try {
     await db.setCurrentUserId(req.user.userId);
     
@@ -989,7 +1020,7 @@ app.post('/api/assets/:id/receipts', authenticateToken, upload.single('receipt')
 });
 
 // Get all receipts for an asset
-app.get('/api/assets/:id/receipts', authenticateToken, async (req, res) => {
+app.get('/api/assets/:id/receipts', authenticateToken, requireAdmin, async (req, res) => {
   try {
     await db.setCurrentUserId(req.user.userId);
     
@@ -1003,7 +1034,7 @@ app.get('/api/assets/:id/receipts', authenticateToken, async (req, res) => {
 });
 
 // Delete a receipt
-app.delete('/api/receipts/:id', authenticateToken, async (req, res) => {
+app.delete('/api/receipts/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     await db.setCurrentUserId(req.user.userId);
     

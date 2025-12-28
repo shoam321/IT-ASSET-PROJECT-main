@@ -24,6 +24,7 @@ const formatDate = (dateString) => {
 
 export default function App() {
   const { user, logout } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [currentScreen, setCurrentScreen] = useState('home');
   const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 1024);
   const [assets, setAssets] = useState([]);
@@ -83,17 +84,35 @@ export default function App() {
   });
 
   useEffect(() => {
-    loadAssets();
-    loadLicenses();
-    loadUsers();
-    loadContracts();
-    
+    // Non-admins should not see admin dashboard/screens.
+    if (!isAdmin) {
+      setCurrentScreen('usage');
+      setShowForm(false);
+      setShowWelcome(false);
+    }
+
+    if (isAdmin) {
+      loadAssets();
+      loadLicenses();
+      loadUsers();
+      loadContracts();
+    }
+
     // Check if user has visited before
     const hasVisited = localStorage.getItem('hasVisited');
     if (hasVisited) {
       setShowWelcome(false);
     }
-  }, []);
+  }, [isAdmin]);
+
+  // Prevent non-admins from landing on admin-only screens (e.g. via stale state).
+  useEffect(() => {
+    const adminOnlyScreens = new Set(['home', 'assets', 'licenses', 'users', 'contracts', 'forbidden-apps', 'audit', 'topology']);
+    if (!isAdmin && adminOnlyScreens.has(currentScreen)) {
+      setCurrentScreen('usage');
+      setShowForm(false);
+    }
+  }, [isAdmin, currentScreen]);
 
   const dismissWelcome = () => {
     setShowWelcome(false);
@@ -1982,7 +2001,7 @@ export default function App() {
       <aside className={`${sidebarOpen ? 'w-64' : 'w-0'} lg:w-64 bg-slate-800 border-r border-slate-700 transition-all duration-300 overflow-hidden flex flex-col absolute lg:relative h-full z-20 lg:z-auto`}>
         <div className="p-6 border-b border-slate-700">
           <button 
-            onClick={() => { setCurrentScreen('home'); setShowForm(false); }}
+            onClick={() => { setCurrentScreen(isAdmin ? 'home' : 'usage'); setShowForm(false); }}
             className="flex items-center justify-center w-full hover:opacity-80 transition cursor-pointer"
           >
             <img src="/logo.svg" alt="Asset Tracker" className="h-12 w-auto" />
@@ -1990,53 +2009,61 @@ export default function App() {
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          <button
-            onClick={() => { setCurrentScreen('assets'); setShowForm(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-              currentScreen === 'assets' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            <HardDrive className="w-5 h-5" />
-            <span>Assets</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentScreen('assets'); setShowForm(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                currentScreen === 'assets' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <HardDrive className="w-5 h-5" />
+              <span>Assets</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => { setCurrentScreen('licenses'); setShowForm(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-              currentScreen === 'licenses' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            <FileText className="w-5 h-5" />
-            <span>Licenses</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentScreen('licenses'); setShowForm(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                currentScreen === 'licenses' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <FileText className="w-5 h-5" />
+              <span>Licenses</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => { setCurrentScreen('users'); setShowForm(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-              currentScreen === 'users' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            <Users className="w-5 h-5" />
-            <span>Users</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentScreen('users'); setShowForm(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                currentScreen === 'users' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <Users className="w-5 h-5" />
+              <span>Users</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => { setCurrentScreen('contracts'); setShowForm(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-              currentScreen === 'contracts' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            <FileCheck className="w-5 h-5" />
-            <span>Contracts</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentScreen('contracts'); setShowForm(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                currentScreen === 'contracts' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <FileCheck className="w-5 h-5" />
+              <span>Contracts</span>
+            </button>
+          )}
 
           <button
             onClick={() => { setCurrentScreen('usage'); setShowForm(false); }}
@@ -2050,17 +2077,19 @@ export default function App() {
             <span>Usage Monitor</span>
           </button>
 
-          <button
-            onClick={() => { setCurrentScreen('forbidden-apps'); setShowForm(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-              currentScreen === 'forbidden-apps' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            <Shield className="w-5 h-5" />
-            <span>Forbidden Apps</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentScreen('forbidden-apps'); setShowForm(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                currentScreen === 'forbidden-apps' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <Shield className="w-5 h-5" />
+              <span>Forbidden Apps</span>
+            </button>
+          )}
 
           <button
             onClick={() => { setCurrentScreen('alerts'); setShowForm(false); }}
@@ -2074,29 +2103,33 @@ export default function App() {
             <span>Security Alerts</span>
           </button>
 
-          <button
-            onClick={() => { setCurrentScreen('topology'); setShowForm(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-              currentScreen === 'topology' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            <Network className="w-5 h-5" />
-            <span>Network Topology</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentScreen('topology'); setShowForm(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                currentScreen === 'topology' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <Network className="w-5 h-5" />
+              <span>Network Topology</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => { setCurrentScreen('audit'); setShowForm(false); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
-              currentScreen === 'audit' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-slate-400 hover:bg-slate-700'
-            }`}
-          >
-            <FileCheck className="w-5 h-5" />
-            <span>Audit Trail</span>
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentScreen('audit'); setShowForm(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                currentScreen === 'audit' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <FileCheck className="w-5 h-5" />
+              <span>Audit Trail</span>
+            </button>
+          )}
         </nav>
 
         {/* User Info & Logout */}

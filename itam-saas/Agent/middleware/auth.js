@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { setCurrentUserId } from '../queries.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -10,7 +11,7 @@ if (!JWT_SECRET) {
 /**
  * Middleware to verify JWT token and protect routes
  */
-export const authenticateToken = (req, res, next) => {
+export const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
@@ -35,10 +36,19 @@ export const authenticateToken = (req, res, next) => {
     }
 
     req.user = normalized; // Add user info to request
+
+    // Set DB session context for Row-Level Security.
+    // This relies on the server binding a single DB client per request.
+    const userIdForRls = normalized.userId ?? normalized.id;
+    await setCurrentUserId(userIdForRls);
+
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ error: 'Token expired. Please login again.' });
+    }
+    if (error.message?.includes?.('set_config') || error.message?.includes?.('setCurrentUserId')) {
+      return res.status(500).json({ error: 'Failed to set user context' });
     }
     return res.status(403).json({ error: 'Invalid token.' });
   }

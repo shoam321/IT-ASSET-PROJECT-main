@@ -5,6 +5,7 @@
 
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 dotenv.config();
 
@@ -20,6 +21,22 @@ const pool = new Pool({
   idleTimeoutMillis: 30000, // Close idle connections after 30s
   connectionTimeoutMillis: 10000, // Fail fast if can't connect in 10s
 });
+
+// AsyncLocalStorage context for binding a single pg Client to a single request.
+// This is critical for Row-Level Security (RLS) based on session variables like:
+//   set_config('app.current_user_id', '<id>', false)
+// because pooled connections otherwise change between queries.
+export const dbAsyncLocalStorage = new AsyncLocalStorage();
+
+// Route all pool.query calls to the request-bound client when available.
+const _poolQuery = pool.query.bind(pool);
+pool.query = (...args) => {
+  const store = dbAsyncLocalStorage.getStore();
+  if (store?.client) {
+    return store.client.query(...args);
+  }
+  return _poolQuery(...args);
+};
 
 pool.on('error', (err) => {
   console.error('Unexpected error on idle client', err);
