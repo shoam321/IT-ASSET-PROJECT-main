@@ -1238,47 +1238,55 @@ export async function logAuditEvent(tableName, recordId, action, oldData, newDat
  */
 export async function getAuditLogs(filters = {}) {
   try {
-    let query = 'SELECT * FROM audit_logs WHERE 1=1';
+    let query = `
+      SELECT
+        al.*,
+        au.full_name AS user_full_name,
+        au.email AS user_email
+      FROM audit_logs al
+      LEFT JOIN auth_users au ON au.id = al.user_id
+      WHERE 1=1
+    `;
     const params = [];
     let paramCount = 1;
 
     if (filters.tableName) {
-      query += ` AND table_name = $${paramCount}`;
+      query += ` AND al.table_name = $${paramCount}`;
       params.push(filters.tableName);
       paramCount++;
     }
 
     if (filters.recordId) {
-      query += ` AND record_id = $${paramCount}`;
+      query += ` AND al.record_id = $${paramCount}`;
       params.push(filters.recordId);
       paramCount++;
     }
 
     if (filters.userId) {
-      query += ` AND user_id = $${paramCount}`;
+      query += ` AND al.user_id = $${paramCount}`;
       params.push(filters.userId);
       paramCount++;
     }
 
     if (filters.action) {
-      query += ` AND action = $${paramCount}`;
+      query += ` AND al.action = $${paramCount}`;
       params.push(filters.action);
       paramCount++;
     }
 
     if (filters.startDate) {
-      query += ` AND timestamp >= $${paramCount}`;
+      query += ` AND al.timestamp >= $${paramCount}`;
       params.push(filters.startDate);
       paramCount++;
     }
 
     if (filters.endDate) {
-      query += ` AND timestamp <= $${paramCount}`;
+      query += ` AND al.timestamp <= $${paramCount}`;
       params.push(filters.endDate);
       paramCount++;
     }
 
-    query += ` ORDER BY timestamp DESC`;
+    query += ` ORDER BY al.timestamp DESC`;
 
     if (filters.limit) {
       query += ` LIMIT $${paramCount}`;
@@ -1306,9 +1314,14 @@ export async function getAuditLogs(filters = {}) {
 export async function getRecordHistory(tableName, recordId) {
   try {
     const result = await pool.query(
-      `SELECT * FROM audit_logs 
-       WHERE table_name = $1 AND record_id = $2 
-       ORDER BY timestamp DESC`,
+      `SELECT
+         al.*,
+         au.full_name AS user_full_name,
+         au.email AS user_email
+       FROM audit_logs al
+       LEFT JOIN auth_users au ON au.id = al.user_id
+       WHERE al.table_name = $1 AND al.record_id = $2
+       ORDER BY al.timestamp DESC`,
       [tableName, recordId]
     );
     return result.rows;

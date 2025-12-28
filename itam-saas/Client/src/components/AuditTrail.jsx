@@ -73,6 +73,8 @@ export default function AuditTrail() {
       case 'CREATE': return <PlusCircle size={16} className="text-green-500" />;
       case 'UPDATE': return <FileEdit size={16} className="text-blue-500" />;
       case 'DELETE': return <Trash2 size={16} className="text-red-500" />;
+      case 'LOGIN': return <User size={16} className="text-slate-600" />;
+      case 'LOGOUT': return <User size={16} className="text-slate-600" />;
       default: return null;
     }
   };
@@ -82,6 +84,8 @@ export default function AuditTrail() {
       case 'CREATE': return 'bg-green-100 text-green-800';
       case 'UPDATE': return 'bg-blue-100 text-blue-800';
       case 'DELETE': return 'bg-red-100 text-red-800';
+      case 'LOGIN': return 'bg-slate-100 text-slate-800';
+      case 'LOGOUT': return 'bg-slate-100 text-slate-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -107,6 +111,14 @@ export default function AuditTrail() {
     });
     
     return changes;
+  };
+
+  const getUserDisplay = (log) => {
+    const name = log.user_full_name || log.username;
+    const email = log.user_email;
+    if (!name && !email) return 'System';
+    if (name && email) return `${name} (${email})`;
+    return name || email;
   };
 
   const normalizeJson = (value) => {
@@ -253,6 +265,8 @@ export default function AuditTrail() {
               <option value="CREATE">Create</option>
               <option value="UPDATE">Update</option>
               <option value="DELETE">Delete</option>
+              <option value="LOGIN">Login</option>
+              <option value="LOGOUT">Logout</option>
             </select>
           </div>
 
@@ -381,18 +395,21 @@ export default function AuditTrail() {
                   </td>
                   <td style={{ padding: '12px', fontWeight: '500' }}>{log.table_name}</td>
                   <td style={{ padding: '12px', fontFamily: 'monospace' }}>#{log.record_id}</td>
-                  <td style={{ padding: '12px' }}>{log.username || 'System'}</td>
+                  <td style={{ padding: '12px' }}>{getUserDisplay(log)}</td>
                   <td style={{ padding: '12px', fontSize: '12px', color: '#64748b' }}>
                     <div>
-                      {getEntitySummary(log) && (
+                      {(() => {
+                        const summary = getEntitySummary(log);
+                        return summary ? (
                         <div style={{ marginBottom: '6px', color: '#0f172a' }}>
-                          <strong>{getEntitySummary(log)}</strong>
+                          <strong>{summary}</strong>
                         </div>
-                      )}
+                        ) : null;
+                      })()}
 
-                      {log.action === 'UPDATE' && log.old_data && log.new_data ? (
+                      {log.action === 'UPDATE' ? (
                         <div>
-                          {getDiff(normalizeJson(log.old_data) || log.old_data, normalizeJson(log.new_data) || log.new_data)
+                          {getDiff(normalizeJson(log.old_data), normalizeJson(log.new_data))
                             ?.slice(0, 3)
                             .map((change, i) => (
                               <div key={i} style={{ marginBottom: '5px' }}>
@@ -401,9 +418,15 @@ export default function AuditTrail() {
                             ))}
                         </div>
                       ) : log.action === 'CREATE' ? (
-                        <span>Record created</span>
+                        <span>Created</span>
+                      ) : log.action === 'DELETE' ? (
+                        <span>Deleted</span>
+                      ) : log.action === 'LOGIN' ? (
+                        <span>Login</span>
+                      ) : log.action === 'LOGOUT' ? (
+                        <span>Logout</span>
                       ) : (
-                        <span>Record deleted</span>
+                        <span>{log.action}</span>
                       )}
 
                       {(log.ip_address || log.user_agent) && (
