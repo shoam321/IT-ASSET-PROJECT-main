@@ -1455,3 +1455,18 @@ export async function removeForbiddenApp(appId, adminId) {
   }
 }
 
+/**
+ * Get audit trail entries for forbidden apps
+ */
+export async function getAuditTrailForForbiddenApps() {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM audit_trail WHERE action IN ('Add Forbidden App', 'Remove Forbidden App') ORDER BY created_at DESC`
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching audit trail for forbidden apps:', error);
+    throw error;
+  }
+}
+
