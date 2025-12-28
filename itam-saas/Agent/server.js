@@ -456,7 +456,7 @@ function csvEscape(value) {
   }
 
   // Escape double-quotes by doubling them; wrap everything in quotes.
-  const escaped = text.replace(/\"/g, '""');
+  const escaped = text.replace(/"/g, '""');
   return `"${escaped}"`;
 }
 
