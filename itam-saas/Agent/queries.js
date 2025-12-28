@@ -726,7 +726,7 @@ export async function upsertDevice(deviceData) {
          hostname = COALESCE($2, devices.hostname),
          os_name = COALESCE($3, devices.os_name),
          os_version = COALESCE($4, devices.os_version),
-         user_id = COALESCE($5, devices.user_id),
+         user_id = COALESCE(devices.user_id, $5),
          last_seen = CURRENT_TIMESTAMP,
          status = 'Active',
          updated_at = CURRENT_TIMESTAMP
