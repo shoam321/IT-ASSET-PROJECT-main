@@ -1,4 +1,8 @@
+import dotenv from 'dotenv';
 import { getRedisClient, getCached } from './redis.js';
+
+// Load environment variables from .env file
+dotenv.config();
 
 async function testRedis() {
   console.log('\n🧪 Testing Redis Connection...\n');
