@@ -934,8 +934,11 @@ export async function getInstalledApps(device_id) {
 export async function getAllForbiddenApps() {
   try {
     const result = await pool.query(
-      `SELECT * FROM forbidden_apps 
-       ORDER BY severity DESC, process_name ASC`
+      `SELECT fa.id, fa.process_name, fa.description, fa.severity, fa.created_at, fa.updated_at, 
+              au.full_name AS created_by_name
+       FROM forbidden_apps fa
+       LEFT JOIN auth_users au ON fa.created_by = au.id
+       ORDER BY fa.created_at DESC`
     );
     return result.rows;
   } catch (error) {
