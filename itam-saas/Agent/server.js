@@ -187,21 +187,27 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-// Google OAuth Strategy
-passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: process.env.GOOGLE_CALLBACK_URL || 'https://it-asset-project-production.up.railway.app/api/auth/google/callback'
-  },
-  async (accessToken, refreshToken, profile, done) => {
-    try {
-      const user = await db.findOrCreateGoogleUser(profile);
-      return done(null, user);
-    } catch (error) {
-      return done(error, null);
+// Google OAuth Strategy (optional)
+// If GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET are not set, we skip registration so local
+// dev and non-SSO deployments don't crash on startup.
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  passport.use(new GoogleStrategy({
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: process.env.GOOGLE_CALLBACK_URL || 'https://it-asset-project-production.up.railway.app/api/auth/google/callback'
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const user = await db.findOrCreateGoogleUser(profile);
+        return done(null, user);
+      } catch (error) {
+        return done(error, null);
+      }
     }
-  }
-));
+  ));
+} else {
+  console.warn('⚠️ Google SSO not configured (missing GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET)');
+}
 
 // Request logging middleware
 // - Adds an `x-request-id` header to every response
@@ -436,6 +442,98 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
 
 // --- AUDIT TRAIL ENDPOINTS ---
 
+function csvEscape(value) {
+  if (value === null || value === undefined) return '';
+  let text = value;
+  if (typeof text === 'object') {
+    try {
+      text = JSON.stringify(text);
+    } catch {
+      text = String(text);
+    }
+  } else {
+    text = String(text);
+  }
+
+  // Escape double-quotes by doubling them; wrap everything in quotes.
+  const escaped = text.replace(/\"/g, '""');
+  return `"${escaped}"`;
+}
+
+function toCsv(rows, columns) {
+  const header = columns.map(csvEscape).join(',');
+  const lines = rows.map((row) => columns.map((col) => csvEscape(row?.[col])).join(','));
+  return [header, ...lines].join('\r\n') + '\r\n';
+}
+
+function buildAuditFiltersFromQuery(query) {
+  const MAX_LIMIT = 5000;
+  const parsedLimit = query.limit ? parseInt(query.limit) : 1000;
+
+  return {
+    tableName: query.table,
+    recordId: query.recordId ? parseInt(query.recordId) : null,
+    userId: query.userId ? parseInt(query.userId) : null,
+    action: query.action,
+    startDate: query.startDate,
+    endDate: query.endDate,
+    limit: Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), MAX_LIMIT) : 1000,
+    offset: query.offset ? parseInt(query.offset) : 0
+  };
+}
+
+// Export audit logs (CSV/JSON) using the same filters as GET /api/audit-logs
+app.get('/api/audit-logs/export', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId || req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token structure' });
+    }
+    await db.setCurrentUserId(userId);
+
+    const format = String(req.query.format || 'csv').toLowerCase();
+    if (!['csv', 'json'].includes(format)) {
+      return res.status(400).json({ error: 'Invalid format. Use csv or json.' });
+    }
+
+    const filters = buildAuditFiltersFromQuery(req.query);
+    const logs = await db.getAuditLogs(filters);
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filenameBase = `audit-logs-${timestamp}`;
+
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filenameBase}.json"`);
+      return res.send(JSON.stringify(logs, null, 2));
+    }
+
+    // CSV
+    const columns = [
+      'id',
+      'timestamp',
+      'action',
+      'table_name',
+      'record_id',
+      'username',
+      'user_full_name',
+      'user_email',
+      'ip_address',
+      'user_agent',
+      'old_data',
+      'new_data'
+    ];
+
+    const csv = toCsv(logs, columns);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filenameBase}.csv"`);
+    return res.send(csv);
+  } catch (error) {
+    console.error('Export audit logs error:', error);
+    res.status(500).json({ error: 'Failed to export audit logs' });
+  }
+});
+
 // Get audit logs with filters
 app.get('/api/audit-logs', authenticateToken, async (req, res) => {
   try {
@@ -447,16 +545,7 @@ app.get('/api/audit-logs', authenticateToken, async (req, res) => {
     }
     await db.setCurrentUserId(userId);
     
-    const filters = {
-      tableName: req.query.table,
-      recordId: req.query.recordId ? parseInt(req.query.recordId) : null,
-      userId: req.query.userId ? parseInt(req.query.userId) : null,
-      action: req.query.action,
-      startDate: req.query.startDate,
-      endDate: req.query.endDate,
-      limit: req.query.limit ? parseInt(req.query.limit) : 100,
-      offset: req.query.offset ? parseInt(req.query.offset) : 0
-    };
+    const filters = buildAuditFiltersFromQuery(req.query);
 
     const logs = await db.getAuditLogs(filters);
     res.json(logs);

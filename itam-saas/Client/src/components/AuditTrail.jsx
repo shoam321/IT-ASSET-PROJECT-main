@@ -27,6 +27,57 @@ export default function AuditTrail() {
     fetchAuditLogs();
   }, [appliedFilters]);
 
+  const getFilenameFromDisposition = (contentDisposition, fallback) => {
+    if (!contentDisposition) return fallback;
+    const match = /filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i.exec(contentDisposition);
+    const filename = decodeURIComponent(match?.[1] || match?.[2] || '');
+    return filename || fallback;
+  };
+
+  const downloadAuditExport = async (format) => {
+    try {
+      setError(null);
+      const token = localStorage.getItem('authToken');
+
+      const queryParams = new URLSearchParams();
+      queryParams.append('format', format);
+      if (appliedFilters.table) queryParams.append('table', appliedFilters.table);
+      if (appliedFilters.action) queryParams.append('action', appliedFilters.action);
+      if (appliedFilters.startDate) queryParams.append('startDate', appliedFilters.startDate);
+      if (appliedFilters.endDate) queryParams.append('endDate', appliedFilters.endDate);
+      if (appliedFilters.limit) queryParams.append('limit', appliedFilters.limit);
+
+      const response = await fetch(`${API_URL}/audit-logs/export?${queryParams.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error('Failed to export audit logs');
+      }
+
+      const blob = await response.blob();
+      const fallbackName = `audit-logs.${format === 'json' ? 'json' : 'csv'}`;
+      const filename = getFilenameFromDisposition(response.headers.get('content-disposition'), fallbackName);
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Audit export error:', err);
+      setError(err.message);
+    }
+  };
+
   const fetchAuditLogs = async () => {
     try {
       setLoading(true);
@@ -345,6 +396,37 @@ export default function AuditTrail() {
             }}
           >
             Clear Filters
+          </button>
+
+          <button
+            type="button"
+            onClick={() => downloadAuditExport('csv')}
+            style={{
+              padding: '10px 20px',
+              background: '#0f172a',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => downloadAuditExport('json')}
+            style={{
+              padding: '10px 20px',
+              background: '#0f172a',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            Export JSON
           </button>
         </div>
       </form>
