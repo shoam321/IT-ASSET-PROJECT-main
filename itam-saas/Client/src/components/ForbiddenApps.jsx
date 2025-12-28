@@ -291,7 +291,7 @@ const ForbiddenApps = () => {
                 <th className="px-6 py-3 text-left text-slate-300 font-semibold">Process Name</th>
                 <th className="px-6 py-3 text-left text-slate-300 font-semibold">Description</th>
                 <th className="px-6 py-3 text-left text-slate-300 font-semibold">Severity</th>
-                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Added</th>
+                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Added By</th> {/* New column */}
                 <th className="px-6 py-3 text-left text-slate-300 font-semibold">Actions</th>
               </tr>
             </thead>
