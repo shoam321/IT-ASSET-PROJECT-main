@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download } from 'lucide-react';
 import * as dbService from './services/db';
 import { useAuth } from './context/AuthContext';
 import UsageMonitor from './components/UsageMonitor';
@@ -9,6 +9,7 @@ import NetworkTopology from './components/NetworkTopology';
 import AuditTrail from './components/AuditTrail';
 import InfoButton from './components/InfoButton';
 import DigitalReceipts from './components/DigitalReceipts';
+import { downloadCsv } from './utils/csvExport';
 
 // Helper function to format dates in a user-friendly way
 const formatDate = (dateString) => {
@@ -499,6 +500,96 @@ export default function App() {
       )
     : assets;
 
+  const filteredLicenses = licenses.filter(lic =>
+    searchTerm
+      ? lic.license_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        lic.software_name?.toLowerCase().includes(searchTerm.toLowerCase())
+      : true
+  );
+
+  const filteredUsers = users.filter(u =>
+    searchTerm
+      ? u.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      : true
+  );
+
+  const filteredContracts = contracts.filter(c =>
+    searchTerm
+      ? c.contract_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.vendor?.toLowerCase().includes(searchTerm.toLowerCase())
+      : true
+  );
+
+  const exportCurrentScreenCsv = () => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    if (currentScreen === 'assets') {
+      downloadCsv(`assets-${stamp}.csv`, filteredAssets, [
+        { key: 'id', header: 'ID' },
+        { key: 'asset_tag', header: 'Asset Tag' },
+        { key: 'asset_type', header: 'Type' },
+        { key: 'manufacturer', header: 'Manufacturer' },
+        { key: 'model', header: 'Model' },
+        { key: 'serial_number', header: 'Serial Number' },
+        { key: 'assigned_user_name', header: 'Assigned User' },
+        { key: 'status', header: 'Status' },
+        { key: 'created_at', header: 'Created At' },
+        { key: 'updated_at', header: 'Updated At' },
+      ]);
+      return;
+    }
+
+    if (currentScreen === 'licenses') {
+      downloadCsv(`licenses-${stamp}.csv`, filteredLicenses, [
+        { key: 'id', header: 'ID' },
+        { key: 'license_name', header: 'License Name' },
+        { key: 'software_name', header: 'Software' },
+        { key: 'vendor', header: 'Vendor' },
+        { key: 'license_type', header: 'License Type' },
+        { key: 'license_key', header: 'License Key' },
+        { key: 'quantity', header: 'Quantity' },
+        { key: 'expiration_date', header: 'Expiration Date' },
+        { key: 'status', header: 'Status' },
+        { key: 'cost', header: 'Cost' },
+        { key: 'created_at', header: 'Created At' },
+        { key: 'updated_at', header: 'Updated At' },
+      ]);
+      return;
+    }
+
+    if (currentScreen === 'users') {
+      downloadCsv(`users-${stamp}.csv`, filteredUsers, [
+        { key: 'id', header: 'ID' },
+        { key: 'user_name', header: 'User Name' },
+        { key: 'email', header: 'Email' },
+        { key: 'department', header: 'Department' },
+        { key: 'phone', header: 'Phone' },
+        { key: 'role', header: 'Role' },
+        { key: 'status', header: 'Status' },
+        { key: 'created_at', header: 'Created At' },
+        { key: 'updated_at', header: 'Updated At' },
+      ]);
+      return;
+    }
+
+    if (currentScreen === 'contracts') {
+      downloadCsv(`contracts-${stamp}.csv`, filteredContracts, [
+        { key: 'id', header: 'ID' },
+        { key: 'contract_name', header: 'Contract Name' },
+        { key: 'vendor', header: 'Vendor' },
+        { key: 'contract_type', header: 'Contract Type' },
+        { key: 'start_date', header: 'Start Date' },
+        { key: 'end_date', header: 'End Date' },
+        { key: 'value', header: 'Value' },
+        { key: 'currency', header: 'Currency' },
+        { key: 'status', header: 'Status' },
+        { key: 'created_at', header: 'Created At' },
+        { key: 'updated_at', header: 'Updated At' },
+      ]);
+    }
+  };
+
   // Screen rendering functions
   const renderHomeScreen = () => (
     <>
@@ -621,11 +712,84 @@ export default function App() {
 
     const totalResults = searchAssets.length + searchLicenses.length + searchUsers.length + searchContracts.length;
 
+    const exportSearchResultsCsv = () => {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const rows = [
+        ...searchAssets.map((a) => ({
+          entity_type: 'asset',
+          id: a.id,
+          name: a.asset_tag,
+          asset_type: a.asset_type,
+          manufacturer: a.manufacturer,
+          model: a.model,
+          status: a.status,
+        })),
+        ...searchLicenses.map((l) => ({
+          entity_type: 'license',
+          id: l.id,
+          name: l.license_name,
+          software_name: l.software_name,
+          vendor: l.vendor,
+          status: l.status,
+          expiration_date: l.expiration_date,
+        })),
+        ...searchUsers.map((u) => ({
+          entity_type: 'user',
+          id: u.id,
+          name: u.user_name,
+          email: u.email,
+          department: u.department,
+          role: u.role,
+          status: u.status,
+        })),
+        ...searchContracts.map((c) => ({
+          entity_type: 'contract',
+          id: c.id,
+          name: c.contract_name,
+          vendor: c.vendor,
+          contract_type: c.contract_type,
+          status: c.status,
+          start_date: c.start_date,
+          end_date: c.end_date,
+        })),
+      ];
+
+      downloadCsv(`search-results-${stamp}.csv`, rows, [
+        { key: 'entity_type', header: 'Entity Type' },
+        { key: 'id', header: 'ID' },
+        { key: 'name', header: 'Name' },
+        { key: 'status', header: 'Status' },
+        { key: 'asset_type', header: 'Asset Type' },
+        { key: 'manufacturer', header: 'Manufacturer' },
+        { key: 'model', header: 'Model' },
+        { key: 'software_name', header: 'Software' },
+        { key: 'vendor', header: 'Vendor' },
+        { key: 'expiration_date', header: 'Expiration Date' },
+        { key: 'email', header: 'Email' },
+        { key: 'department', header: 'Department' },
+        { key: 'role', header: 'Role' },
+        { key: 'contract_type', header: 'Contract Type' },
+        { key: 'start_date', header: 'Start Date' },
+        { key: 'end_date', header: 'End Date' },
+      ]);
+    };
+
     return (
       <>
-        <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Search Results</h1>
-          <p className="text-sm md:text-base text-slate-400">Found {totalResults} result{totalResults !== 1 ? 's' : ''} for "{universalSearch}"</p>
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Search Results</h1>
+            <p className="text-sm md:text-base text-slate-400">Found {totalResults} result{totalResults !== 1 ? 's' : ''} for "{universalSearch}"</p>
+          </div>
+          {totalResults > 0 && (
+            <button
+              onClick={exportSearchResultsCsv}
+              className="bg-slate-700 hover:bg-slate-600 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base border border-slate-600"
+            >
+              <Download className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="hidden sm:inline">Export CSV</span>
+            </button>
+          )}
         </div>
 
         {totalResults === 0 && (
@@ -1227,7 +1391,7 @@ export default function App() {
                   </td>
                 </tr>
               ) : (
-                licenses.filter(lic => searchTerm ? lic.license_name.toLowerCase().includes(searchTerm.toLowerCase()) || lic.software_name?.toLowerCase().includes(searchTerm.toLowerCase()) : true).map((license) => (
+                filteredLicenses.map((license) => (
                   <tr key={license.id} className="border-b border-slate-600 hover:bg-slate-600 transition">
                     <td className="px-6 py-4 text-white font-medium">{license.license_name}</td>
                     <td className="px-6 py-4 text-slate-300">{license.software_name}</td>
@@ -1425,7 +1589,7 @@ export default function App() {
                   </td>
                 </tr>
               ) : (
-                users.filter(user => searchTerm ? user.user_name.toLowerCase().includes(searchTerm.toLowerCase()) || user.email?.toLowerCase().includes(searchTerm.toLowerCase()) : true).map((user) => (
+                filteredUsers.map((user) => (
                   <tr key={user.id} className="border-b border-slate-600 hover:bg-slate-600 transition">
                     <td className="px-6 py-4 text-white font-medium">{user.user_name}</td>
                     <td className="px-6 py-4 text-slate-300">{user.email}</td>
@@ -1652,7 +1816,7 @@ export default function App() {
                   </td>
                 </tr>
               ) : (
-                contracts.filter(contract => searchTerm ? contract.contract_name.toLowerCase().includes(searchTerm.toLowerCase()) || contract.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) : true).map((contract) => (
+                filteredContracts.map((contract) => (
                   <tr key={contract.id} className="border-b border-slate-600 hover:bg-slate-600 transition">
                     <td className="px-6 py-4 text-white font-medium">{contract.contract_name}</td>
                     <td className="px-6 py-4 text-slate-300">{contract.vendor}</td>
@@ -1993,44 +2157,32 @@ export default function App() {
               </div>
             </div>
             
-            {currentScreen === 'assets' && !universalSearch && (
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
-              >
-                <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="hidden sm:inline">Add Asset</span>
-              </button>
-            )}
-            
-            {currentScreen === 'licenses' && !universalSearch && (
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
-              >
-                <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="hidden sm:inline">Add License</span>
-              </button>
-            )}
-            
-            {currentScreen === 'users' && !universalSearch && (
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
-              >
-                <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="hidden sm:inline">Add User</span>
-              </button>
-            )}
-            
-            {currentScreen === 'contracts' && !universalSearch && (
-              <button
-                onClick={() => setShowForm(!showForm)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
-              >
-                <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="hidden sm:inline">Add Contract</span>
-              </button>
+            {['assets', 'licenses', 'users', 'contracts'].includes(currentScreen) && !universalSearch && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={exportCurrentScreenCsv}
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base border border-slate-600"
+                >
+                  <Download className="w-4 h-4 md:w-5 md:h-5" />
+                  <span className="hidden sm:inline">Export CSV</span>
+                </button>
+
+                <button
+                  onClick={() => setShowForm(!showForm)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
+                >
+                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
+                  <span className="hidden sm:inline">
+                    {currentScreen === 'assets'
+                      ? 'Add Asset'
+                      : currentScreen === 'licenses'
+                        ? 'Add License'
+                        : currentScreen === 'users'
+                          ? 'Add User'
+                          : 'Add Contract'}
+                  </span>
+                </button>
+              </div>
             )}
           </div>
         </header>

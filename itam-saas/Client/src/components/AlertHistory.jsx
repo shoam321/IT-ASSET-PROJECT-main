@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
-import { RefreshCw, Filter } from 'lucide-react';
+import { RefreshCw, Filter, Download } from 'lucide-react';
 import InfoButton from './InfoButton';
+import { downloadCsv } from '../utils/csvExport';
 
 const AlertHistory = () => {
   const [alerts, setAlerts] = useState([]);
@@ -160,6 +161,22 @@ const AlertHistory = () => {
     return alert.status === filter;
   });
 
+  const exportAlertsCsv = () => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadCsv(`security-alerts-${stamp}.csv`, filteredAlerts, [
+      { key: 'id', header: 'ID' },
+      { key: 'created_at', header: 'Time' },
+      { key: 'device_id', header: 'Device ID' },
+      { key: 'hostname', header: 'Hostname' },
+      { key: 'app_detected', header: 'App Detected' },
+      { key: 'severity', header: 'Severity' },
+      { key: 'status', header: 'Status' },
+      { key: 'rule_name', header: 'Rule Name' },
+      { key: 'user_name', header: 'User Name' },
+      { key: 'user_email', header: 'User Email' },
+    ]);
+  };
+
   return (
     <>
       {error && (
@@ -242,6 +259,13 @@ const AlertHistory = () => {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${autoRefresh ? 'bg-green-600 hover:bg-green-700' : 'bg-slate-600 hover:bg-slate-500'} text-white`}
           >
             {autoRefresh ? '✓ Auto-Refresh On' : 'Auto-Refresh Off'}
+          </button>
+          <button
+            onClick={exportAlertsCsv}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition border border-slate-600"
+          >
+            <Download className="w-4 h-4" />
+            Export CSV
           </button>
           <button
             onClick={() => { fetchAlerts(); fetchStats(); }}

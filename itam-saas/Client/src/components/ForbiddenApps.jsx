@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Trash2, Search, Edit2, Check, XCircle } from 'lucide-react';
+import { Plus, X, Trash2, Search, Edit2, Check, XCircle, Download } from 'lucide-react';
 import InfoButton from './InfoButton';
+import { downloadCsv } from '../utils/csvExport';
 
 const ForbiddenApps = () => {
   const [forbiddenApps, setForbiddenApps] = useState([]);
@@ -176,6 +177,20 @@ const ForbiddenApps = () => {
     : true
   );
 
+  const exportForbiddenAppsCsv = () => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    downloadCsv(`forbidden-apps-${stamp}.csv`, filteredApps, [
+      { key: 'id', header: 'ID' },
+      { key: 'process_name', header: 'Process Name' },
+      { key: 'description', header: 'Description' },
+      { key: 'severity', header: 'Severity' },
+      { key: 'created_by_name', header: 'Added By Name' },
+      { key: 'created_by_email', header: 'Added By Email' },
+      { key: 'created_at', header: 'Created At' },
+      { key: 'updated_at', header: 'Updated At' },
+    ]);
+  };
+
   return (
     <>
       {error && (
@@ -231,6 +246,13 @@ const ForbiddenApps = () => {
             className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
           />
         </div>
+        <button
+          onClick={exportForbiddenAppsCsv}
+          className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition whitespace-nowrap border border-slate-600"
+        >
+          <Download className="w-4 h-4" />
+          Export CSV
+        </button>
         <button
           onClick={() => setShowForm(!showForm)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition whitespace-nowrap"

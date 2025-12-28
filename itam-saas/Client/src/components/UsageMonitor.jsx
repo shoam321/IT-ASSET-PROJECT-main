@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './UsageMonitor.css';
 import InfoButton from './InfoButton';
+import { downloadCsv } from '../utils/csvExport';
 
 const UsageMonitor = () => {
   const [devices, setDevices] = useState([]);
@@ -177,6 +178,43 @@ const UsageMonitor = () => {
     return { text: 'Offline', class: 'status-offline' };
   };
 
+  const exportUsageCsv = () => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+
+    if (selectedDevice && usageStats.length > 0) {
+      const device = devices.find((d) => d.device_id === selectedDevice);
+      const rows = usageStats.map((stat) => ({
+        device_id: selectedDevice,
+        hostname: device?.hostname,
+        os_name: device?.os_name,
+        app_name: stat.app_name,
+        usage_count: stat.usage_count,
+        total_duration_seconds: stat.total_duration,
+        avg_duration_seconds: stat.avg_duration,
+        last_used: stat.last_used,
+      }));
+
+      downloadCsv(`usage-device-${selectedDevice}-${stamp}.csv`, rows, [
+        { key: 'device_id', header: 'Device ID' },
+        { key: 'hostname', header: 'Hostname' },
+        { key: 'os_name', header: 'OS' },
+        { key: 'app_name', header: 'Application' },
+        { key: 'usage_count', header: 'Usage Count' },
+        { key: 'total_duration_seconds', header: 'Total Duration (s)' },
+        { key: 'avg_duration_seconds', header: 'Avg Duration (s)' },
+        { key: 'last_used', header: 'Last Used (timestamp)' },
+      ]);
+      return;
+    }
+
+    // Fallback: export the overall app usage summary
+    downloadCsv(`usage-top-apps-${stamp}.csv`, appUsageSummary, [
+      { key: 'app_name', header: 'Application' },
+      { key: 'device_count', header: 'Device Count' },
+      { key: 'total_duration', header: 'Total Duration (s)' },
+    ]);
+  };
+
   if (loading) {
     return (
       <div className="usage-monitor">
@@ -247,6 +285,9 @@ const UsageMonitor = () => {
             </span>
             <button onClick={fetchDevices} className="refresh-btn-header">
               🔄 Refresh All
+            </button>
+            <button onClick={exportUsageCsv} className="refresh-btn-header">
+              ⬇️ Export CSV
             </button>
           </div>
         </div>
