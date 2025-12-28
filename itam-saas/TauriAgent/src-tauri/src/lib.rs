@@ -118,10 +118,12 @@ fn handle_oauth_connection(mut stream: TcpStream, expected_nonce: &str) -> Optio
         }
     }
 
+    // Include a data: favicon so Chrome won't make a follow-up /favicon.ico request
+    // after the one-shot server has already exited.
     let body = if token.is_some() {
-        "<html><body><h3>Authentication successful.</h3><p>You can close this window.</p></body></html>"
+        "<!doctype html><html><head><meta charset='utf-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/><title>IT Asset Agent</title><link rel='icon' href='data:,'/><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;padding:32px;background:#f7f7fb;color:#222} .card{max-width:560px;margin:0 auto;background:#fff;border:1px solid #e6e6ef;border-radius:14px;padding:24px} h2{margin:0 0 8px 0} p{margin:0;color:#555}</style></head><body><div class='card'><h2>Authentication successful</h2><p>You can close this tab and return to the Agent.</p></div></body></html>"
     } else {
-        "<html><body><h3>Authentication failed.</h3><p>Return to the agent and try again.</p></body></html>"
+        "<!doctype html><html><head><meta charset='utf-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/><title>IT Asset Agent</title><link rel='icon' href='data:,'/><style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;padding:32px;background:#f7f7fb;color:#222} .card{max-width:560px;margin:0 auto;background:#fff;border:1px solid #e6e6ef;border-radius:14px;padding:24px} h2{margin:0 0 8px 0} p{margin:0;color:#555}</style></head><body><div class='card'><h2>Authentication failed</h2><p>Return to the Agent and try again.</p></div></body></html>"
     };
     let response = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
