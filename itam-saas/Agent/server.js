@@ -1114,6 +1114,21 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ===== AGENT ROUTES =====
 
+// Agent device IDs come from the machine hostname. In a multi-user / multi-tenant
+// setup, the same hostname may appear under different users over time (testing,
+// reassignments, shared machines). Since `devices.device_id` is unique, a plain
+// hostname can collide across users and cause RLS failures on upsert.
+//
+// Solution: namespace the DB-facing device_id by userId, while keeping the raw
+// hostname in `devices.hostname` for display/debugging.
+function canonicalizeAgentDeviceId(rawDeviceId, userId) {
+  const base = String(rawDeviceId || '').trim();
+  if (!base) return base;
+  const suffix = `::${userId}`;
+  if (base.endsWith(suffix)) return base;
+  return `${base}${suffix}`;
+}
+
 // Receive usage data from agent
 app.post('/api/agent/usage', authenticateToken, async (req, res) => {
   try {
@@ -1124,21 +1139,24 @@ app.post('/api/agent/usage', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'device_id and app_name are required' });
     }
 
+    const rawDeviceId = device_id;
+    const canonicalDeviceId = canonicalizeAgentDeviceId(rawDeviceId, userId);
+
     // Set PostgreSQL session variable for Row-Level Security
     await db.setCurrentUserId(userId);
 
     // Ensure device exists first (auto-create if needed)
     await db.upsertDevice({
-      device_id,
+      device_id: canonicalDeviceId,
       user_id: userId, // Associate device with user
-      hostname: device_id,
+      hostname: rawDeviceId,
       os_name: 'Unknown',
       os_version: 'Unknown',
       timestamp: Date.now()
     });
 
     const usageData = await db.insertUsageData({
-      device_id,
+      device_id: canonicalDeviceId,
       user_id: userId, // Associate usage with user
       app_name,
       window_title: window_title || '',
@@ -1166,13 +1184,16 @@ app.post('/api/agent/heartbeat', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'device_id is required' });
     }
 
+    const rawDeviceId = device_id;
+    const canonicalDeviceId = canonicalizeAgentDeviceId(rawDeviceId, userId);
+
     // Set PostgreSQL session variable for Row-Level Security
     await db.setCurrentUserId(userId);
 
     // Update or create device
     await db.upsertDevice({
-      device_id,
-      hostname,
+      device_id: canonicalDeviceId,
+      hostname: hostname || rawDeviceId,
       os_name,
       os_version,
       user_id: userId
@@ -1180,13 +1201,13 @@ app.post('/api/agent/heartbeat', authenticateToken, async (req, res) => {
 
     // Record heartbeat
     await db.insertHeartbeat({
-      device_id,
+      device_id: canonicalDeviceId,
       timestamp: timestamp || Date.now()
     });
 
     res.json({ 
       message: 'Heartbeat received',
-      device_id,
+      device_id: rawDeviceId,
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -1199,12 +1220,16 @@ app.post('/api/agent/heartbeat', authenticateToken, async (req, res) => {
 app.post('/api/agent/apps', authenticateToken, async (req, res) => {
   try {
     const { device_id, apps } = req.body;
+    const { userId } = req.user;
     
     if (!device_id || !Array.isArray(apps)) {
       return res.status(400).json({ error: 'device_id and apps array are required' });
     }
 
-    await db.upsertInstalledApps(device_id, apps);
+    const rawDeviceId = device_id;
+    const canonicalDeviceId = canonicalizeAgentDeviceId(rawDeviceId, userId);
+
+    await db.upsertInstalledApps(canonicalDeviceId, apps);
 
     res.json({ 
       message: 'Installed apps updated',
@@ -1454,9 +1479,12 @@ app.post('/api/alerts', [
   try {
     const { userId } = req.user;
     await db.setCurrentUserId(userId);
+
+    const rawDeviceId = req.body.device_id;
+    const canonicalDeviceId = canonicalizeAgentDeviceId(rawDeviceId, userId);
     
     const alertData = {
-      device_id: req.body.device_id,
+      device_id: canonicalDeviceId,
       app_detected: req.body.app_detected,
       severity: req.body.severity || 'Medium',
       process_id: req.body.process_id,
