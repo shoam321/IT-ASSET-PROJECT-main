@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { setCurrentUserId } from '../queries.js';
+import { findUserById } from '../authQueries.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -58,10 +59,27 @@ export const authenticateToken = async (req, res, next) => {
  * Middleware to check if user has admin role
  */
 export const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Access denied. Admin rights required.' });
-  }
-  next();
+  (async () => {
+    try {
+      const userId = req.user?.userId ?? req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: 'Invalid token structure' });
+      }
+
+      const user = await findUserById(userId);
+      const role = typeof user?.role === 'string' ? user.role.toLowerCase() : '';
+      if (role !== 'admin') {
+        return res.status(403).json({ error: 'Access denied. Admin rights required.' });
+      }
+
+      // Keep req.user.role consistent with DB for downstream logic.
+      req.user.role = 'admin';
+      return next();
+    } catch (error) {
+      console.error('Admin check error:', error);
+      return res.status(500).json({ error: 'Failed to verify admin role' });
+    }
+  })();
 };
 
 /**

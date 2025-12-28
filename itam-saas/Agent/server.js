@@ -654,10 +654,20 @@ app.get('/api/audit-logs/:table/:id', authenticateToken, async (req, res) => {
 // Get all assets (RLS: users see only their own, admins see all)
 app.get('/api/assets', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.user;
+    const { userId, role } = req.user;
     await db.setCurrentUserId(userId);
-    
-    const assets = await db.getAllAssets();
+
+    // Defense-in-depth: do not trust JWT role alone for "admin sees all".
+    // If token claims admin, verify against DB.
+    let isAdmin = role === 'admin';
+    if (isAdmin) {
+      const dbUser = await authQueries.findUserById(userId);
+      isAdmin = typeof dbUser?.role === 'string' && dbUser.role.toLowerCase() === 'admin';
+    }
+
+    const assets = isAdmin
+      ? await db.getAllAssets()
+      : await db.getAssetsForUser(userId);
     res.json(assets);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -667,10 +677,18 @@ app.get('/api/assets', authenticateToken, async (req, res) => {
 // Get asset by ID (RLS: users see only their own, admins see all)
 app.get('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.user;
+    const { userId, role } = req.user;
     await db.setCurrentUserId(userId);
-    
-    const asset = await db.getAssetById(req.params.id);
+
+    let isAdmin = role === 'admin';
+    if (isAdmin) {
+      const dbUser = await authQueries.findUserById(userId);
+      isAdmin = typeof dbUser?.role === 'string' && dbUser.role.toLowerCase() === 'admin';
+    }
+
+    const asset = isAdmin
+      ? await db.getAssetById(req.params.id)
+      : await db.getAssetByIdForUser(req.params.id, userId);
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }
@@ -683,10 +701,18 @@ app.get('/api/assets/:id', authenticateToken, async (req, res) => {
 // Search assets (RLS: users see only their own, admins see all)
 app.get('/api/assets/search/:query', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.user;
+    const { userId, role } = req.user;
     await db.setCurrentUserId(userId);
-    
-    const assets = await db.searchAssets(req.params.query);
+
+    let isAdmin = role === 'admin';
+    if (isAdmin) {
+      const dbUser = await authQueries.findUserById(userId);
+      isAdmin = typeof dbUser?.role === 'string' && dbUser.role.toLowerCase() === 'admin';
+    }
+
+    const assets = isAdmin
+      ? await db.searchAssets(req.params.query)
+      : await db.searchAssetsForUser(req.params.query, userId);
     res.json(assets);
   } catch (error) {
     res.status(500).json({ error: error.message });

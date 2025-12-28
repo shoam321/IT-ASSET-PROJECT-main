@@ -149,6 +149,22 @@ export async function getAllAssets() {
 }
 
 /**
+ * Get assets for a specific user (defense-in-depth alongside RLS)
+ */
+export async function getAssetsForUser(userId) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM assets WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching assets for user:', error);
+    throw error;
+  }
+}
+
+/**
  * Get asset by ID
  */
 export async function getAssetById(id) {
@@ -157,6 +173,22 @@ export async function getAssetById(id) {
     return result.rows[0];
   } catch (error) {
     console.error('Error fetching asset:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get asset by ID scoped to a user
+ */
+export async function getAssetByIdForUser(id, userId) {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM assets WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error fetching asset for user:', error);
     throw error;
   }
 }
@@ -260,6 +292,31 @@ export async function searchAssets(query) {
     return result.rows;
   } catch (error) {
     console.error('Error searching assets:', error);
+    throw error;
+  }
+}
+
+/**
+ * Search assets scoped to a user
+ */
+export async function searchAssetsForUser(query, userId) {
+  try {
+    const searchTerm = `%${query}%`;
+    const result = await pool.query(
+      `SELECT * FROM assets
+       WHERE user_id = $2
+         AND (
+           asset_tag ILIKE $1
+           OR manufacturer ILIKE $1
+           OR model ILIKE $1
+           OR assigned_user_name ILIKE $1
+         )
+       ORDER BY created_at DESC`,
+      [searchTerm, userId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error searching assets for user:', error);
     throw error;
   }
 }
