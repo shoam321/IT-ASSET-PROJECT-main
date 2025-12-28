@@ -5,9 +5,10 @@
   "description": "IT Asset Tracker Backend Server - Node.js with PostgreSQL",
   "main": "server.js",
   "scripts": {
-    "start": "node migrations/add-cost-column.js && node run-multi-tenancy-migration.js && node migrations/run-audit-migration.js && node migrations/run-receipts-migration.js && node migrations/run-google-sso-migration.js && node server.js",
+    "start": "node server.js",
     "dev": "nodemon server.js",
-    "migrate": "node migrations/run.js"
+    "migrate": "node migrations/run.js",
+    "migrate:all": "node migrations/add-cost-column.js && node run-multi-tenancy-migration.js && node migrations/run-audit-migration.js && node migrations/run-receipts-migration.js && node migrations/run-google-sso-migration.js"
   },
   "dependencies": {
     "@xyflow/react": "^12.10.0",
