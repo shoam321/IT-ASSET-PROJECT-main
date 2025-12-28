@@ -170,14 +170,14 @@ export async function getAssetByTag(assetTag) {
  * Create new asset
  */
 export async function createAsset(assetData) {
-  const { asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered } = assetData;
+  const { asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id } = assetData;
   
   try {
     const result = await pool.query(
-      `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false]
+      [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id]
     );
     return result.rows[0];
   } catch (error) {

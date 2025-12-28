@@ -614,9 +614,12 @@ app.get('/api/audit-logs/:table/:id', authenticateToken, async (req, res) => {
 
 // ===== ASSET ROUTES (Protected) =====
 
-// Get all assets
-app.get('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
+// Get all assets (RLS: users see only their own, admins see all)
+app.get('/api/assets', authenticateToken, async (req, res) => {
   try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
     const assets = await db.getAllAssets();
     res.json(assets);
   } catch (error) {
@@ -624,9 +627,12 @@ app.get('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-// Get asset by ID
+// Get asset by ID (RLS: users see only their own, admins see all)
 app.get('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
     const asset = await db.getAssetById(req.params.id);
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
@@ -637,9 +643,12 @@ app.get('/api/assets/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Search assets
+// Search assets (RLS: users see only their own, admins see all)
 app.get('/api/assets/search/:query', authenticateToken, async (req, res) => {
   try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
     const assets = await db.searchAssets(req.params.query);
     res.json(assets);
   } catch (error) {
@@ -657,10 +666,19 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// Create new asset
+// Create new asset (Admin-only)
 app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const asset = await db.createAsset(req.body);
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
+    // If user_id not provided in body, assign to requesting user (for admins creating for users)
+    const assetData = {
+      ...req.body,
+      user_id: req.body.user_id || userId  // Default to current user if not specified
+    };
+    
+    const asset = await db.createAsset(assetData);
     
     // Log audit event
     await db.logAuditEvent('assets', asset.id, 'CREATE', null, asset, {
@@ -676,9 +694,12 @@ app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-// Update asset
+// Update asset (Admin-only)
 app.put('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    const { userId } = req.user;
+    await db.setCurrentUserId(userId);
+    
     const oldAsset = await db.getAssetById(req.params.id);
     const asset = await db.updateAsset(req.params.id, req.body);
     if (!asset) {
