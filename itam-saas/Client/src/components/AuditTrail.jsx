@@ -181,6 +181,7 @@ export default function AuditTrail() {
               <option value="licenses">Licenses</option>
               <option value="users">Users</option>
               <option value="contracts">Contracts</option>
+              <option value="forbidden_apps">Forbidden Apps</option> {/* New option */}
             </select>
           </div>
 

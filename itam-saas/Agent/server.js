@@ -1279,6 +1279,19 @@ app.get('/api/alerts/device/:deviceId', authenticateToken, async (req, res) => {
   }
 });
 
+// Get audit trail entries for forbidden apps
+app.get('/audit-trail', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM audit_trail ORDER BY created_at DESC`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching audit trail:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
 // Initialize and start server
 startServer();
 

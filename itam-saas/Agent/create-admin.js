@@ -10,7 +10,7 @@ dotenv.config();
 async function createAdmin() {
   try {
     console.log('🔧 Creating admin user...\n');
-
+5
     // Get credentials from command line or use defaults
     const username = process.argv[2] || 'admin';
     const email = process.argv[3] || 'admin@itasset.local';
