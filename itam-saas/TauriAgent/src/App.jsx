@@ -73,7 +73,9 @@ function App() {
       const appWindow = getCurrentWindow();
       await appWindow.hide();
     } catch (err) {
-      console.error("Failed to minimize:", err);
+      const message = `Failed to minimize to tray: ${String(err)}`;
+      setErrorMessage(message);
+      console.error(message, err);
     }
   };
 
