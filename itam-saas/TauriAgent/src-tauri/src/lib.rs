@@ -1,6 +1,8 @@
 use tauri::{AppHandle, Emitter, Manager, menu::{MenuBuilder, MenuItemBuilder}, tray::{TrayIconBuilder, TrayIconEvent}};
 use tauri_plugin_single_instance::init as single_instance_init;
 use std::{thread, time::{Duration, SystemTime}};
+use std::net::{TcpListener, TcpStream};
+use std::io::{Read, Write};
 use std::sync::{Arc, Mutex};
 use sysinfo::System;
 use serde::{Deserialize, Serialize};
@@ -53,6 +55,115 @@ struct LoginRequest {
 #[derive(Debug, Serialize, Deserialize)]
 struct LoginResponse {
     token: String,
+}
+
+fn parse_query_param(query: &str, key: &str) -> Option<String> {
+    for pair in query.split('&') {
+        let mut it = pair.splitn(2, '=');
+        let k = it.next().unwrap_or("");
+        let v = it.next().unwrap_or("");
+        if k == key {
+            // Basic URL decode for %XX and +
+            let v = v.replace('+', " ");
+            let bytes = v.as_bytes();
+            let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+            let mut i = 0;
+            while i < bytes.len() {
+                if bytes[i] == b'%' && i + 2 < bytes.len() {
+                    if let (Some(h), Some(l)) = (hex_val(bytes[i + 1]), hex_val(bytes[i + 2])) {
+                        out.push((h << 4) | l);
+                        i += 3;
+                        continue;
+                    }
+                }
+                out.push(bytes[i]);
+                i += 1;
+            }
+            return String::from_utf8(out).ok();
+        }
+    }
+    None
+}
+
+fn hex_val(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn handle_oauth_connection(mut stream: TcpStream, expected_nonce: &str) -> Option<String> {
+    let mut buf = [0u8; 8192];
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
+    let n = stream.read(&mut buf).ok()?;
+    let req = String::from_utf8_lossy(&buf[..n]);
+    let first_line = req.lines().next().unwrap_or("");
+    // e.g. GET /oauth/callback?token=...&nonce=... HTTP/1.1
+    let mut parts = first_line.split_whitespace();
+    let _method = parts.next().unwrap_or("");
+    let path = parts.next().unwrap_or("/");
+
+    let (path_only, query) = match path.split_once('?') {
+        Some((p, q)) => (p, q),
+        None => (path, ""),
+    };
+
+    let mut token: Option<String> = None;
+    if path_only == "/oauth/callback" {
+        let nonce = parse_query_param(query, "nonce").unwrap_or_default();
+        if nonce == expected_nonce {
+            token = parse_query_param(query, "token");
+        }
+    }
+
+    let body = if token.is_some() {
+        "<html><body><h3>Authentication successful.</h3><p>You can close this window.</p></body></html>"
+    } else {
+        "<html><body><h3>Authentication failed.</h3><p>Return to the agent and try again.</p></body></html>"
+    };
+    let response = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        body.len(),
+        body
+    );
+    let _ = stream.write_all(response.as_bytes());
+    let _ = stream.flush();
+    token
+}
+
+#[tauri::command]
+fn start_oauth_callback_server(app: AppHandle) -> Result<serde_json::Value, String> {
+    // Random-ish nonce without extra deps
+    let nonce = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_nanos()
+        .to_string();
+
+    let listener = TcpListener::bind("127.0.0.1:0").map_err(|e| format!("Failed to bind localhost: {}", e))?;
+    let port = listener
+        .local_addr()
+        .map_err(|e| format!("Failed to get local addr: {}", e))?
+        .port();
+
+    let app_handle = app.clone();
+    let expected_nonce = nonce.clone();
+
+    thread::spawn(move || {
+        // Accept a single connection and then exit
+        if let Ok((stream, _addr)) = listener.accept() {
+            if let Some(token) = handle_oauth_connection(stream, &expected_nonce) {
+                let _ = app_handle.emit(
+                    "oauth-token",
+                    serde_json::json!({ "token": token, "nonce": expected_nonce }),
+                );
+            }
+        }
+    });
+
+    Ok(serde_json::json!({ "port": port, "nonce": nonce }))
 }
 
 #[tauri::command]
@@ -479,6 +590,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             login_user,
             get_user_from_token,
+            start_oauth_callback_server,
             get_agent_status,
             send_usage_data,
             send_heartbeat,

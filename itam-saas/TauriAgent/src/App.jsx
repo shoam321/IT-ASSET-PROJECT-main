@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import "./App.css";
 
@@ -24,32 +25,52 @@ function App() {
   const handleGoogleSignIn = async () => {
     try {
       setLoginError('');
-      // Open Google OAuth in browser
-      await openUrl(`${API_URL.replace('/api', '')}/api/auth/google?agent=true`);
-      
-      // Show token input dialog
-      const token = prompt('Complete Google sign-in in your browser.\nAfter signing in, copy the token from the page and paste it here:');
-      
-      if (token && token.trim()) {
-        const trimmedToken = token.trim();
+      // 1) Start a temporary localhost callback server in the agent
+      const { port, nonce } = await invoke('start_oauth_callback_server');
 
-        // Validate token via Rust (avoids WebView CORS)
-        const userData = await invoke('get_user_from_token', { token: trimmedToken });
+      // 2) Listen for the OAuth token event
+      const tokenPromise = new Promise((resolve, reject) => {
+        let unlisten;
+        const timeoutId = setTimeout(async () => {
+          if (unlisten) await unlisten();
+          reject(new Error('Timed out waiting for Google sign-in'));
+        }, 2 * 60 * 1000);
 
-        const displayName = userData?.username || userData?.email || username || 'Google User';
+        listen('oauth-token', async (event) => {
+          const payload = event?.payload;
+          if (!payload || payload.nonce !== nonce) return;
+          clearTimeout(timeoutId);
+          if (unlisten) await unlisten();
+          resolve(payload.token);
+        }).then((fn) => {
+          unlisten = fn;
+        }).catch((err) => {
+          clearTimeout(timeoutId);
+          reject(err);
+        });
+      });
 
-        localStorage.setItem('auth_token', trimmedToken);
-        localStorage.setItem('username', displayName);
-        setAuthToken(trimmedToken);
-        setUsername(displayName);
-        setIsAuthenticated(true);
+      // 3) Open Google OAuth in system browser and let it redirect back to localhost
+      const base = API_URL.replace('/api', '');
+      const oauthUrl = `${base}/api/auth/google?agent=true&port=${encodeURIComponent(port)}&nonce=${encodeURIComponent(nonce)}`;
+      await openUrl(oauthUrl);
 
-        // Set monitoring token
-        await invoke('set_monitoring_token', { token: trimmedToken });
+      // 4) Wait for token, then validate and log in
+      const receivedToken = await tokenPromise;
+      const trimmedToken = String(receivedToken || '').trim();
+      if (!trimmedToken) throw new Error('No token received from Google sign-in');
 
-        // Auto-minimize
-        setTimeout(() => minimizeToTray(), 2000);
-      }
+      const userData = await invoke('get_user_from_token', { token: trimmedToken });
+      const displayName = userData?.username || userData?.email || 'Google User';
+
+      localStorage.setItem('auth_token', trimmedToken);
+      localStorage.setItem('username', displayName);
+      setAuthToken(trimmedToken);
+      setUsername(displayName);
+      setIsAuthenticated(true);
+
+      await invoke('set_monitoring_token', { token: trimmedToken });
+      setTimeout(() => minimizeToTray(), 2000);
     } catch (err) {
       const msg = (err && err.message) ? err.message : String(err);
       setLoginError('Google sign-in failed: ' + msg);

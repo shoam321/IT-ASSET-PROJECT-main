@@ -412,8 +412,21 @@ app.post('/api/auth/login', authLimiter, [
 // Relying on server session cookies is flaky in cross-site redirects.
 app.get('/api/auth/google', (req, res, next) => {
   const isAgent = req.query.agent === 'true';
+  const agentPort = req.query.port;
+  const agentNonce = req.query.nonce;
   const options = { scope: ['profile', 'email'] };
-  if (isAgent) options.state = 'agent';
+  if (isAgent) {
+    // Encode callback details in OAuth state so it survives the Google redirect.
+    // Format: agent:<port>:<nonce>
+    const portNum = Number(agentPort);
+    if (!Number.isFinite(portNum) || portNum <= 0 || portNum > 65535) {
+      return res.status(400).json({ error: 'Invalid agent port' });
+    }
+    if (!agentNonce || typeof agentNonce !== 'string' || agentNonce.length < 8) {
+      return res.status(400).json({ error: 'Invalid agent nonce' });
+    }
+    options.state = `agent:${portNum}:${agentNonce}`;
+  }
   return passport.authenticate('google', options)(req, res, next);
 });
 
@@ -435,87 +448,19 @@ app.get('/api/auth/google/callback',
         userAgent: req.headers['user-agent']
       });
       
-      // Check if this is for desktop agent
-      if (req.query.state === 'agent') {
-        // Show token page for agent
-        res.send(`
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <title>Agent Authentication</title>
-            <style>
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                margin: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              }
-              .container {
-                background: white;
-                padding: 3rem;
-                border-radius: 20px;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-                max-width: 600px;
-                text-align: center;
-              }
-              h1 { color: #2C3E50; margin-bottom: 1rem; }
-              p { color: #7F8C8D; margin-bottom: 2rem; }
-              .token-box {
-                background: #F8F9FA;
-                padding: 1.5rem;
-                border-radius: 10px;
-                border: 2px solid #E0E6ED;
-                margin: 2rem 0;
-                word-break: break-all;
-                font-family: monospace;
-                font-size: 0.9rem;
-                color: #2C3E50;
-              }
-              button {
-                background: linear-gradient(135deg, #5B8DEE 0%, #4A7BDE 100%);
-                color: white;
-                border: none;
-                padding: 1rem 2rem;
-                border-radius: 10px;
-                font-size: 1.1rem;
-                font-weight: 600;
-                cursor: pointer;
-                transition: transform 0.2s;
-              }
-              button:hover {
-                transform: translateY(-2px);
-              }
-              .success {
-                color: #27AE60;
-                font-weight: bold;
-                margin-top: 1rem;
-                display: none;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>✅ Authentication Successful!</h1>
-              <p>Copy this token and paste it into the Desktop Agent:</p>
-              <div class="token-box" id="token">${token}</div>
-              <button onclick="copyToken()">📋 Copy Token</button>
-              <p class="success" id="success">Token copied! You can close this window.</p>
-            </div>
-            <script>
-              function copyToken() {
-                const token = document.getElementById('token').textContent;
-                navigator.clipboard.writeText(token).then(() => {
-                  document.getElementById('success').style.display = 'block';
-                });
-              }
-            </script>
-          </body>
-          </html>
-        `);
-      } else {
+      // Agent flow: redirect token to the localhost callback server.
+      if (typeof req.query.state === 'string' && req.query.state.startsWith('agent:')) {
+        const parts = req.query.state.split(':');
+        const port = Number(parts[1]);
+        const nonce = parts.slice(2).join(':');
+        if (Number.isFinite(port) && port > 0 && port <= 65535 && nonce) {
+          const callbackUrl = `http://127.0.0.1:${port}/oauth/callback?token=${encodeURIComponent(token)}&nonce=${encodeURIComponent(nonce)}`;
+          return res.redirect(callbackUrl);
+        }
+      }
+
+      // Web app flow
+      {
         // Redirect to frontend with token (web app)
         const frontendUrl = process.env.FRONTEND_URL || 'https://it-asset-project.vercel.app';
         res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
