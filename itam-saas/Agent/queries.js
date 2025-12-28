@@ -720,13 +720,34 @@ export async function upsertDevice(deviceData) {
   try {
     const result = await pool.query(
       `INSERT INTO devices (device_id, hostname, os_name, os_version, user_id, last_seen, status)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, 'Active')
+       VALUES (
+         $1,
+         $2,
+         $3,
+         $4,
+         COALESCE($5, current_setting('app.current_user_id', true)::integer),
+         CURRENT_TIMESTAMP,
+         'Active'
+       )
        ON CONFLICT (device_id) 
        DO UPDATE SET 
          hostname = COALESCE($2, devices.hostname),
          os_name = COALESCE($3, devices.os_name),
          os_version = COALESCE($4, devices.os_version),
-         user_id = COALESCE(devices.user_id, $5),
+         -- Claim ownership only when safe:
+         -- - If the row is unowned (legacy/dev)
+         -- - Or it's owned by an admin seed account (common after migrations)
+         -- Otherwise, do not change ownership (prevents "stealing" devices).
+         user_id = CASE
+           WHEN devices.user_id IS NULL THEN COALESCE($5, current_setting('app.current_user_id', true)::integer)
+           WHEN EXISTS (
+             SELECT 1
+             FROM auth_users owner
+             WHERE owner.id = devices.user_id
+               AND owner.role = 'admin'
+           ) THEN COALESCE($5, current_setting('app.current_user_id', true)::integer)
+           ELSE devices.user_id
+         END,
          last_seen = CURRENT_TIMESTAMP,
          status = 'Active',
          updated_at = CURRENT_TIMESTAMP
