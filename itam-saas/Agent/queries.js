@@ -1418,11 +1418,13 @@ export async function addForbiddenApp(appData, adminId) {
     );
 
     // Log to audit trail
-    await pool.query(
+    const auditResult = await pool.query(
       `INSERT INTO audit_trail (action, details, performed_by)
-       VALUES ($1, $2, $3)`,
+       VALUES ($1, $2, $3) RETURNING *`,
       ['Add Forbidden App', `App: ${process_name}, Severity: ${severity}`, adminId]
     );
+
+    console.log('Audit trail entry created:', auditResult.rows[0]); // Debugging log
 
     return result.rows[0];
   } catch (error) {
@@ -1442,11 +1444,13 @@ export async function removeForbiddenApp(appId, adminId) {
     );
 
     // Log to audit trail
-    await pool.query(
+    const auditResult = await pool.query(
       `INSERT INTO audit_trail (action, details, performed_by)
-       VALUES ($1, $2, $3)`,
+       VALUES ($1, $2, $3) RETURNING *`,
       ['Remove Forbidden App', `App ID: ${appId}`, adminId]
     );
+
+    console.log('Audit trail entry created:', auditResult.rows[0]); // Debugging log
 
     return result.rows[0];
   } catch (error) {
