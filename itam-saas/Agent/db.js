@@ -6,8 +6,20 @@
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-dotenv.config();
+// Load env relative to this module so it works regardless of process.cwd().
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const envLocalPath = path.join(__dirname, '.env.local');
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envLocalPath)) {
+  dotenv.config({ path: envLocalPath });
+} else {
+  dotenv.config({ path: envPath });
+}
 
 const connectionString = process.env.DATABASE_URL;
 

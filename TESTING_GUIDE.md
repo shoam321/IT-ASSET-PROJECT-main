@@ -47,29 +47,35 @@ Run this after any major backend/security change. It will **FAIL** if a non-admi
 
 **Prereqs:**
 - Backend is running
-- You have an **admin** username/password (local/dev default is often `admin` / `admin123`)
+- For **local/full** mode: you have an **admin** username/password (local/dev default is often `admin` / `admin123`)
+- For **production/read-only** mode: you have a valid **user JWT token**
 
 ```powershell
 cd itam-saas/Agent
 
-# Local
+# Local (full mode: creates temporary users + test assets, then deletes the assets)
 $env:API_BASE_URL = "http://localhost:5000/api"
+$env:MODE = "full"
 $env:ADMIN_USERNAME = "admin"
 $env:ADMIN_PASSWORD = "admin123"
 npm run test:assets-isolation
 ```
 
-**Against production (use with care):**
+**Against production (safe default: read-only, no user/asset creation):**
 ```powershell
 cd itam-saas/Agent
 $env:API_BASE_URL = "https://it-asset-project-production.up.railway.app/api"
-$env:ADMIN_USERNAME = "<your-admin-username>"
-$env:ADMIN_PASSWORD = "<your-admin-password>"
+$env:MODE = "read-only"
+$env:TEST_USER_TOKEN = "<paste-user-jwt-token>"
 npm run test:assets-isolation
 ```
 
+Tip: if you're logged into the web UI, you can grab the JWT from DevTools:
+- Console: `copy(localStorage.getItem('authToken'))` (it copies to clipboard; `copy(...)` returns `undefined`)
+
 Notes:
-- The test creates a couple of temporary users and a few test assets, then deletes the assets.
+- In `MODE=read-only`, the test logs in via `TEST_USER_TOKEN` and verifies `GET /assets` only returns rows where `user_id` matches the caller.
+- In `MODE=full`, the test creates a couple of temporary users and a few test assets, then deletes the assets.
 - If this test fails, treat it as a **security regression**.
 
 #### Test Agent Endpoints

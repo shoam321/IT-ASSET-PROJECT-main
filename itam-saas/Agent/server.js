@@ -20,10 +20,19 @@ import * as authQueries from './authQueries.js';
 import { authenticateToken, generateToken, requireAdmin } from './middleware/auth.js';
 import { initializeAlertService, shutdownAlertService } from './alertService.js';
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load environment variables relative to this folder so `node itam-saas/Agent/server.js`
+// works no matter what the current working directory is.
+// Prefer `.env.local` for local development to avoid accidentally using production creds.
+const envLocalPath = path.join(__dirname, '.env.local');
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envLocalPath)) {
+  dotenv.config({ path: envLocalPath });
+} else {
+  dotenv.config({ path: envPath });
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -46,6 +55,12 @@ try {
       port: dbUrl.port || '(default)',
       database: dbUrl.pathname?.replace('/', '') || '(unknown)'
     });
+
+    const isLocalDbHost = dbUrl.hostname === 'localhost' || dbUrl.hostname === '127.0.0.1';
+    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+    if (!isProd && !isLocalDbHost) {
+      console.warn('⚠️ Warning: running in non-production while DATABASE_URL points to a non-local host. Consider using itam-saas/Agent/.env.local for a local dev DB.');
+    }
   }
 } catch {
   console.warn('⚠️ DATABASE_URL is set but could not be parsed as a URL');

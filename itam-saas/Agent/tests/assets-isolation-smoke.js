@@ -3,15 +3,35 @@
  *
  * Goal: Fail fast if a non-admin user can see assets that are not assigned to them.
  *
- * Usage:
- *   API_BASE_URL=http://localhost:5000/api node tests/assets-isolation-smoke.js
+ * Modes:
+ * - read-only (default for non-local URLs):
+ *     Uses an existing user token and verifies GET /assets only returns rows for that user.
+ * - full (recommended for local/dev):
+ *     Logs in as admin, creates two users + assets, asserts isolation, then deletes created assets.
  *
- * Optional env:
- *   ADMIN_USERNAME=admin
- *   ADMIN_PASSWORD=admin123
+ * Usage (local, full):
+ *   API_BASE_URL=http://localhost:5000/api MODE=full ADMIN_USERNAME=admin ADMIN_PASSWORD=admin123 node tests/assets-isolation-smoke.js
+ *
+ * Usage (prod, read-only):
+ *   API_BASE_URL=https://<host>/api MODE=read-only TEST_USER_TOKEN=<jwt> node tests/assets-isolation-smoke.js
  */
 
 const API_BASE_URL = (process.env.API_BASE_URL || 'http://localhost:5000/api').replace(/\/$/, '');
+const MODE = String(process.env.MODE || '').trim().toLowerCase();
+
+function isLocalApi(baseUrl) {
+  try {
+    const u = new URL(baseUrl);
+    return u.hostname === 'localhost' || u.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+}
+
+function defaultMode() {
+  if (MODE === 'full' || MODE === 'read-only') return MODE;
+  return isLocalApi(API_BASE_URL) ? 'full' : 'read-only';
+}
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -86,6 +106,33 @@ function uniqueSuffix() {
 async function main() {
   console.log(`🔎 Assets isolation smoke test`);
   console.log(`API_BASE_URL=${API_BASE_URL}`);
+
+  const mode = defaultMode();
+  console.log(`MODE=${mode}`);
+
+  if (mode === 'read-only') {
+    const userToken = process.env.TEST_USER_TOKEN;
+    assert(typeof userToken === 'string' && userToken.length > 20, 'TEST_USER_TOKEN is required in read-only mode');
+
+    const me = await request('GET', '/auth/me', { token: userToken });
+    assert(typeof me?.id === 'number', 'GET /auth/me did not return id');
+
+    const assets = await request('GET', '/assets', { token: userToken });
+    assert(Array.isArray(assets), 'GET /assets should return an array');
+
+    // Strict: every returned asset must belong to current user.
+    const foreign = assets.filter(a => a?.user_id !== me.id);
+    assert(foreign.length === 0, `User can see assets not owned by them (found ${foreign.length})`);
+
+    console.log(`✅ PASS: read-only isolation (userId=${me.id}, assets=${assets.length})`);
+    return;
+  }
+
+  // FULL mode: creates temporary users/assets for deterministic assertions.
+  // Guard: require explicit opt-in if pointing at a non-local API.
+  if (!isLocalApi(API_BASE_URL) && process.env.ALLOW_NONLOCAL_FULL_TESTS !== 'true') {
+    throw new Error('Refusing to run MODE=full against a non-local API. Set ALLOW_NONLOCAL_FULL_TESTS=true to override.');
+  }
 
   const suffix = uniqueSuffix();
 
