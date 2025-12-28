@@ -1,0 +1,12 @@
+{
+  "name": "load-testing",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "load-test": "node simple-load-test.js",
+    "browser-test": "node browser-load-test.js"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}
