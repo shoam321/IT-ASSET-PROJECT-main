@@ -320,7 +320,11 @@ async function startServer() {
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    version: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT || 'unknown'
+  });
 });
 
 // ===== AUTHENTICATION ROUTES =====
@@ -1129,6 +1133,11 @@ function canonicalizeAgentDeviceId(rawDeviceId, userId) {
   return `${base}${suffix}`;
 }
 
+function logAgentDeviceIdMapping(route, rawDeviceId, canonicalDeviceId, userId) {
+  if (process.env.DEBUG_AGENT_DEVICE_ID !== '1') return;
+  console.log(`[agent-device-id] route=${route} userId=${userId} raw=${rawDeviceId} canonical=${canonicalDeviceId}`);
+}
+
 // Receive usage data from agent
 app.post('/api/agent/usage', authenticateToken, async (req, res) => {
   try {
@@ -1141,6 +1150,7 @@ app.post('/api/agent/usage', authenticateToken, async (req, res) => {
 
     const rawDeviceId = device_id;
     const canonicalDeviceId = canonicalizeAgentDeviceId(rawDeviceId, userId);
+    logAgentDeviceIdMapping('/api/agent/usage', rawDeviceId, canonicalDeviceId, userId);
 
     // Set PostgreSQL session variable for Row-Level Security
     await db.setCurrentUserId(userId);
@@ -1186,6 +1196,7 @@ app.post('/api/agent/heartbeat', authenticateToken, async (req, res) => {
 
     const rawDeviceId = device_id;
     const canonicalDeviceId = canonicalizeAgentDeviceId(rawDeviceId, userId);
+    logAgentDeviceIdMapping('/api/agent/heartbeat', rawDeviceId, canonicalDeviceId, userId);
 
     // Set PostgreSQL session variable for Row-Level Security
     await db.setCurrentUserId(userId);
@@ -1228,6 +1239,7 @@ app.post('/api/agent/apps', authenticateToken, async (req, res) => {
 
     const rawDeviceId = device_id;
     const canonicalDeviceId = canonicalizeAgentDeviceId(rawDeviceId, userId);
+    logAgentDeviceIdMapping('/api/agent/apps', rawDeviceId, canonicalDeviceId, userId);
 
     await db.upsertInstalledApps(canonicalDeviceId, apps);
 
@@ -1482,6 +1494,7 @@ app.post('/api/alerts', [
 
     const rawDeviceId = req.body.device_id;
     const canonicalDeviceId = canonicalizeAgentDeviceId(rawDeviceId, userId);
+    logAgentDeviceIdMapping('/api/alerts', rawDeviceId, canonicalDeviceId, userId);
     
     const alertData = {
       device_id: canonicalDeviceId,
