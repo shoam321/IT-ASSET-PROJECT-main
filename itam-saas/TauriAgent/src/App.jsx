@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import "./App.css";
 
 function App() {
@@ -24,39 +25,34 @@ function App() {
     try {
       setLoginError('');
       // Open Google OAuth in browser
-      const { open } = await import('@tauri-apps/plugin-opener');
-      await open(`${API_URL.replace('/api', '')}/api/auth/google?agent=true`);
+      await openUrl(`${API_URL.replace('/api', '')}/api/auth/google?agent=true`);
       
       // Show token input dialog
       const token = prompt('Complete Google sign-in in your browser.\nAfter signing in, copy the token from the page and paste it here:');
       
       if (token && token.trim()) {
-        // Validate token with backend
-        const response = await fetch(`${API_URL}/auth/me`, {
-          headers: {
-            'Authorization': `Bearer ${token.trim()}`
-          }
-        });
-        
-        if (response.ok) {
-          const userData = await response.json();
-          localStorage.setItem('auth_token', token.trim());
-          localStorage.setItem('username', userData.username || userData.email);
-          setAuthToken(token.trim());
-          setUsername(userData.username || userData.email);
-          setIsAuthenticated(true);
-          
-          // Set monitoring token
-          await invoke('set_monitoring_token', { token: token.trim() });
-          
-          // Auto-minimize
-          setTimeout(() => minimizeToTray(), 2000);
-        } else {
-          setLoginError('Invalid token. Please try again.');
-        }
+        const trimmedToken = token.trim();
+
+        // Validate token via Rust (avoids WebView CORS)
+        const userData = await invoke('get_user_from_token', { token: trimmedToken });
+
+        const displayName = userData?.username || userData?.email || username || 'Google User';
+
+        localStorage.setItem('auth_token', trimmedToken);
+        localStorage.setItem('username', displayName);
+        setAuthToken(trimmedToken);
+        setUsername(displayName);
+        setIsAuthenticated(true);
+
+        // Set monitoring token
+        await invoke('set_monitoring_token', { token: trimmedToken });
+
+        // Auto-minimize
+        setTimeout(() => minimizeToTray(), 2000);
       }
     } catch (err) {
-      setLoginError('Google sign-in failed: ' + err.message);
+      const msg = (err && err.message) ? err.message : String(err);
+      setLoginError('Google sign-in failed: ' + msg);
     }
   };
 

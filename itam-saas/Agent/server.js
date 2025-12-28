@@ -408,14 +408,14 @@ app.post('/api/auth/login', authLimiter, [
 });
 
 // Google OAuth Routes
-app.get('/api/auth/google',
-  (req, res, next) => {
-    // Check if this is for desktop agent
-    req.session.isAgentAuth = req.query.agent === 'true';
-    next();
-  },
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
+// NOTE: We use the OAuth `state` parameter to detect agent auth flows.
+// Relying on server session cookies is flaky in cross-site redirects.
+app.get('/api/auth/google', (req, res, next) => {
+  const isAgent = req.query.agent === 'true';
+  const options = { scope: ['profile', 'email'] };
+  if (isAgent) options.state = 'agent';
+  return passport.authenticate('google', options)(req, res, next);
+});
 
 app.get('/api/auth/google/callback',
   passport.authenticate('google', { 
@@ -436,7 +436,7 @@ app.get('/api/auth/google/callback',
       });
       
       // Check if this is for desktop agent
-      if (req.session.isAgentAuth) {
+      if (req.query.state === 'agent') {
         // Show token page for agent
         res.send(`
           <!DOCTYPE html>
