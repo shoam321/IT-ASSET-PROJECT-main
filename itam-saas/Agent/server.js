@@ -499,6 +499,18 @@ app.get('/api/audit-logs/export', authenticateToken, async (req, res) => {
     const filters = buildAuditFiltersFromQuery(req.query);
     const logs = await db.getAuditLogs(filters);
 
+    // Log export event after fetching so the export output doesn't include itself.
+    await db.logAuditEvent('audit_logs', 0, 'EXPORT', null, {
+      format,
+      filters,
+      resultCount: Array.isArray(logs) ? logs.length : 0
+    }, {
+      userId,
+      username: req.user?.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const filenameBase = `audit-logs-${timestamp}`;
 
@@ -1195,7 +1207,7 @@ app.get('/api/agent/apps/usage', authenticateToken, async (req, res) => {
  *
  * Compliance/audit:
  * - POST/PUT/DELETE write an audit record into `audit_logs` via `db.logAuditEvent()`.
- * - Actions are constrained by DB schema to: LOGIN/LOGOUT/CREATE/UPDATE/DELETE.
+ * - Actions are constrained by DB schema to: LOGIN/LOGOUT/CREATE/UPDATE/DELETE/EXPORT.
  * - Audit payload includes actor (userId/username) and request metadata (ip/user-agent).
  */
 

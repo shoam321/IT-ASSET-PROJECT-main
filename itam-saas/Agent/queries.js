@@ -1200,10 +1200,10 @@ export async function cleanupOldAlerts(hoursOld = 5) {
  */
 
 /**
- * Log an audit event (CREATE, UPDATE, DELETE)
+ * Log an audit event (LOGIN, LOGOUT, CREATE, UPDATE, DELETE, EXPORT)
  * @param {string} tableName - Name of the table being modified
  * @param {number} recordId - ID of the record
- * @param {string} action - CREATE, UPDATE, or DELETE
+ * @param {string} action - LOGIN, LOGOUT, CREATE, UPDATE, DELETE, or EXPORT
  * @param {object} oldData - Data before change (null for CREATE)
  * @param {object} newData - Data after change (null for DELETE)
  * @param {object} userInfo - {userId, username, ipAddress, userAgent}

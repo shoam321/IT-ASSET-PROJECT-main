@@ -34,7 +34,7 @@ BEGIN
     SELECT 1 FROM information_schema.table_constraints
     WHERE table_name = 'audit_logs' AND constraint_name = 'audit_logs_action_check'
   ) THEN
-    EXECUTE 'ALTER TABLE audit_logs ADD CONSTRAINT audit_logs_action_check CHECK (action IN (''LOGIN'', ''LOGOUT'', ''CREATE'', ''UPDATE'', ''DELETE''))';
+    EXECUTE 'ALTER TABLE audit_logs ADD CONSTRAINT audit_logs_action_check CHECK (action IN (''LOGIN'', ''LOGOUT'', ''CREATE'', ''UPDATE'', ''DELETE'', ''EXPORT''))';
   END IF;
 END $$;
 
