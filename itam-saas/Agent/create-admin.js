@@ -1,5 +1,6 @@
 import * as authQueries from './authQueries.js';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -10,11 +11,11 @@ dotenv.config();
 async function createAdmin() {
   try {
     console.log('🔧 Creating admin user...\n');
-5
+
     // Get credentials from command line or use defaults
     const username = process.argv[2] || 'admin';
     const email = process.argv[3] || 'admin@itasset.local';
-    const password = process.argv[4] || 'admin123';
+    const password = process.argv[4] || process.env.ADMIN_INITIAL_PASSWORD || crypto.randomBytes(18).toString('base64url');
     const fullName = process.argv[5] || 'System Administrator';
 
     console.log(`Username: ${username}`);
@@ -41,7 +42,7 @@ async function createAdmin() {
     console.log('📝 Login credentials:');
     console.log(`  Username: ${username}`);
     console.log(`  Password: ${password}`);
-    console.log('\n⚠️  Remember to change the password after first login!\n');
+    console.log('\n⚠️  Store this password securely and rotate it after first login.\n');
 
     process.exit(0);
   } catch (error) {

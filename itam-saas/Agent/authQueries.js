@@ -1,5 +1,6 @@
 import pool from './db.js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 /**
  * Create a new user
@@ -149,20 +150,37 @@ export async function getAllAuthUsers() {
  */
 export async function ensureDefaultAdmin() {
   try {
+    // In production SaaS, never create a default admin unless explicitly enabled.
+    if (process.env.AUTO_CREATE_ADMIN !== 'true') {
+      return;
+    }
+
     // Check if any admin exists
     const result = await pool.query("SELECT count(*) FROM auth_users WHERE role = 'admin'");
     const count = parseInt(result.rows[0].count);
     
     if (count === 0) {
-      console.log('⚠️ No admin users found. Creating default admin user...');
+      console.warn('⚠️ No admin users found. AUTO_CREATE_ADMIN=true so creating an admin user...');
+
+      const providedPassword = process.env.ADMIN_INITIAL_PASSWORD;
+      const generatedPassword = crypto.randomBytes(18).toString('base64url');
+      const passwordToUse = providedPassword || generatedPassword;
+
       await createAuthUser(
         'admin',
         'admin@itasset.local',
-        'admin123',
+        passwordToUse,
         'System Administrator',
         'admin'
       );
-      console.log('✅ Default admin created: admin / admin123');
+
+      if (!providedPassword) {
+        console.warn('✅ Admin user created: admin');
+        console.warn(`🔐 Generated password (store it now): ${generatedPassword}`);
+        console.warn('Set ADMIN_INITIAL_PASSWORD to control this, and disable AUTO_CREATE_ADMIN after bootstrap.');
+      } else {
+        console.warn('✅ Admin user created: admin (password from ADMIN_INITIAL_PASSWORD)');
+      }
     }
   } catch (error) {
     console.error('Error ensuring default admin:', error);

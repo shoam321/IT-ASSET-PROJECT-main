@@ -15,7 +15,6 @@ const ForbiddenApps = () => {
     description: '',
     severity: 'Medium'
   });
-  const [filter, setFilter] = useState('');
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app';
 
@@ -174,8 +173,6 @@ const ForbiddenApps = () => {
       app.process_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (app.description && app.description.toLowerCase().includes(searchTerm.toLowerCase()))
     : true
-  ).filter(app => 
-    filter ? app.process_name === filter : true
   );
 
   return (
@@ -341,7 +338,7 @@ const ForbiddenApps = () => {
                           </select>
                         </td>
                         <td className="px-6 py-4 text-slate-300 text-sm">
-                          {new Date(app.created_at).toLocaleDateString()}
+                          {app.created_by_name || '-'}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
@@ -373,7 +370,7 @@ const ForbiddenApps = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-slate-300">
-                          {new Date(app.created_at).toLocaleDateString()}
+                          {app.created_by_name || '-'}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
