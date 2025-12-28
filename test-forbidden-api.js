@@ -1,4 +1,14 @@
 // Test script to verify forbidden apps API
+//
+// Usage:
+// - Set ADMIN_PASSWORD in your environment (no insecure defaults are used).
+//   PowerShell example:
+//     $env:ADMIN_PASSWORD='your-admin-password'
+//     node test-forbidden-api.js
+//
+// Notes:
+// - This script hits the deployed Railway URL by default.
+// - The login token is used only in-memory; it is not printed.
 const API_URL = 'https://it-asset-project-production.up.railway.app';
 
 async function testForbiddenAppsAPI() {

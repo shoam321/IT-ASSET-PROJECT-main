@@ -14,8 +14,10 @@ import pool from './db.js';
  * - RLS policies defined in migrations/add-multi-tenancy.sql
  * 
  * WHO IS ADMIN:
- * - Created using: node create-admin.js (default: admin/admin@itasset.local/admin123)
- * - First admin must be created manually before system use
+ * - Recommended: create the first admin with `node create-admin.js`
+ * - Dev-only bootstrap: start server with `AUTO_CREATE_ADMIN=true`
+ *   - If no admin exists, one is created with password from `ADMIN_INITIAL_PASSWORD`
+ *     or a generated strong password printed once to the console.
  * - Admins can create more users/admins via API (future feature)
  * 
  * IMPORTANT FIXES LEARNED:

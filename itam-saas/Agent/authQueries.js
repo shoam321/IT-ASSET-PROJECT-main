@@ -4,6 +4,10 @@ import crypto from 'crypto';
 
 /**
  * Create a new user
+ *
+ * Security:
+ * - Passwords are hashed with bcrypt (`bcryptjs`).
+ * - Cost factor is intentionally set to 12 for better resistance against offline cracking.
  */
 export async function createAuthUser(username, email, password, fullName = null, role = 'user') {
   try {
@@ -147,6 +151,15 @@ export async function getAllAuthUsers() {
 
 /**
  * Ensure default admin exists
+ *
+ * IMPORTANT (SaaS-safe defaults):
+ * - This function does NOTHING unless `AUTO_CREATE_ADMIN=true`.
+ * - Intended for local/dev bootstrap only.
+ * - In production, create admins explicitly using `node create-admin.js`.
+ *
+ * Password source when bootstrap is enabled and no admin exists:
+ * - `ADMIN_INITIAL_PASSWORD` if provided, otherwise a strong password is generated
+ *   and printed once to the server console.
  */
 export async function ensureDefaultAdmin() {
   try {

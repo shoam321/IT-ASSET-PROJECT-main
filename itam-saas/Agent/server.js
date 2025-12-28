@@ -13,6 +13,7 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
 import { authenticateToken, generateToken } from './middleware/auth.js';
@@ -26,6 +27,28 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// Startup diagnostics (do not print secrets)
+console.log('🔧 Environment:', {
+  NODE_ENV: process.env.NODE_ENV || 'development',
+  PORT,
+  HAS_DATABASE_URL: Boolean(process.env.DATABASE_URL),
+  HAS_JWT_SECRET: Boolean(process.env.JWT_SECRET),
+  HAS_SESSION_SECRET: Boolean(process.env.SESSION_SECRET)
+});
+
+try {
+  if (process.env.DATABASE_URL) {
+    const dbUrl = new URL(process.env.DATABASE_URL);
+    console.log('🔧 Database target:', {
+      host: dbUrl.hostname,
+      port: dbUrl.port || '(default)',
+      database: dbUrl.pathname?.replace('/', '') || '(unknown)'
+    });
+  }
+} catch {
+  console.warn('⚠️ DATABASE_URL is set but could not be parsed as a URL');
+}
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads', 'receipts');
@@ -180,9 +203,23 @@ passport.use(new GoogleStrategy({
   }
 ));
 
-// Logging middleware
+// Request logging middleware
+// - Adds an `x-request-id` header to every response
+// - Logs: timestamp, requestId, method, url, status, duration
+// - Helps correlate client errors with server logs quickly
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  const requestId = crypto.randomUUID();
+  req.requestId = requestId;
+  res.setHeader('x-request-id', requestId);
+
+  const startMs = Date.now();
+  res.on('finish', () => {
+    const durationMs = Date.now() - startMs;
+    console.log(
+      `[${new Date().toISOString()}] [${requestId}] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${durationMs}ms)`
+    );
+  });
+
   next();
 });
 
@@ -1052,6 +1089,27 @@ app.get('/api/agent/apps/usage', authenticateToken, async (req, res) => {
 
 // ===== FORBIDDEN APPS & SECURITY ALERTS ROUTES =====
 
+/**
+ * Forbidden Apps
+ *
+ * Routes:
+ * - GET    /api/forbidden-apps        (auth) list all forbidden apps (used by UI + agent sync)
+ * - GET    /api/forbidden-apps/list   (auth) lightweight list for agent sync (process_name, severity)
+ * - POST   /api/forbidden-apps        (admin) create forbidden app
+ * - PUT    /api/forbidden-apps/:id    (admin) update forbidden app
+ * - DELETE /api/forbidden-apps/:id    (admin) delete forbidden app
+ *
+ * Security model:
+ * - All routes require JWT (`authenticateToken`).
+ * - Write routes require `role === 'admin'`.
+ * - For multi-tenancy/RLS, we call `db.setCurrentUserId(userId)` before DB work.
+ *
+ * Compliance/audit:
+ * - POST/PUT/DELETE write an audit record into `audit_logs` via `db.logAuditEvent()`.
+ * - Actions are constrained by DB schema to: LOGIN/LOGOUT/CREATE/UPDATE/DELETE.
+ * - Audit payload includes actor (userId/username) and request metadata (ip/user-agent).
+ */
+
 // Get all forbidden apps (for agent sync)
 app.get('/api/forbidden-apps', authenticateToken, async (req, res) => {
   try {
@@ -1311,6 +1369,20 @@ app.get('/api/alerts/device/:deviceId', authenticateToken, async (req, res) => {
 
 // Initialize and start server
 startServer();
+
+// Global error handler (must be after routes)
+// Ensures unexpected errors return JSON and include request correlation id.
+app.use((err, req, res, next) => {
+  const requestId = req?.requestId || 'unknown';
+  console.error(`[${new Date().toISOString()}] [${requestId}] Unhandled error:`, err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({
+    error: 'Internal server error',
+    requestId
+  });
+});
 
 // Export for Vercel
 export default app;

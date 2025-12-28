@@ -76,17 +76,18 @@ export const requireAdmin = (req, res, next) => {
  * ═══════════════════════════════════════════════════════════════════════════
  * 
  * CREATING THE FIRST ADMIN:
- * 1. Run command: node create-admin.js
- * 2. Default credentials created:
- *    - Username: admin
- *    - Email: admin@itasset.local
- *    - Password: admin123
- *    - Role: admin
+ * 1) Preferred: Run `node create-admin.js` to create the first admin.
+ *    - You can pass username/email/password/fullName as arguments.
+ *    - The script supports using `ADMIN_INITIAL_PASSWORD` from env.
  * 
- * 3. Custom admin creation:
- *    node create-admin.js myusername admin@company.com StrongPass123 "Jane Doe"
+ * 2) Dev-only bootstrap: set `AUTO_CREATE_ADMIN=true` before starting the server.
+ *    - If no admin exists, the server will create `admin`.
+ *    - Password source:
+ *      - `ADMIN_INITIAL_PASSWORD` if provided, otherwise a strong random password is generated
+ *        and printed once to the console.
+ *    - Disable `AUTO_CREATE_ADMIN` after bootstrap.
  * 
- * 4. Admin user is stored in 'auth_users' table with role='admin'
+ * Admin users are stored in the `auth_users` table with `role='admin'`.
  * 
  * WHAT HAPPENS DURING MIGRATION:
  * - All existing devices get assigned to first admin user (user_id = admin's ID)
@@ -186,7 +187,7 @@ export const authorize = (...allowedPermissions) => {
  * - Sent as Authorization header: "Bearer <token>"
  * 
  * ROLE ASSIGNMENT:
- * - Admin: Created manually via: node create-admin.js
+ * - Admin: Created via `node create-admin.js` (recommended) or `AUTO_CREATE_ADMIN=true` (dev-only)
  * - User: Default role when registering via /api/auth/register
  * - Role stored in auth_users.role column in database
  * - Role determines which permissions are added to token
