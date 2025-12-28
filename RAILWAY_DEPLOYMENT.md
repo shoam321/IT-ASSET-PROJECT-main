@@ -33,7 +33,10 @@ Railway will detect your monorepo. You need to specify which folder is your back
 2. Add these variables:
 
 ```
-DATABASE_URL=postgresql://postgres:KOcMWUlOIOsQudIVqzANkoVSWfWTpvDm@postgres.railway.internal:5432/railway
+DATABASE_URL=postgresql://postgres:<PASSWORD>@<PUBLIC_HOST>:<PORT>/<DBNAME>
+
+Note: the `postgres.railway.internal` host is only reachable *inside Railway*.
+For local development, use the Railway Postgres **Public** connection URL/host.
 PORT=5000
 NODE_ENV=production
 ```
