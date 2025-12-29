@@ -1146,10 +1146,10 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
         console.log(`📄 Parsing receipt with Mindee: ${req.file.originalname}`);
         
         // Use Mindee's standard Receipt V5 API with ClientV2
-        const inputSource = mindeeClient.loadDocument(req.file.path);
-        const response = await mindeeClient.parse(mindee.product.ReceiptV5, inputSource);
+        const inputSource = mindeeClient.docFromPath(req.file.path);
+        const response = await mindeeClient.enqueueAndParse(mindee.product.ReceiptV5, inputSource);
 
-        const document = response.document;
+        const document = response.document.inference.prediction;
         console.log('📊 Mindee Receipt Data:', {
           supplier: document.supplierName?.value,
           date: document.date?.value,
