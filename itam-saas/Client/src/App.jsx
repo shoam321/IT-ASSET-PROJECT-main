@@ -14,6 +14,7 @@ import ReceiptsView from './components/ReceiptsView';
 import AssetScanner from './components/AssetScanner';
 import QRCodeGenerator from './components/QRCodeGenerator';
 import StockOverview from './components/StockOverview';
+import Consumables from './components/Consumables';
 import CategoryIcon from './components/CategoryIcon';
 import { downloadCsv } from './utils/csvExport';
 
@@ -1986,6 +1987,8 @@ export default function App() {
         return renderHomeScreen();
       case 'assets':
         return renderAssetsScreen();
+      case 'consumables':
+        return <Consumables />;
       case 'licenses':
         return renderLicensesScreen();
       case 'users':
@@ -2212,6 +2215,20 @@ export default function App() {
             <AlertTriangle className="w-5 h-5" />
             <span>Security Alerts</span>
           </button>
+
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentScreen('consumables'); setShowForm(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                currentScreen === 'consumables' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <Boxes className="w-5 h-5" />
+              <span>Consumables</span>
+            </button>
+          )}
 
           {isAdmin && (
             <button
