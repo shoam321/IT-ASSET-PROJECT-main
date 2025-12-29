@@ -1872,15 +1872,22 @@ app.get('/api/consumables/:id', authenticateToken, requireAdmin, async (req, res
 });
 
 // Create consumable
-app.post('/api/consumables', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/consumables', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    await db.setCurrentUserId(req.user.userId);
-    const consumable = await consumablesDb.createConsumable({
-      ...req.body,
-      user_id: req.user.userId
-    });
-    res.status(201).json(consumable);
+    const consumables = await consumablesDb.getAllConsumables();
+    res.json(consumables);
   } catch (error) {
+    console.error('Error fetching consumables:', error);
+    if (error?.code === '42P01') {
+      return res.status(500).json({
+        error: 'Consumables tables not found. Apply migration.',
+        code: 'MISSING_CONSUMABLES_TABLE',
+        fix: 'Run: node itam-saas/Agent/migrations/run-consumables-migration.js'
+      });
+    }
+    res.status(500).json({ error: 'Failed to fetch consumables' });
+  }
+});
     console.error('Error creating consumable:', error);
     res.status(500).json({ error: 'Failed to create consumable' });
   }

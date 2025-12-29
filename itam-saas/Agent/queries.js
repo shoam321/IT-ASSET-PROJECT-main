@@ -1,4 +1,10 @@
 import pool from './db.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Set the current user ID for PostgreSQL Row-Level Security (RLS)
@@ -123,10 +129,16 @@ export async function initDatabase() {
       ) as forbidden_apps_exists,
       EXISTS (
         SELECT 1 FROM information_schema.tables WHERE table_name = 'security_alerts'
-      ) as security_alerts_exists;
+      ) as security_alerts_exists,
+      EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'consumables'
+      ) as consumables_exists,
+      EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'consumable_transactions'
+      ) as consumable_transactions_exists;
     `);
     
-    const { assets_exists, licenses_exists, users_exists, contracts_exists, forbidden_apps_exists, security_alerts_exists } = tablesCheck.rows[0];
+    const { assets_exists, licenses_exists, users_exists, contracts_exists, forbidden_apps_exists, security_alerts_exists, consumables_exists, consumable_transactions_exists } = tablesCheck.rows[0];
     
     if (assets_exists) {
       console.log('✅ Assets table exists');
@@ -162,6 +174,27 @@ export async function initDatabase() {
       console.log('✅ Security Alerts table exists');
     } else {
       console.warn('⚠️ Security Alerts table not found - run: node run-forbidden-migration.js');
+    }
+    
+    if (consumables_exists && consumable_transactions_exists) {
+      console.log('✅ Consumables tables exist');
+    } else {
+      console.warn('⚠️ Consumables tables not found');
+      const autoMigrate = String(process.env.AUTO_MIGRATE_CONSUMABLES || '').toLowerCase();
+      if (autoMigrate === 'true' || autoMigrate === '1' || (process.env.NODE_ENV !== 'production' && autoMigrate !== 'false')) {
+        try {
+          const migrationPath = path.join(__dirname, 'migrations', 'add-consumables.sql');
+          const sql = fs.readFileSync(migrationPath, 'utf8');
+          console.log('🔄 Applying consumables migration automatically...');
+          await pool.query(sql);
+          console.log('✅ Consumables migration applied successfully');
+        } catch (mErr) {
+          console.error('❌ Failed to apply consumables migration automatically:', mErr.message);
+          console.warn('ℹ️ You can run it manually: node itam-saas/Agent/migrations/run-consumables-migration.js');
+        }
+      } else {
+        console.warn('ℹ️ AUTO_MIGRATE_CONSUMABLES is disabled. To create tables, run: node itam-saas/Agent/migrations/run-consumables-migration.js');
+      }
     }
     
     if (assets_exists && licenses_exists && users_exists && contracts_exists) {
