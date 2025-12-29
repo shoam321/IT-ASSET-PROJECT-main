@@ -280,7 +280,13 @@ async function checkAndCreateLowStockAlert(consumable) {
           consumable.quantity,
           consumable.min_quantity,
           consumable.unit || 'units',
-          isOutOfStock
+          isOutOfStock,
+          {
+            category: consumable.category,
+            supplier: consumable.supplier,
+            lastOrderDate: consumable.last_order_date,
+            reorderQuantity: consumable.min_quantity * 2 // Suggest 2x minimum
+          }
         ).catch(err => console.error('Failed to send low stock email:', err));
       }
     } else {
