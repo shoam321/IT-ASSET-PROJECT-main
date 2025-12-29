@@ -16,7 +16,8 @@ const Dashboard = () => {
       setLoading(true);
       setError(null);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/analytics/dashboard`, {
+      const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
+      const response = await fetch(`${API_URL}/analytics/dashboard`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -40,7 +41,8 @@ const Dashboard = () => {
     try {
       setExporting(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/analytics/export?type=${type}`, {
+      const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
+      const response = await fetch(`${API_URL}/analytics/export?type=${type}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
