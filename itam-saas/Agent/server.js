@@ -1137,8 +1137,8 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
     let currency = null;
     let parsingStatus = 'pending';
 
-    // Parse receipt with Tesseract OCR if file is image/pdf
-    const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    // Parse receipt with Tesseract OCR if file is image or PDF
+    const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
     if (supportedTypes.includes(req.file.mimetype)) {
       try {
         console.log(`📄 Parsing receipt with Tesseract OCR: ${req.file.originalname}`);
