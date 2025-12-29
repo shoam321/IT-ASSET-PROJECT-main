@@ -178,9 +178,7 @@ const getRolePermissions = (role) => {
     ],
     user: [
       'read:own_devices',
-      'write:own_devices',
-      // Keep analytics visible to authenticated users as per route intent
-      'analytics:view'
+      'write:own_devices'
     ]
   };
   const key = typeof role === 'string' ? role.toLowerCase() : 'user';
