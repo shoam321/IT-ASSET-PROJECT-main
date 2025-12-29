@@ -35,7 +35,7 @@ Auto-sends emails when:
 ### Environment Variables (`.env`)
 ```env
 # Resend Email Service
-RESEND_API_KEY=re_G8ntpHhF_JyrycSvfZdFv3MXXDaw6JZ9a
+RESEND_API_KEY=re_your_api_key_here
 FROM_EMAIL=noreply@itasset.local
 FRONTEND_URL=https://it-asset-project.vercel.app/
 ADMIN_EMAIL=your-email@example.com
