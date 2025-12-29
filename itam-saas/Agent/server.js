@@ -156,6 +156,9 @@ const allowedOrigins = process.env.REACT_APP_URL
   : ['https://it-asset-project.vercel.app'];
 console.log('🔧 CORS Origins:', allowedOrigins);
 
+// Trust Railway proxy for proper IP forwarding
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors({
   origin: function (origin, callback) {
