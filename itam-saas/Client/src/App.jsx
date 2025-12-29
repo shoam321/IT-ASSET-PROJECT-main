@@ -54,7 +54,8 @@ export default function App() {
     model: '',
     serial_number: '',
     assigned_user_name: '',
-    status: 'In Use'
+    status: 'In Use',
+    cost: 0
   });
   const [licenseFormData, setLicenseFormData] = useState({
     license_name: '',
@@ -208,7 +209,8 @@ export default function App() {
         model: '',
         serial_number: '',
         assigned_user_name: '',
-        status: 'In Use'
+        status: 'In Use',
+        cost: 0
       });
       setShowForm(false);
       await loadAssets();
@@ -230,7 +232,8 @@ export default function App() {
       model: asset.model,
       serial_number: asset.serial_number,
       assigned_user_name: asset.assigned_user_name,
-      status: asset.status
+      status: asset.status,
+      cost: asset.cost || 0
     });
     setShowForm(true);
   };
@@ -558,6 +561,7 @@ export default function App() {
         { key: 'serial_number', header: 'Serial Number' },
         { key: 'assigned_user_name', header: 'Assigned User' },
         { key: 'status', header: 'Status' },
+        { key: 'cost', header: 'Cost' },
         { key: 'created_at', header: 'Created At' },
         { key: 'updated_at', header: 'Updated At' },
       ]);
@@ -838,6 +842,7 @@ export default function App() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Manufacturer</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Model</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Cost</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-slate-300 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
@@ -857,6 +862,7 @@ export default function App() {
                             {asset.status}
                           </span>
                         </td>
+                        <td className="px-6 py-4 text-slate-300">${parseFloat(asset.cost || 0).toFixed(2)}</td>
                         <td className="px-6 py-4">
                           <button
                             onClick={() => { setCurrentScreen('assets'); setSearchTerm(asset.asset_tag); setUniversalSearch(''); }}
@@ -1106,6 +1112,17 @@ export default function App() {
               onChange={(e) => setFormData({...formData, assigned_user_name: e.target.value})}
               className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
             />
+            <input
+              id="asset_cost"
+              name="asset_cost"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Cost ($)"
+              value={formData.cost}
+              onChange={(e) => setFormData({...formData, cost: parseFloat(e.target.value) || 0})}
+              className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
+            />
           </div>
           <div className="flex gap-2 mt-4">
             <button
@@ -1125,7 +1142,8 @@ export default function App() {
                   model: '',
                   serial_number: '',
                   assigned_user_name: '',
-                  status: 'In Use'
+                  status: 'In Use',
+                  cost: 0
                 });
               }}
               className="bg-slate-600 hover:bg-slate-500 text-white px-6 py-2 rounded-lg transition"
@@ -1166,13 +1184,14 @@ export default function App() {
                 <th className="px-6 py-3 text-left text-slate-300 font-semibold">Model</th>
                 <th className="px-6 py-3 text-left text-slate-300 font-semibold">Assigned User</th>
                 <th className="px-6 py-3 text-left text-slate-300 font-semibold">Status</th>
+                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Cost</th>
                 <th className="px-6 py-3 text-left text-slate-300 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredAssets.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center">
+                  <td colSpan="8" className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-4">
                       <HardDrive className="w-16 h-16 text-slate-600" />
                       <div>
@@ -1208,6 +1227,7 @@ export default function App() {
                         {asset.status}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-slate-300">${parseFloat(asset.cost || 0).toFixed(2)}</td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
                         <button 
