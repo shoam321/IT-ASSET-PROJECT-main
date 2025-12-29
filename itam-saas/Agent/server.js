@@ -1840,6 +1840,19 @@ app.get('/api/consumables', authenticateToken, requireAdmin, async (req, res) =>
     res.json(consumables);
   } catch (error) {
     console.error('Error fetching consumables:', error);
+    if (error?.code === '42P01') {
+      let dbInfo = null;
+      let schemaInfo = null;
+      try { dbInfo = await db.getDbSessionInfo(); } catch {}
+      try { schemaInfo = await db.getConsumablesSchemaDiagnostics(); } catch {}
+      return res.status(500).json({
+        error: 'Consumables tables not found. Apply migration.',
+        code: 'MISSING_CONSUMABLES_TABLE',
+        fix: 'Run: node itam-saas/Agent/migrations/run-consumables-migration.js',
+        db: dbInfo || undefined,
+        schema: schemaInfo || undefined
+      });
+    }
     res.status(500).json({ error: 'Failed to fetch consumables' });
   }
 });
@@ -1872,23 +1885,27 @@ app.get('/api/consumables/:id', authenticateToken, requireAdmin, async (req, res
 });
 
 // Create consumable
-app.get('/api/consumables', authenticateToken, requireAdmin, async (req, res) => {
+app.post('/api/consumables', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const consumables = await consumablesDb.getAllConsumables();
-    res.json(consumables);
+    await db.setCurrentUserId(req.user.userId);
+    const payload = { ...req.body, user_id: req.user.userId };
+    const consumable = await consumablesDb.createConsumable(payload);
+    res.status(201).json(consumable);
   } catch (error) {
-    console.error('Error fetching consumables:', error);
+    console.error('Error creating consumable:', error);
     if (error?.code === '42P01') {
+      let dbInfo = null;
+      let schemaInfo = null;
+      try { dbInfo = await db.getDbSessionInfo(); } catch {}
+      try { schemaInfo = await db.getConsumablesSchemaDiagnostics(); } catch {}
       return res.status(500).json({
         error: 'Consumables tables not found. Apply migration.',
         code: 'MISSING_CONSUMABLES_TABLE',
-        fix: 'Run: node itam-saas/Agent/migrations/run-consumables-migration.js'
+        fix: 'Run: node itam-saas/Agent/migrations/run-consumables-migration.js',
+        db: dbInfo || undefined,
+        schema: schemaInfo || undefined
       });
     }
-    res.status(500).json({ error: 'Failed to fetch consumables' });
-  }
-});
-    console.error('Error creating consumable:', error);
     res.status(500).json({ error: 'Failed to create consumable' });
   }
 });

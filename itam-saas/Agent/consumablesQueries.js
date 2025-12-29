@@ -7,7 +7,7 @@ import * as emailService from './emailService.js';
 export async function getAllConsumables() {
   try {
     const result = await pool.query(
-      'SELECT * FROM consumables ORDER BY name ASC'
+      'SELECT * FROM public.consumables ORDER BY name ASC'
     );
     return result.rows;
   } catch (error) {
@@ -22,7 +22,7 @@ export async function getAllConsumables() {
 export async function getConsumableById(id) {
   try {
     const result = await pool.query(
-      'SELECT * FROM consumables WHERE id = $1',
+      'SELECT * FROM public.consumables WHERE id = $1',
       [id]
     );
     return result.rows[0];
@@ -51,7 +51,7 @@ export async function createConsumable(data) {
     );
 
     const result = await client.query(
-      `INSERT INTO consumables (
+      `INSERT INTO public.consumables (
         name, category, description, quantity, min_quantity, unit,
         unit_cost, location, supplier, sku, notes, user_id
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -86,7 +86,7 @@ export async function updateConsumable(id, data) {
     } = data;
 
     const result = await pool.query(
-      `UPDATE consumables SET
+      `UPDATE public.consumables SET
         name = COALESCE($1, name),
         category = COALESCE($2, category),
         description = COALESCE($3, description),
@@ -120,7 +120,7 @@ export async function updateConsumable(id, data) {
 export async function deleteConsumable(id) {
   try {
     const result = await pool.query(
-      'DELETE FROM consumables WHERE id = $1 RETURNING *',
+      'DELETE FROM public.consumables WHERE id = $1 RETURNING *',
       [id]
     );
     return result.rows[0];
@@ -145,7 +145,7 @@ export async function adjustStock(id, quantityChange, reason, performedBy, perfo
 
     // Get current quantity
     const consumable = await client.query(
-      'SELECT * FROM consumables WHERE id = $1',
+      'SELECT * FROM public.consumables WHERE id = $1',
       [id]
     );
 
@@ -162,7 +162,7 @@ export async function adjustStock(id, quantityChange, reason, performedBy, perfo
 
     // Update quantity
     const updated = await client.query(
-      `UPDATE consumables SET 
+      `UPDATE public.consumables SET 
         quantity = $1,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
@@ -172,7 +172,7 @@ export async function adjustStock(id, quantityChange, reason, performedBy, perfo
 
     // Record transaction
     await client.query(
-      `INSERT INTO consumable_transactions (
+      `INSERT INTO public.consumable_transactions (
         consumable_id, transaction_type, quantity_change, quantity_before,
         quantity_after, reason, performed_by, performed_by_name, user_id
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -210,7 +210,7 @@ export async function adjustStock(id, quantityChange, reason, performedBy, perfo
 export async function getConsumableTransactions(consumableId) {
   try {
     const result = await pool.query(
-      `SELECT * FROM consumable_transactions 
+      `SELECT * FROM public.consumable_transactions 
        WHERE consumable_id = $1 
        ORDER BY created_at DESC`,
       [consumableId]
@@ -228,7 +228,7 @@ export async function getConsumableTransactions(consumableId) {
 export async function getLowStockItems() {
   try {
     const result = await pool.query(
-      'SELECT * FROM consumables WHERE quantity <= min_quantity ORDER BY quantity ASC'
+      'SELECT * FROM public.consumables WHERE quantity <= min_quantity ORDER BY quantity ASC'
     );
     return result.rows;
   } catch (error) {
