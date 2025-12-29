@@ -1,12 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Users, Package, FileText, AlertTriangle, Download, RefreshCw, ShoppingCart, Shield, ChevronUp, ChevronDown, ExternalLink } from 'lucide-react';
+import React, { useState } from 'react';
+import { BarChart3, ExternalLink, RefreshCw, Maximize2 } from 'lucide-react';
 
 const Dashboard = () => {
-  const [analytics, setAnalytics] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [exporting, setExporting] = useState(false);
-  const [showGrafana, setShowGrafana] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Grafana URL configuration
   const GRAFANA_URL = process.env.REACT_APP_GRAFANA_URL || 
@@ -14,9 +10,8 @@ const Dashboard = () => {
       ? 'http://localhost:3000' 
       : 'https://grafana-production-f114.up.railway.app');
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, []);
+  // Time range for panels (last 30 days)
+  const timeRange = 'from=now-30d&to=now';
 
   const fetchAnalytics = async () => {
     try {
