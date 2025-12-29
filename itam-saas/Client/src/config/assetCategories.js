@@ -117,7 +117,7 @@ export const ASSET_CATEGORIES = [
   {
     id: 'docking-station',
     label: 'Docking Station',
-    icon: 'Dock',
+    icon: 'Usb',
     color: 'emerald',
     description: 'Laptop docking stations, hubs'
   },

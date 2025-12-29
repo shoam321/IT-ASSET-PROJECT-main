@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, Monitor, Laptop, Server, Router, Cable, Printer, Smartphone, Tablet, MonitorSpeaker, Keyboard, Mouse, Zap, Headphones, Dock, Container, Wifi, Cloud, Box } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, Monitor, Laptop, Server, Router, Cable, Printer, Smartphone, Tablet, MonitorSpeaker, Keyboard, Mouse, Zap, Headphones, Usb, Container, Wifi, Cloud, Box } from 'lucide-react';
 import * as dbService from './services/db';
 import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from './config/assetCategories';
 import { useAuth } from './context/AuthContext';

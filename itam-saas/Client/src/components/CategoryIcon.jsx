@@ -2,7 +2,7 @@ import React from 'react';
 import { 
   Monitor, Laptop, Server, Network, Router, Cable, Printer, 
   Smartphone, Tablet, MonitorSpeaker, Keyboard, Mouse, HardDrive, 
-  Zap, Camera, Headphones, Dock, Container, Wifi, Package, Cloud, Box 
+  Zap, Camera, Headphones, Usb, Container, Wifi, Package, Cloud, Box 
 } from 'lucide-react';
 
 // Map icon names to actual icon components
@@ -23,7 +23,7 @@ const iconMap = {
   Zap, 
   Camera, 
   Headphones, 
-  Dock, 
+  Usb, 
   Container, 
   Wifi, 
   Package, 
