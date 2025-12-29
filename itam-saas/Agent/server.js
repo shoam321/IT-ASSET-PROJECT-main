@@ -163,7 +163,8 @@ const allowedOrigins = process.env.REACT_APP_URL
   ? process.env.REACT_APP_URL.split(',').map(origin => origin.trim())
   : [
     'https://it-asset-project.vercel.app',
-    'https://it-asset-project-git-main-shoams-projects-578cf60a.vercel.app'
+    'https://it-asset-project-git-main-shoams-projects-578cf60a.vercel.app',
+    'http://localhost:3000'
   ];
 console.log('🔧 CORS Origins:', allowedOrigins);
 
