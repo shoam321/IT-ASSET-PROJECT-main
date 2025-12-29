@@ -11,7 +11,7 @@ const DigitalReceipts = ({ assetId }) => {
   const [description, setDescription] = useState('');
   const [showUploadForm, setShowUploadForm] = useState(false);
 
-  const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app';
+  const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
   useEffect(() => {
     if (assetId) {
@@ -23,7 +23,7 @@ const DigitalReceipts = ({ assetId }) => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/api/assets/${assetId}/receipts`, {
+      const response = await fetch(`${API_URL}/assets/${assetId}/receipts`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -76,7 +76,7 @@ const DigitalReceipts = ({ assetId }) => {
       formData.append('description', description);
 
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/api/assets/${assetId}/receipts`, {
+      const response = await fetch(`${API_URL}/assets/${assetId}/receipts`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -108,7 +108,7 @@ const DigitalReceipts = ({ assetId }) => {
 
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/api/receipts/${receiptId}`, {
+      const response = await fetch(`${API_URL}/receipts/${receiptId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
