@@ -19,6 +19,9 @@ function Analyze-Logs {
         FailedRequests = 0
         UniqueUsers = @()
         Issues = @()
+        ContainerRestarts = 0
+        MindeeErrors = 0
+        DatabaseErrors = 0
     }
     
     # Split logs into lines
@@ -56,6 +59,23 @@ function Analyze-Logs {
             if ($userId -notin $analysis.UniqueUsers) {
                 $analysis.UniqueUsers += $userId
             }
+        }
+        
+        # Track container restarts
+        if ($line -match 'Stopping Container|Starting Container') {
+            $analysis.ContainerRestarts++
+            $analysis.Issues += "RESTART: $($line.Trim())"
+        }
+        
+        # Track Mindee errors
+        if ($line -match 'Mindee parsing error|Mindee.*error') {
+            $analysis.MindeeErrors++
+            $analysis.Issues += "MINDEE: $($line.Trim())"
+        }
+        
+        # Track database errors
+        if ($line -match 'could not receive data from client|database.*error|Connection reset') {
+            $analysis.DatabaseErrors++
         }
         
         # Check for critical issues
@@ -127,6 +147,9 @@ function Display-Analysis {
     Write-Host "  Failed Requests: $($analysis.FailedRequests)" -ForegroundColor $(if ($analysis.FailedRequests -gt 0) { "Red" } else { "Gray" })
     Write-Host "  Errors: $($analysis.Errors)" -ForegroundColor $(if ($analysis.Errors -gt 0) { "Red" } else { "Gray" })
     Write-Host "  Warnings: $($analysis.Warnings)" -ForegroundColor $(if ($analysis.Warnings -gt 0) { "Yellow" } else { "Gray" })
+    Write-Host "  Container Restarts: $($analysis.ContainerRestarts)" -ForegroundColor $(if ($analysis.ContainerRestarts -gt 0) { "Red" } else { "Gray" })
+    Write-Host "  Mindee Errors: $($analysis.MindeeErrors)" -ForegroundColor $(if ($analysis.MindeeErrors -gt 0) { "Yellow" } else { "Gray" })
+    Write-Host "  Database Errors: $($analysis.DatabaseErrors)" -ForegroundColor $(if ($analysis.DatabaseErrors -gt 0) { "Red" } else { "Gray" })
     Write-Host "  Active Users: $($analysis.UniqueUsers.Count)" -ForegroundColor Cyan
     if ($analysis.UniqueUsers.Count -gt 0) {
         Write-Host "    User IDs: $($analysis.UniqueUsers -join ', ')" -ForegroundColor Gray
