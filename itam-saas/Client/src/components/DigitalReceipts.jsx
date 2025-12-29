@@ -290,47 +290,65 @@ const DigitalReceipts = ({ assetId }) => {
               {/* Show parsed receipt data if available */}
               {receipt.parsing_status === 'success' && (receipt.merchant || receipt.total_amount) && (
                 <div className="mt-3 pt-3 border-t border-slate-500">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-xs font-semibold text-green-400">AI Parsed Data</span>
-                    <span className="px-2 py-0.5 bg-green-900 text-green-300 text-xs rounded">Verified</span>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-semibold text-green-400">🤖 AI Extracted Data (Tesseract OCR)</span>
+                    <span className="px-2 py-0.5 bg-green-900 text-green-300 text-xs rounded font-medium">✓ Verified</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
                     {receipt.merchant && (
-                      <div>
-                        <span className="text-slate-400">Vendor:</span>
-                        <span className="text-white ml-2 font-medium">{receipt.merchant}</span>
+                      <div className="bg-slate-800 p-2 rounded">
+                        <div className="text-slate-400 text-xs mb-1">Merchant</div>
+                        <div className="text-white font-medium">{receipt.merchant}</div>
                       </div>
                     )}
                     {receipt.total_amount && (
-                      <div>
-                        <span className="text-slate-400">Total:</span>
-                        <span className="text-white ml-2 font-medium">
+                      <div className="bg-slate-800 p-2 rounded">
+                        <div className="text-slate-400 text-xs mb-1">Total Amount</div>
+                        <div className="text-green-400 font-bold text-base">
                           {receipt.currency || '$'}{parseFloat(receipt.total_amount).toFixed(2)}
-                        </span>
+                        </div>
                       </div>
                     )}
                     {receipt.purchase_date && (
-                      <div>
-                        <span className="text-slate-400">Date:</span>
-                        <span className="text-white ml-2">{new Date(receipt.purchase_date).toLocaleDateString()}</span>
+                      <div className="bg-slate-800 p-2 rounded">
+                        <div className="text-slate-400 text-xs mb-1">Purchase Date</div>
+                        <div className="text-white">{new Date(receipt.purchase_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
                       </div>
                     )}
                     {receipt.tax_amount && (
-                      <div>
-                        <span className="text-slate-400">Tax:</span>
-                        <span className="text-white ml-2">
+                      <div className="bg-slate-800 p-2 rounded">
+                        <div className="text-slate-400 text-xs mb-1">Tax Amount</div>
+                        <div className="text-white">
                           {receipt.currency || '$'}{parseFloat(receipt.tax_amount).toFixed(2)}
-                        </span>
+                        </div>
                       </div>
                     )}
                   </div>
+                  {receipt.parsed_data?.extracted_text && (
+                    <details className="mt-3">
+                      <summary className="text-xs text-blue-400 cursor-pointer hover:text-blue-300">
+                        View Full OCR Text
+                      </summary>
+                      <div className="mt-2 p-2 bg-slate-800 rounded text-xs text-slate-300 max-h-32 overflow-y-auto font-mono whitespace-pre-wrap">
+                        {receipt.parsed_data.extracted_text}
+                      </div>
+                    </details>
+                  )}
                 </div>
               )}
               
               {receipt.parsing_status === 'failed' && (
                 <div className="mt-3 pt-3 border-t border-slate-500">
-                  <span className="px-2 py-0.5 bg-yellow-900 text-yellow-300 text-xs rounded">
-                    ⚠️ Auto-parsing failed - Manual entry required
+                  <span className="px-2 py-1 bg-yellow-900 text-yellow-300 text-xs rounded">
+                    ⚠️ OCR parsing failed - Please verify file quality
+                  </span>
+                </div>
+              )}
+              
+              {receipt.parsing_status === 'unsupported_type' && (
+                <div className="mt-3 pt-3 border-t border-slate-500">
+                  <span className="px-2 py-1 bg-slate-600 text-slate-300 text-xs rounded">
+                    📄 Document stored (OCR not available for this file type)
                   </span>
                 </div>
               )}
