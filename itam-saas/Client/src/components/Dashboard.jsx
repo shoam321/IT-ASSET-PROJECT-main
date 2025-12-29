@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Users, Package, FileText, AlertTriangle, Download, RefreshCw, ShoppingCart, Shield } from 'lucide-react';
+import { BarChart3, TrendingUp, Users, Package, FileText, AlertTriangle, Download, RefreshCw, ShoppingCart, Shield, ChevronUp, ChevronDown, ExternalLink } from 'lucide-react';
 
 const Dashboard = () => {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [exporting, setExporting] = useState(false);
+  const [showGrafana, setShowGrafana] = useState(true);
+
+  // Grafana URL configuration
+  const GRAFANA_URL = process.env.REACT_APP_GRAFANA_URL || 
+    (window.location.hostname === 'localhost' 
+      ? 'http://localhost:3000' 
+      : 'https://grafana-production-f114.up.railway.app');
 
   useEffect(() => {
     fetchAnalytics();
@@ -376,6 +383,106 @@ const Dashboard = () => {
             Export Consumables
           </button>
         </div>
+      </div>
+
+      {/* Grafana Monitoring Dashboards */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-6 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-purple-600" />
+              Advanced Monitoring
+            </h3>
+            <button
+              onClick={() => setShowGrafana(!showGrafana)}
+              className="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1"
+            >
+              {showGrafana ? 'Hide' : 'Show'} Grafana Panels
+              {showGrafana ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+        
+        {showGrafana && (
+          <div className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Total Assets Panel */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700">Total Assets</h4>
+                </div>
+                <iframe
+                  src={`${GRAFANA_URL}/d-solo/it-assets/it-asset-dashboard?orgId=1&from=now-7d&to=now&timezone=browser&panelId=1`}
+                  width="100%"
+                  height="200"
+                  frameBorder="0"
+                  title="Total Assets"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Assets by Category Panel */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700">Assets by Category</h4>
+                </div>
+                <iframe
+                  src={`${GRAFANA_URL}/d-solo/it-assets/it-asset-dashboard?orgId=1&from=now-7d&to=now&timezone=browser&panelId=2`}
+                  width="100%"
+                  height="200"
+                  frameBorder="0"
+                  title="Assets by Category"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Low Stock Items Panel */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700">Low Stock Items</h4>
+                </div>
+                <iframe
+                  src={`${GRAFANA_URL}/d-solo/it-assets/it-asset-dashboard?orgId=1&from=now-7d&to=now&timezone=browser&panelId=3`}
+                  width="100%"
+                  height="200"
+                  frameBorder="0"
+                  title="Low Stock Items"
+                  className="w-full"
+                />
+              </div>
+
+              {/* Recent Assets Panel */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                  <h4 className="text-sm font-medium text-gray-700">Recent Assets</h4>
+                </div>
+                <iframe
+                  src={`${GRAFANA_URL}/d-solo/it-assets/it-asset-dashboard?orgId=1&from=now-7d&to=now&timezone=browser&panelId=4`}
+                  width="100%"
+                  height="200"
+                  frameBorder="0"
+                  title="Recent Assets"
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-gray-500">
+                Data refreshed every 30 seconds
+              </p>
+              <a
+                href={GRAFANA_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-purple-600 hover:text-purple-700 flex items-center gap-1"
+              >
+                Open Full Grafana Dashboard
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
