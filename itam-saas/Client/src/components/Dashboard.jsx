@@ -24,6 +24,12 @@ const Dashboard = () => {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Unauthorized. Please login again.');
+        }
+        if (response.status === 403) {
+          throw new Error('Access denied. You do not have permission to view analytics.');
+        }
         throw new Error('Failed to fetch analytics');
       }
 
@@ -82,17 +88,22 @@ const Dashboard = () => {
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <div className="flex items-center gap-2 text-red-800">
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <div className="flex items-center gap-2 text-yellow-900">
           <AlertTriangle className="h-5 w-5" />
-          <p>Error loading analytics: {error}</p>
+          <p>{error}</p>
         </div>
-        <button
-          onClick={fetchAnalytics}
-          className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-        >
-          Retry
-        </button>
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={fetchAnalytics}
+            className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+          >
+            Retry
+          </button>
+          {error?.includes('Unauthorized') && (
+            <a href="/login" className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Login</a>
+          )}
+        </div>
       </div>
     );
   }

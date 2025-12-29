@@ -226,15 +226,41 @@ app.use('/api', async (req, res, next) => {
   next();
 });
 
+// Trust proxy for secure cookies behind Railway/Vercel/NGINX
+app.set('trust proxy', 1);
+
+// Prefer a production-backed session store when available; fallback to MemoryStore
+let sessionStore;
+try {
+  if (process.env.USE_PG_SESSION === 'true') {
+    // Dynamically import to avoid hard dependency when not needed
+    const mod = await import('connect-pg-simple');
+    const PgSession = mod.default(session);
+    sessionStore = new PgSession({
+      conString: process.env.DATABASE_URL,
+      tableName: 'user_sessions',
+      createTableIfMissing: true
+    });
+    console.log('🔐 Session store: connect-pg-simple');
+  }
+} catch (e) {
+  console.warn('⚠️ Failed to initialize connect-pg-simple. Falling back to MemoryStore.', e?.message);
+}
+if (!sessionStore) {
+  sessionStore = new session.MemoryStore();
+  console.warn('⚠️ Using MemoryStore. Not suitable for production.');
+}
+
 // Session configuration for Passport
 app.use(session({
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || process.env.JWT_SECRET || 'fallback-secret-change-me',
   resave: false,
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'none',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
