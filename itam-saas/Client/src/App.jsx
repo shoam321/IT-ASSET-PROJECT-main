@@ -2256,21 +2256,23 @@ export default function App() {
             </div>
             
             {['assets', 'licenses', 'users', 'contracts'].includes(currentScreen) && !universalSearch && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={exportCurrentScreenCsv}
-                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base border border-slate-600"
+                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base border border-slate-600 flex-shrink-0"
+                  title="Export CSV"
                 >
-                  <Download className="w-4 h-4 md:w-5 md:h-5" />
-                  <span className="hidden sm:inline">Export CSV</span>
+                  <Download className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                  <span className="hidden md:inline">Export CSV</span>
                 </button>
 
                 <button
                   onClick={() => setShowForm(!showForm)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base flex-shrink-0"
+                  title={currentScreen === 'assets' ? 'Add Asset' : currentScreen === 'licenses' ? 'Add License' : currentScreen === 'users' ? 'Add User' : 'Add Contract'}
                 >
-                  <Plus className="w-4 h-4 md:w-5 md:h-5" />
-                  <span className="hidden sm:inline">
+                  <Plus className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                  <span className="hidden md:inline">
                     {currentScreen === 'assets'
                       ? 'Add Asset'
                       : currentScreen === 'licenses'
