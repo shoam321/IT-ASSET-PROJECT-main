@@ -18,6 +18,7 @@ import * as mindee from 'mindee';
 import pool, { dbAsyncLocalStorage } from './db.js';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
+import * as consumablesDb from './consumablesQueries.js';
 import { authenticateToken, generateToken, requireAdmin } from './middleware/auth.js';
 import { initializeAlertService, shutdownAlertService } from './alertService.js';
 import { getCached, invalidateCache } from './redis.js';
@@ -73,11 +74,9 @@ const mindeeClient = process.env.MINDEE_API_KEY
   ? new mindee.ClientV2({ apiKey: process.env.MINDEE_API_KEY })
   : null;
 
-const MINDEE_MODEL_ID = process.env.MINDEE_MODEL_ID || '67078557-e9f3-4448-9297-4a545addd55b';
-
 if (mindeeClient) {
-  console.log('✅ Mindee receipt parsing enabled (Custom Model)');
-  console.log('📋 Model ID:', MINDEE_MODEL_ID);
+  console.log('✅ Mindee receipt parsing enabled (Standard Receipt OCR)');
+  console.log('📋 Using Mindee ReceiptV5 API');
 } else {
   console.warn('⚠️ MINDEE_API_KEY not set - receipt parsing disabled');
 }
@@ -1145,33 +1144,38 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
       try {
         console.log(`📄 Parsing receipt with Mindee: ${req.file.originalname}`);
         
-        const inputSource = new mindee.PathInput({ inputPath: req.file.path });
+        const inputSource = mindeeClient.docFromPath(req.file.path);
         
-        const inferenceParams = {
-          modelId: MINDEE_MODEL_ID,
-          confidence: true,
-          rawText: true
-        };
-        
-        const response = await mindeeClient.enqueueAndGetInference(
-          inputSource,
-          inferenceParams
-        );
+        // Use Mindee's standard Receipt OCR API (no custom model needed)
+        const response = await inputSource.parse(mindee.product.ReceiptV5);
 
-        const fields = response.inference.result.fields;
-        console.log('📊 Raw Mindee response:', JSON.stringify(fields, null, 2));
+        const document = response.document;
+        console.log('📊 Mindee Receipt Data:', {
+          supplier: document.supplierName?.value,
+          date: document.date?.value,
+          total: document.totalAmount?.value,
+          tax: document.totalTax?.value,
+          locale: document.locale?.value
+        });
 
-        // Extract data from custom model fields
-        // Adjust these field names based on your custom model's output
-        merchant = fields.merchant?.value || fields.vendor?.value || fields.supplier_name?.value || null;
-        purchaseDate = fields.date?.value || fields.purchase_date?.value || null;
-        totalAmount = fields.total?.value || fields.total_amount?.value || null;
-        taxAmount = fields.tax?.value || fields.tax_amount?.value || null;
-        currency = fields.currency?.value || 'USD';
+        // Extract data from standard receipt fields
+        merchant = document.supplierName?.value || null;
+        purchaseDate = document.date?.value || null;
+        totalAmount = document.totalAmount?.value || null;
+        taxAmount = document.totalTax?.value || null;
+        currency = document.locale?.currency || 'USD';
         parsingStatus = 'success';
         
         // Store full parsed data as JSON
-        parsedData = fields;
+        parsedData = {
+          supplier: document.supplierName?.value,
+          date: document.date?.value,
+          total_amount: document.totalAmount?.value,
+          total_tax: document.totalTax?.value,
+          currency: document.locale?.currency,
+          confidence: document.supplierName?.confidence,
+          full_response: response.document
+        };
 
         console.log(`✅ Receipt parsed - Merchant: ${merchant}, Total: ${currency} ${totalAmount}`);
 
@@ -1754,6 +1758,129 @@ app.get('/api/alerts/device/:deviceId', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching device alerts:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ CONSUMABLES ENDPOINTS ============
+
+// Get all consumables
+app.get('/api/consumables', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const consumables = await consumablesDb.getAllConsumables();
+    res.json(consumables);
+  } catch (error) {
+    console.error('Error fetching consumables:', error);
+    res.status(500).json({ error: 'Failed to fetch consumables' });
+  }
+});
+
+// Get low stock items
+app.get('/api/consumables/low-stock', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const lowStockItems = await consumablesDb.getLowStockItems();
+    res.json(lowStockItems);
+  } catch (error) {
+    console.error('Error fetching low stock items:', error);
+    res.status(500).json({ error: 'Failed to fetch low stock items' });
+  }
+});
+
+// Get single consumable
+app.get('/api/consumables/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const consumable = await consumablesDb.getConsumableById(req.params.id);
+    if (!consumable) {
+      return res.status(404).json({ error: 'Consumable not found' });
+    }
+    res.json(consumable);
+  } catch (error) {
+    console.error('Error fetching consumable:', error);
+    res.status(500).json({ error: 'Failed to fetch consumable' });
+  }
+});
+
+// Create consumable
+app.post('/api/consumables', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const consumable = await consumablesDb.createConsumable({
+      ...req.body,
+      user_id: req.user.userId
+    });
+    res.status(201).json(consumable);
+  } catch (error) {
+    console.error('Error creating consumable:', error);
+    res.status(500).json({ error: 'Failed to create consumable' });
+  }
+});
+
+// Update consumable
+app.put('/api/consumables/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const consumable = await consumablesDb.updateConsumable(req.params.id, req.body);
+    if (!consumable) {
+      return res.status(404).json({ error: 'Consumable not found' });
+    }
+    res.json(consumable);
+  } catch (error) {
+    console.error('Error updating consumable:', error);
+    res.status(500).json({ error: 'Failed to update consumable' });
+  }
+});
+
+// Delete consumable
+app.delete('/api/consumables/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const consumable = await consumablesDb.deleteConsumable(req.params.id);
+    if (!consumable) {
+      return res.status(404).json({ error: 'Consumable not found' });
+    }
+    res.json({ message: 'Consumable deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting consumable:', error);
+    res.status(500).json({ error: 'Failed to delete consumable' });
+  }
+});
+
+// Adjust stock
+app.post('/api/consumables/:id/adjust', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const { quantity, reason } = req.body;
+    
+    if (!quantity || quantity === 0) {
+      return res.status(400).json({ error: 'Quantity is required' });
+    }
+    
+    const consumable = await consumablesDb.adjustStock(
+      req.params.id,
+      parseInt(quantity),
+      reason,
+      req.user.userId,
+      req.user.username,
+      req.user.userId
+    );
+    res.json(consumable);
+  } catch (error) {
+    console.error('Error adjusting stock:', error);
+    res.status(500).json({ error: error.message || 'Failed to adjust stock' });
+  }
+});
+
+// Get transaction history
+app.get('/api/consumables/:id/transactions', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const transactions = await consumablesDb.getConsumableTransactions(req.params.id);
+    res.json(transactions);
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    res.status(500).json({ error: 'Failed to fetch transactions' });
   }
 });
 
