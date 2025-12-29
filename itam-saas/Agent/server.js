@@ -15,6 +15,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import axios from 'axios';
+import Tesseract from 'tesseract.js';
 import pool, { dbAsyncLocalStorage } from './db.js';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
@@ -69,14 +70,8 @@ try {
   console.warn('⚠️ DATABASE_URL is set but could not be parsed as a URL');
 }
 
-// Initialize OCR.Space API for receipt parsing
-const OCR_SPACE_API_KEY = process.env.OCR_SPACE_API_KEY || null;
-
-if (OCR_SPACE_API_KEY) {
-  console.log('✅ OCR.Space receipt parsing enabled');
-} else {
-  console.warn('⚠️ OCR_SPACE_API_KEY not set - receipt parsing disabled');
-}
+// Initialize Tesseract OCR for receipt parsing (fully local, no API key needed)
+console.log('✅ Tesseract OCR receipt parsing enabled (local processing)');
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads', 'receipts');
@@ -1142,70 +1137,79 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
     let currency = null;
     let parsingStatus = 'pending';
 
-    // Parse receipt with OCR.Space if available and file is image/pdf
-    const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-    if (OCR_SPACE_API_KEY && supportedTypes.includes(req.file.mimetype)) {
+    // Parse receipt with Tesseract OCR if file is image/pdf
+    const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (supportedTypes.includes(req.file.mimetype)) {
       try {
-        console.log(`📄 Parsing receipt with OCR.Space: ${req.file.originalname}`);
+        console.log(`📄 Parsing receipt with Tesseract OCR: ${req.file.originalname}`);
         
-        // Read file and convert to base64
-        const fileBuffer = fs.readFileSync(req.file.path);
-        const base64File = fileBuffer.toString('base64');
-        
-        // Call OCR.Space API
-        const formData = new URLSearchParams();
-        formData.append('apikey', OCR_SPACE_API_KEY);
-        formData.append('base64Image', `data:${req.file.mimetype};base64,${base64File}`);
-        formData.append('language', 'eng');
-        formData.append('isTable', 'true');
-        formData.append('OCREngine', '2');
-        
-        const response = await axios.post('https://api.ocr.space/parse/image', formData, {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        });
-
-        if (response.data.OCRExitCode === 1 && response.data.ParsedResults) {
-          const extractedText = response.data.ParsedResults[0]?.ParsedText || '';
-          console.log('📊 OCR.Space Extracted Text:', extractedText.substring(0, 200));
-
-          // Basic text parsing for receipt data (you can enhance this)
-          const lines = extractedText.split('\n');
-          
-          // Try to find total amount (look for patterns like "Total: $50.00")
-          const totalPattern = /(?:total|amount|sum)[:\s]*\$?([0-9]+\.?[0-9]*)/i;
-          const totalMatch = extractedText.match(totalPattern);
-          totalAmount = totalMatch ? parseFloat(totalMatch[1]) : null;
-          
-          merchant = lines[0] || null; // First line often contains merchant name
-          parsingStatus = 'success';
-          
-          parsedData = {
-            extracted_text: extractedText,
-            total_amount: totalAmount,
-            merchant: merchant
-          };
-
-          console.log(`✅ Receipt parsed - Merchant: ${merchant}, Total: ${totalAmount}`);
-
-          // Auto-update asset cost if total amount found
-          if (totalAmount && totalAmount > 0) {
-            const asset = await db.getAssetById(assetId);
-            if (asset && (!asset.cost || asset.cost === 0)) {
-              await db.updateAsset(assetId, { cost: totalAmount });
-              console.log(`💰 Auto-updated asset cost to ${totalAmount}`);
+        // Run Tesseract OCR
+        const { data: { text } } = await Tesseract.recognize(
+          req.file.path,
+          'eng',
+          {
+            logger: info => {
+              if (info.status === 'recognizing text') {
+                console.log(`OCR Progress: ${Math.round(info.progress * 100)}%`);
+              }
             }
           }
-        } else {
-          throw new Error(response.data.ErrorMessage || 'OCR parsing failed');
+        );
+
+        console.log('📊 Tesseract Extracted Text:', text.substring(0, 200));
+
+        // Parse the extracted text
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        // Try to find total amount (look for patterns like "Total: $50.00" or "TOTAL 50.00")
+        const totalPatterns = [
+          /(?:total|amount|sum|balance)[:\s]*\$?([0-9]+\.?[0-9]{0,2})/i,
+          /\$\s*([0-9]+\.[0-9]{2})/,
+          /([0-9]+\.[0-9]{2})\s*(?:usd|eur|gbp)/i
+        ];
+        
+        for (const pattern of totalPatterns) {
+          const match = text.match(pattern);
+          if (match) {
+            totalAmount = parseFloat(match[1]);
+            break;
+          }
+        }
+        
+        // First non-empty line is often the merchant name
+        merchant = lines[0] || null;
+        
+        // Try to find date patterns
+        const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/;
+        const dateMatch = text.match(datePattern);
+        purchaseDate = dateMatch ? dateMatch[1] : null;
+        
+        parsingStatus = 'success';
+        
+        parsedData = {
+          extracted_text: text,
+          total_amount: totalAmount,
+          merchant: merchant,
+          date: purchaseDate,
+          ocr_engine: 'tesseract'
+        };
+
+        console.log(`✅ Receipt parsed - Merchant: ${merchant}, Total: ${totalAmount}, Date: ${purchaseDate}`);
+
+        // Auto-update asset cost if total amount found
+        if (totalAmount && totalAmount > 0) {
+          const asset = await db.getAssetById(assetId);
+          if (asset && (!asset.cost || asset.cost === 0)) {
+            await db.updateAsset(assetId, { cost: totalAmount });
+            console.log(`💰 Auto-updated asset cost to ${totalAmount}`);
+          }
         }
 
       } catch (parseError) {
-        console.error('⚠️ OCR.Space parsing error:', parseError.message);
+        console.error('⚠️ Tesseract OCR error:', parseError.message);
         parsingStatus = 'failed';
         parsedData = { error: parseError.message };
       }
-    } else if (!OCR_SPACE_API_KEY) {
-      parsingStatus = 'disabled';
     } else {
       parsingStatus = 'unsupported_type';
     }
