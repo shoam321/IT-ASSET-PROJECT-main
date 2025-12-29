@@ -1857,9 +1857,16 @@ export async function findOrCreateGoogleUser(profile) {
 /**
  * Get comprehensive dashboard analytics
  */
-export async function getDashboardAnalytics() {
+export async function getDashboardAnalytics(role = 'user', userId = null) {
   try {
+    // For regular users, add user_id filter where applicable
+    // Admins see everything, users see only their own data
+    const userFilter = (role === 'admin') ? '' : `WHERE user_id = ${userId}`;
+    
     // Overview counts
+    // Note: Some tables like assets, licenses don't have user_id yet,
+    // so for now regular users see aggregated counts
+    // TODO: Add user_id to all relevant tables for proper multi-tenancy
     const overviewQuery = await pool.query(`
       SELECT
         (SELECT COUNT(*) FROM assets) as total_assets,
@@ -1889,13 +1896,16 @@ export async function getDashboardAnalytics() {
       ORDER BY count DESC
     `);
 
-    // Recent activity from audit logs
+    // Recent activity from audit logs (filtered by user for non-admins)
+    const recentActivityFilter = (role === 'admin') ? '' : `WHERE user_id = $1`;
+    const recentActivityParams = (role === 'admin') ? [] : [userId];
     const recentActivityQuery = await pool.query(`
       SELECT action, entity_type, entity_id, user_id, username, details, created_at
       FROM audit_logs
+      ${recentActivityFilter}
       ORDER BY created_at DESC
       LIMIT 20
-    `);
+    `, recentActivityParams);
 
     // Upcoming license expirations
     const upcomingExpirationsQuery = await pool.query(`
@@ -1932,7 +1942,8 @@ export async function getDashboardAnalytics() {
       assetsByCategory: assetsByCategoryQuery.rows,
       assetsByStatus: assetsByStatusQuery.rows,
       recentActivity: recentActivityQuery.rows,
-      upcomingExpirations: upcomingExpirationsQuery.rows
+      upcomingExpirations: upcomingExpirationsQuery.rows,
+      userRole: role // Include role in response so UI can adapt
     };
   } catch (error) {
     console.error('Error fetching dashboard analytics:', error);

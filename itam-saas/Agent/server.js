@@ -700,11 +700,22 @@ app.get('/api/audit-logs/:table/:id', authenticateToken, async (req, res) => {
 
 // ===== ANALYTICS ROUTES =====
 
-// Get dashboard analytics
-app.get('/api/analytics/dashboard', authenticateToken, requireAdmin, async (req, res) => {
+// Get dashboard analytics (accessible to all authenticated users)
+app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
   try {
-    await db.setCurrentUserId(req.user.userId);
-    const analytics = await db.getDashboardAnalytics();
+    const userId = req.user?.userId ?? req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token structure' });
+    }
+    
+    await db.setCurrentUserId(userId);
+    
+    // Get user from database to verify role
+    const user = await authQueries.findUserById(userId);
+    const role = typeof user?.role === 'string' ? user.role.toLowerCase() : 'user';
+    
+    // Admins see all data, regular users see only their own
+    const analytics = await db.getDashboardAnalytics(role, userId);
     res.json(analytics);
   } catch (error) {
     console.error('Error fetching dashboard analytics:', error);
