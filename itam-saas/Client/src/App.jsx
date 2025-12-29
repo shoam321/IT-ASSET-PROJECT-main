@@ -1176,17 +1176,17 @@ export default function App() {
 
       <div className="bg-slate-700 border border-slate-600 rounded-lg overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[800px]">
             <thead className="bg-slate-800 border-b border-slate-600">
               <tr>
-                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Asset Tag</th>
-                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Type</th>
-                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Manufacturer</th>
-                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Model</th>
-                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Assigned User</th>
-                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Status</th>
-                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Cost</th>
-                <th className="px-6 py-3 text-left text-slate-300 font-semibold">Actions</th>
+                <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Asset Tag</th>
+                <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Type</th>
+                <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Manufacturer</th>
+                <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Model</th>
+                <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Assigned User</th>
+                <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Status</th>
+                <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Cost</th>
+                <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1212,24 +1212,24 @@ export default function App() {
               ) : (
                 filteredAssets.map((asset) => (
                   <tr key={asset.id} className="border-b border-slate-600 hover:bg-slate-600 transition">
-                    <td className="px-6 py-4 text-white font-medium">{asset.asset_tag}</td>
-                    <td className="px-6 py-4 text-slate-300">
+                    <td className="px-3 lg:px-6 py-4 text-white font-medium">{asset.asset_tag}</td>
+                    <td className="px-3 lg:px-6 py-4 text-slate-300">
                       <span className="bg-blue-900 text-blue-200 px-2 py-1 rounded text-xs">
                         {asset.asset_type}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-300">{asset.manufacturer}</td>
-                    <td className="px-6 py-4 text-slate-300">{asset.model}</td>
-                    <td className="px-6 py-4 text-slate-300">{asset.assigned_user_name}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 lg:px-6 py-4 text-slate-300">{asset.manufacturer}</td>
+                    <td className="px-3 lg:px-6 py-4 text-slate-300">{asset.model}</td>
+                    <td className="px-3 lg:px-6 py-4 text-slate-300">{asset.assigned_user_name}</td>
+                    <td className="px-3 lg:px-6 py-4">
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
                         asset.status === 'In Use' ? 'bg-green-900 text-green-200' : 'bg-yellow-900 text-yellow-200'
                       }`}>
                         {asset.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-300">${parseFloat(asset.cost || 0).toFixed(2)}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 lg:px-6 py-4 text-slate-300">${parseFloat(asset.cost || 0).toFixed(2)}</td>
+                    <td className="px-3 lg:px-6 py-4">
                       <div className="flex gap-2">
                         <button 
                           onClick={() => handleEditAsset(asset)}
