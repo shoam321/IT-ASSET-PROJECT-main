@@ -1660,6 +1660,21 @@ export async function getReceiptsByAssetId(assetId) {
 }
 
 /**
+ * Get all receipts across all assets
+ */
+export async function getAllReceipts() {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM receipts ORDER BY upload_date DESC'
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching all receipts:', error);
+    throw error;
+  }
+}
+
+/**
  * Delete a receipt
  */
 export async function deleteReceipt(id) {

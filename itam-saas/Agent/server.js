@@ -1234,6 +1234,19 @@ app.get('/api/assets/:id/receipts', authenticateToken, requireAdmin, async (req,
   }
 });
 
+// Get all receipts across all assets
+app.get('/api/receipts/all', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    
+    const receipts = await db.getAllReceipts();
+    res.json(receipts);
+  } catch (error) {
+    console.error('Get all receipts error:', error);
+    res.status(500).json({ error: 'Failed to fetch receipts' });
+  }
+});
+
 // Delete a receipt
 app.delete('/api/receipts/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
