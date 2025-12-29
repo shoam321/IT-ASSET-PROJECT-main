@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, Monitor, Laptop, Server, Router, Cable, Printer, Smartphone, Tablet, MonitorSpeaker, Keyboard, Mouse, Zap, Headphones, Dock, Container, Wifi, Cloud, Box } from 'lucide-react';
 import * as dbService from './services/db';
+import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from './config/assetCategories';
 import { useAuth } from './context/AuthContext';
 import UsageMonitor from './components/UsageMonitor';
 import ForbiddenApps from './components/ForbiddenApps';
@@ -13,6 +14,7 @@ import ReceiptsView from './components/ReceiptsView';
 import AssetScanner from './components/AssetScanner';
 import QRCodeGenerator from './components/QRCodeGenerator';
 import StockOverview from './components/StockOverview';
+import CategoryIcon from './components/CategoryIcon';
 import { downloadCsv } from './utils/csvExport';
 
 // Helper function to format dates in a user-friendly way
@@ -52,6 +54,7 @@ export default function App() {
   const [formData, setFormData] = useState({
     asset_tag: '',
     asset_type: '',
+    category: '',
     manufacturer: '',
     model: '',
     serial_number: '',
@@ -207,6 +210,7 @@ export default function App() {
       setFormData({
         asset_tag: '',
         asset_type: '',
+        category: '',
         manufacturer: '',
         model: '',
         serial_number: '',
@@ -230,6 +234,7 @@ export default function App() {
     setFormData({
       asset_tag: asset.asset_tag,
       asset_type: asset.asset_type,
+      category: asset.category || '',
       manufacturer: asset.manufacturer,
       model: asset.model,
       serial_number: asset.serial_number,
@@ -246,6 +251,7 @@ export default function App() {
     setFormData({
       asset_tag: '',
       asset_type: '',
+      category: '',
       manufacturer: '',
       model: '',
       serial_number: '',
@@ -1077,6 +1083,20 @@ export default function App() {
               <option value="cloud">Cloud</option>
               <option value="network">Network</option>
             </select>
+            <select
+              id="category"
+              name="category"
+              value={formData.category}
+              onChange={(e) => setFormData({...formData, category: e.target.value})}
+              className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white"
+            >
+              <option value="">Select Category</option>
+              {ASSET_CATEGORIES.map(cat => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
             <input
               id="manufacturer"
               name="manufacturer"
@@ -1181,6 +1201,7 @@ export default function App() {
             <thead className="bg-slate-800 border-b border-slate-600">
               <tr>
                 <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Asset Tag</th>
+                <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Category</th>
                 <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Type</th>
                 <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Manufacturer</th>
                 <th className="px-3 lg:px-6 py-3 text-left text-slate-300 font-semibold">Model</th>
@@ -1211,9 +1232,23 @@ export default function App() {
                   </td>
                 </tr>
               ) : (
-                filteredAssets.map((asset) => (
+                filteredAssets.map((asset) => {
+                  const category = asset.category ? getCategoryById(asset.category) : null;
+                  return (
                   <tr key={asset.id} className="border-b border-slate-600 hover:bg-slate-600 transition">
                     <td className="px-3 lg:px-6 py-4 text-white font-medium">{asset.asset_tag}</td>
+                    <td className="px-3 lg:px-6 py-4">
+                      {category ? (
+                        <div className="flex items-center gap-2">
+                          <div className={`p-1.5 rounded ${getCategoryColorClasses(asset.category, 'bg')}`}>
+                            <CategoryIcon iconName={category.icon} className="w-4 h-4 text-white" />
+                          </div>
+                          <span className="text-slate-300 text-xs">{category.label}</span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-500 text-xs">Not set</span>
+                      )}
+                    </td>
                     <td className="px-3 lg:px-6 py-4 text-slate-300">
                       <span className="bg-blue-900 text-blue-200 px-2 py-1 rounded text-xs">
                         {asset.asset_type}
@@ -1259,7 +1294,8 @@ export default function App() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

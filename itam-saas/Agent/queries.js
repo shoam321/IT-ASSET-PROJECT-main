@@ -326,15 +326,15 @@ export async function getAssetByTag(assetTag) {
  * Create new asset
  */
 export async function createAsset(assetData) {
-  const { asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id } = assetData;
+  const { asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category } = assetData;
   
   try {
     if (await assetsHasUserIdColumn()) {
       const result = await pool.query(
-        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
-        [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id]
+        [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, category]
       );
       return result.rows[0];
     }
@@ -347,10 +347,10 @@ export async function createAsset(assetData) {
     }
 
     const result = await pool.query(
-      `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, category)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false]
+      [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false, category]
     );
     return result.rows[0];
   } catch (error) {
@@ -432,6 +432,7 @@ export async function searchAssets(query) {
           OR manufacturer ILIKE $1 
           OR model ILIKE $1 
           OR assigned_user_name ILIKE $1
+          OR category ILIKE $1
        ORDER BY created_at DESC`,
       [searchTerm]
     );
