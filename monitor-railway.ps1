@@ -67,6 +67,41 @@ function Analyze-Logs {
     return $analysis
 }
 
+function Send-WindowsNotification {
+    param(
+        [string]$title,
+        [string]$message,
+        [string]$severity = "Warning"
+    )
+    
+    try {
+        # Create notification
+        [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+        [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+        
+        $template = @"
+<toast>
+    <visual>
+        <binding template="ToastText02">
+            <text id="1">$title</text>
+            <text id="2">$message</text>
+        </binding>
+    </visual>
+    <audio src="ms-winsoundevent:Notification.Default"/>
+</toast>
+"@
+        
+        $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+        $xml.LoadXml($template)
+        $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
+        [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("Railway Monitor").Show($toast)
+    }
+    catch {
+        # Fallback to system beep
+        [Console]::Beep(800, 300)
+    }
+}
+
 function Display-Analysis {
     param($analysis, $iteration, $timestamp)
     
@@ -74,13 +109,17 @@ function Display-Analysis {
     Write-Host "Check #$iteration - $timestamp" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     
-    # Status indicator
+    # Status indicator and notifications
     if ($analysis.Issues.Count -eq 0 -and $analysis.FailedRequests -eq 0) {
         Write-Host "STATUS: HEALTHY" -ForegroundColor Green
     } elseif ($analysis.Issues.Count -lt 3) {
         Write-Host "STATUS: WARNING" -ForegroundColor Yellow
+        Send-WindowsNotification -title "Railway Warning" -message "$($analysis.Issues.Count) issue(s) detected on IT-ASSET-PROJECT" -severity "Warning"
+        [Console]::Beep(600, 200)
     } else {
         Write-Host "STATUS: CRITICAL" -ForegroundColor Red
+        Send-WindowsNotification -title "Railway CRITICAL" -message "$($analysis.Issues.Count) critical issues detected!" -severity "Critical"
+        [Console]::Beep(1000, 500)
     }
     
     Write-Host "`nMetrics:" -ForegroundColor White
