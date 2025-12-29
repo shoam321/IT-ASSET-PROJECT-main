@@ -234,6 +234,8 @@ export const generateToken = (user) => {
       username: user.username,
       email: user.email,
       role: user.role,
+      organizationId: user.organization_id || null,
+      orgRole: user.org_role || 'member',
       permissions: permissions
     },
     JWT_SECRET,

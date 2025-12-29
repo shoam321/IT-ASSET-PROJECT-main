@@ -9,16 +9,16 @@ import crypto from 'crypto';
  * - Passwords are hashed with bcrypt (`bcryptjs`).
  * - Cost factor is intentionally set to 12 for better resistance against offline cracking.
  */
-export async function createAuthUser(username, email, password, fullName = null, role = 'user') {
+export async function createAuthUser(username, email, password, fullName = null, role = 'user', organizationId = null, orgRole = 'member') {
   try {
     const salt = await bcrypt.genSalt(12); // Increased salt rounds from 10 to 12
     const passwordHash = await bcrypt.hash(password, salt);
 
     const result = await pool.query(
-      `INSERT INTO auth_users (username, email, password_hash, full_name, role)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, username, email, full_name, role, is_active, created_at`,
-      [username, email, passwordHash, fullName, role]
+      `INSERT INTO auth_users (username, email, password_hash, full_name, role, organization_id, org_role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, username, email, full_name, role, organization_id, org_role, is_active, created_at`,
+      [username, email, passwordHash, fullName, role, organizationId, orgRole]
     );
 
     return result.rows[0];
@@ -32,6 +32,55 @@ export async function createAuthUser(username, email, password, fullName = null,
       }
     }
     throw error;
+  }
+}
+
+/**
+ * Create organization and first owner user in a single transaction
+ */
+export async function createOrganizationWithOwner(orgName, orgDomain, username, email, password, fullName = null) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const orgResult = await client.query(
+      `INSERT INTO organizations (name, domain)
+       VALUES ($1, $2)
+       RETURNING id, name, domain`,
+      [orgName, orgDomain || null]
+    );
+
+    const organizationId = orgResult.rows[0].id;
+
+    const salt = await bcrypt.genSalt(12);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    const userResult = await client.query(
+      `INSERT INTO auth_users (username, email, password_hash, full_name, role, organization_id, org_role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, username, email, full_name, role, organization_id, org_role, is_active, created_at`,
+      [username, email, passwordHash, fullName, 'admin', organizationId, 'owner']
+    );
+
+    await client.query('COMMIT');
+
+    return { organization: orgResult.rows[0], user: userResult.rows[0] };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    if (error.code === '23505') {
+      if (error.constraint === 'auth_users_username_key') {
+        throw new Error('Username already exists');
+      }
+      if (error.constraint === 'auth_users_email_key') {
+        throw new Error('Email already exists');
+      }
+      if (error.constraint === 'organizations_domain_key') {
+        throw new Error('Organization domain already exists');
+      }
+    }
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
