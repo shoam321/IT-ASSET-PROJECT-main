@@ -288,13 +288,20 @@ const Consumables = () => {
             </div>
 
             <div>
-              <label className="block text-sm text-slate-300 mb-2">Min Threshold</label>
+              <label className="block text-sm text-slate-300 mb-2">
+                Low Stock Alert Threshold
+                <span className="ml-2 text-xs text-amber-400">📧 Email alert when below</span>
+              </label>
               <input
                 type="number"
                 value={formData.min_quantity}
                 onChange={(e) => setFormData({ ...formData, min_quantity: parseInt(e.target.value) || 0 })}
                 className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white"
+                placeholder="e.g., 5"
               />
+              <p className="text-xs text-slate-400 mt-1">
+                ⚠️ You'll receive an email when stock drops to or below this number
+              </p>
             </div>
 
             <div>
@@ -468,8 +475,8 @@ const Consumables = () => {
                         <p className="text-white font-semibold">
                           {item.quantity} {item.unit}
                         </p>
-                        <p className="text-slate-400 text-xs">
-                          Min: {item.min_quantity} {item.unit}
+                        <p className="text-slate-400 text-xs flex items-center gap-1">
+                          📧 Alert at: {item.min_quantity} {item.unit}
                         </p>
                       </div>
                     </td>

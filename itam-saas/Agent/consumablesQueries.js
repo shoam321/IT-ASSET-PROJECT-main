@@ -1,4 +1,5 @@
 import pool from './db.js';
+import * as emailService from './emailService.js';
 
 /**
  * Get all consumables
@@ -268,6 +269,20 @@ async function checkAndCreateLowStockAlert(consumable) {
           consumable.user_id
         ]
       );
+
+      // Send email notification (non-blocking)
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (adminEmail && adminEmail !== 'noreply@itasset.local') {
+        const isOutOfStock = consumable.quantity === 0;
+        emailService.sendLowStockAlertEmail(
+          adminEmail,
+          consumable.name,
+          consumable.quantity,
+          consumable.min_quantity,
+          consumable.unit || 'units',
+          isOutOfStock
+        ).catch(err => console.error('Failed to send low stock email:', err));
+      }
     } else {
       // If stock is now sufficient, resolve any existing alerts
       await pool.query(

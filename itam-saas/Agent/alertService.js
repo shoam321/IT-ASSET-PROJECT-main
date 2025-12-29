@@ -10,6 +10,7 @@
 
 import pg from 'pg';
 const { Client } = pg;
+import * as emailService from './emailService.js';
 
 let alertClient = null;
 let io = null;
@@ -45,6 +46,20 @@ export async function initializeAlertService(socketIO) {
         if (io) {
           io.emit('security-alert', alertData);
           console.log('📡 Alert broadcasted to all clients');
+        }
+
+        // Send email notification for high/critical alerts (non-blocking)
+        if (alertData.severity && ['high', 'critical'].includes(alertData.severity.toLowerCase())) {
+          // Get admin email from environment or use default
+          const adminEmail = process.env.ADMIN_EMAIL || process.env.FROM_EMAIL;
+          if (adminEmail && adminEmail !== 'noreply@itasset.local') {
+            emailService.sendSecurityAlertEmail(
+              adminEmail,
+              alertData.alert_type || 'Security Alert',
+              alertData.description || alertData.details || 'Security issue detected',
+              alertData.severity || 'high'
+            ).catch(err => console.error('Failed to send security alert email:', err));
+          }
         }
       } catch (error) {
         console.error('Error processing notification:', error);

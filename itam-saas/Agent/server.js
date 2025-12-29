@@ -23,6 +23,8 @@ import * as consumablesDb from './consumablesQueries.js';
 import { authenticateToken, generateToken, requireAdmin } from './middleware/auth.js';
 import { initializeAlertService, shutdownAlertService } from './alertService.js';
 import { getCached, invalidateCache } from './redis.js';
+import * as emailService from './emailService.js';
+import { startLicenseExpirationChecker, stopLicenseExpirationChecker } from './licenseExpirationChecker.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -338,6 +340,13 @@ async function startServer() {
         console.error('⚠️ Failed to ensure default admin:', error.message);
       }
       
+      // Start license expiration checker
+      try {
+        global.licenseCheckerInterval = startLicenseExpirationChecker();
+      } catch (error) {
+        console.error('⚠️ Failed to start license expiration checker:', error.message);
+      }
+      
       return;
     } catch (error) {
       retries--;
@@ -382,6 +391,11 @@ app.post('/api/auth/register', authLimiter, [
     
     const user = await authQueries.createAuthUser(username, email, password, fullName, 'user');
     const token = generateToken(user);
+
+    // Send welcome email (non-blocking)
+    emailService.sendWelcomeEmail(email, username || fullName).catch(err => {
+      console.error('Failed to send welcome email:', err);
+    });
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -790,6 +804,17 @@ app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
     
     const asset = await db.createAsset(assetData);
     
+    // Send email if asset assigned to user with email
+    if (req.body.assigned_to && req.body.assigned_user_email) {
+      emailService.sendAssetAssignmentEmail(
+        req.body.assigned_user_email,
+        req.body.assigned_to,
+        asset.asset_tag,
+        asset.asset_type,
+        asset.category
+      ).catch(err => console.error('Failed to send asset assignment email:', err));
+    }
+    
     // Log audit event
     await db.logAuditEvent('assets', asset.id, 'CREATE', null, asset, {
       userId: req.user.id,
@@ -814,6 +839,18 @@ app.put('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) => 
     const asset = await db.updateAsset(req.params.id, req.body);
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
+    }
+    
+    // Send email if assignment changed and email provided
+    if (req.body.assigned_to && req.body.assigned_user_email && 
+        oldAsset.assigned_to !== req.body.assigned_to) {
+      emailService.sendAssetAssignmentEmail(
+        req.body.assigned_user_email,
+        req.body.assigned_to,
+        asset.asset_tag,
+        asset.asset_type,
+        asset.category
+      ).catch(err => console.error('Failed to send asset assignment email:', err));
     }
     
     // Log audit event
@@ -972,6 +1009,15 @@ app.get('/api/users/search/:query', authenticateToken, async (req, res) => {
 app.post('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const user = await db.createUser(req.body);
+    
+    // Send welcome email if email provided (non-blocking)
+    if (user.email) {
+      emailService.sendWelcomeEmail(
+        user.email,
+        user.username,
+        req.body.password // Send temp password if provided
+      ).catch(err => console.error('Failed to send welcome email:', err));
+    }
     
     // Audit log
     await db.logAuditEvent('users', user.id, 'CREATE', null, user, {
@@ -1930,12 +1976,14 @@ export default app;
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
+  stopLicenseExpirationChecker(global.licenseCheckerInterval);
   await shutdownAlertService();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
+  stopLicenseExpirationChecker(global.licenseCheckerInterval);
   await shutdownAlertService();
   process.exit(0);
 });
