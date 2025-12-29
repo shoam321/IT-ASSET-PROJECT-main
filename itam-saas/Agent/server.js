@@ -77,8 +77,7 @@ const mindeeClient = process.env.MINDEE_API_KEY
 const MINDEE_MODEL_ID = process.env.MINDEE_MODEL_ID || '67078557-e9f3-4448-9297-4a545addd55b';
 
 if (mindeeClient) {
-  console.log('✅ Mindee receipt parsing enabled (Custom Model)');
-  console.log('📋 Model ID:', MINDEE_MODEL_ID);
+  console.log('✅ Mindee receipt parsing enabled (Standard ReceiptV5)');
 } else {
   console.warn('⚠️ MINDEE_API_KEY not set - receipt parsing disabled');
 }
@@ -1148,19 +1147,19 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
         
         const inputSource = mindeeClient.docFromPath(req.file.path);
         
-        // Use custom model
-        const CustomReceipt = mindeeClient.createEndpoint(
-          "Receipt",
-          "shoam321",
-          MINDEE_MODEL_ID
-        );
-        
-        const response = await inputSource.parse(CustomReceipt);
+        // Use Mindee's standard Receipt V5 API
+        const response = await inputSource.parse(mindee.product.ReceiptV5);
 
-        const document = response.document.inference.prediction;
-        console.log('📊 Mindee Receipt Data:', JSON.stringify(document, null, 2));
+        const document = response.document;
+        console.log('📊 Mindee Receipt Data:', {
+          supplier: document.supplierName?.value,
+          date: document.date?.value,
+          total: document.totalAmount?.value,
+          tax: document.totalTax?.value,
+          currency: document.locale?.currency
+        });
 
-        // Extract data from custom model fields (camelCase from schema)
+        // Extract data from standard receipt fields
         merchant = document.supplierName?.value || null;
         purchaseDate = document.date?.value || null;
         totalAmount = document.totalAmount?.value || null;
@@ -1169,7 +1168,18 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
         parsingStatus = 'success';
         
         // Store full parsed data as JSON
-        parsedData = document;
+        parsedData = {
+          supplier: document.supplierName?.value,
+          date: document.date?.value,
+          total_amount: document.totalAmount?.value,
+          total_tax: document.totalTax?.value,
+          currency: document.locale?.currency,
+          line_items: document.lineItems?.map(item => ({
+            description: item.description,
+            quantity: item.quantity,
+            total: item.totalAmount
+          }))
+        };
 
         console.log(`✅ Receipt parsed - Merchant: ${merchant}, Total: ${currency} ${totalAmount}`);
 
