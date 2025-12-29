@@ -1122,8 +1122,13 @@ app.delete('/api/contracts/:id', authenticateToken, requireAdmin, async (req, re
 
 // ===== DIGITAL RECEIPTS ROUTES =====
 
+// Handle CORS preflight for receipts routes
+app.options('/api/assets/:id/receipts', cors());
+app.options('/api/receipts/:id', cors());
+app.options('/api/receipts/all', cors());
+
 // Upload receipt for an asset
-app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.single('receipt'), async (req, res) => {
+app.post('/api/assets/:id/receipts', cors(), authenticateToken, requireAdmin, upload.single('receipt'), async (req, res) => {
   try {
     await db.setCurrentUserId(req.user.userId);
     
@@ -1243,7 +1248,7 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
 });
 
 // Get all receipts for an asset
-app.get('/api/assets/:id/receipts', authenticateToken, requireAdmin, async (req, res) => {
+app.get('/api/assets/:id/receipts', cors(), authenticateToken, requireAdmin, async (req, res) => {
   try {
     await db.setCurrentUserId(req.user.userId);
     
