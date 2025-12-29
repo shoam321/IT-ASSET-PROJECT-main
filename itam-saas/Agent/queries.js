@@ -209,6 +209,26 @@ async function assetsHasUserIdColumn() {
   }
 }
 
+let _assetsHasCategoryColumn;
+async function assetsHasCategoryColumn() {
+  if (typeof _assetsHasCategoryColumn === 'boolean') return _assetsHasCategoryColumn;
+  try {
+    const result = await pool.query(
+      `SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'assets'
+         AND column_name = 'category'
+       LIMIT 1`
+    );
+    _assetsHasCategoryColumn = result.rowCount > 0;
+    return _assetsHasCategoryColumn;
+  } catch (e) {
+    _assetsHasCategoryColumn = false;
+    return _assetsHasCategoryColumn;
+  }
+}
+
 async function getUserIdentityById(userId) {
   const result = await pool.query(
     'SELECT username, full_name, email FROM auth_users WHERE id = $1',
@@ -329,14 +349,27 @@ export async function createAsset(assetData) {
   const { asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category } = assetData;
   
   try {
+    // Check if category column exists
+    const hasCategoryColumn = await assetsHasCategoryColumn();
+    
     if (await assetsHasUserIdColumn()) {
-      const result = await pool.query(
-        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-         RETURNING *`,
-        [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, category]
-      );
-      return result.rows[0];
+      if (hasCategoryColumn) {
+        const result = await pool.query(
+          `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+           RETURNING *`,
+          [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, category]
+        );
+        return result.rows[0];
+      } else {
+        const result = await pool.query(
+          `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           RETURNING *`,
+          [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id]
+        );
+        return result.rows[0];
+      }
     }
 
     // Legacy schema fallback: store ownership in assigned_user_name.
@@ -346,13 +379,23 @@ export async function createAsset(assetData) {
       assignedName = identity?.username || identity?.full_name || identity?.email || null;
     }
 
-    const result = await pool.query(
-      `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, category)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING *`,
-      [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false, category]
-    );
-    return result.rows[0];
+    if (hasCategoryColumn) {
+      const result = await pool.query(
+        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, category)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
+        [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false, category]
+      );
+      return result.rows[0];
+    } else {
+      const result = await pool.query(
+        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING *`,
+        [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false]
+      );
+      return result.rows[0];
+    }
   } catch (error) {
     console.error('Error creating asset:', error);
     console.error('Error details:', error.message, error.code, error.detail);
