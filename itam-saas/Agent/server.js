@@ -14,7 +14,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-import * as mindee from 'mindee';
+import axios from 'axios';
 import pool, { dbAsyncLocalStorage } from './db.js';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
@@ -69,15 +69,13 @@ try {
   console.warn('⚠️ DATABASE_URL is set but could not be parsed as a URL');
 }
 
-// Initialize Mindee client for receipt parsing with V1 API
-const mindeeClient = process.env.MINDEE_API_KEY 
-  ? new mindee.Client({ apiKey: process.env.MINDEE_API_KEY })
-  : null;
+// Initialize OCR.Space API for receipt parsing
+const OCR_SPACE_API_KEY = process.env.OCR_SPACE_API_KEY || null;
 
-if (mindeeClient) {
-  console.log('✅ Mindee receipt parsing enabled (Standard ReceiptV5)');
+if (OCR_SPACE_API_KEY) {
+  console.log('✅ OCR.Space receipt parsing enabled');
 } else {
-  console.warn('⚠️ MINDEE_API_KEY not set - receipt parsing disabled');
+  console.warn('⚠️ OCR_SPACE_API_KEY not set - receipt parsing disabled');
 }
 
 // Create uploads directory if it doesn't exist
@@ -1137,64 +1135,69 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
     let currency = null;
     let parsingStatus = 'pending';
 
-    // Parse receipt with Mindee if available and file is image/pdf
+    // Parse receipt with OCR.Space if available and file is image/pdf
     const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-    if (mindeeClient && supportedTypes.includes(req.file.mimetype)) {
+    if (OCR_SPACE_API_KEY && supportedTypes.includes(req.file.mimetype)) {
       try {
-        console.log(`📄 Parsing receipt with Mindee: ${req.file.originalname}`);
+        console.log(`📄 Parsing receipt with OCR.Space: ${req.file.originalname}`);
         
-        // Use Mindee's standard Receipt V5 API with V1 Client
-        const inputSource = mindeeClient.docFromPath(req.file.path);
-        const response = await mindeeClient.parse(mindee.product.ReceiptV5, inputSource);
-
-        const document = response.document.inference.prediction;
-        console.log('📊 Mindee Receipt Data:', {
-          supplier: document.supplierName?.value,
-          date: document.date?.value,
-          total: document.totalAmount?.value,
-          tax: document.totalTax?.value,
-          currency: document.locale?.currency
+        // Read file and convert to base64
+        const fileBuffer = fs.readFileSync(req.file.path);
+        const base64File = fileBuffer.toString('base64');
+        
+        // Call OCR.Space API
+        const formData = new URLSearchParams();
+        formData.append('apikey', OCR_SPACE_API_KEY);
+        formData.append('base64Image', `data:${req.file.mimetype};base64,${base64File}`);
+        formData.append('language', 'eng');
+        formData.append('isTable', 'true');
+        formData.append('OCREngine', '2');
+        
+        const response = await axios.post('https://api.ocr.space/parse/image', formData, {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
 
-        // Extract data from standard receipt fields
-        merchant = document.supplierName?.value || null;
-        purchaseDate = document.date?.value || null;
-        totalAmount = document.totalAmount?.value || null;
-        taxAmount = document.totalTax?.value || null;
-        currency = document.locale?.currency || 'USD';
-        parsingStatus = 'success';
-        
-        // Store full parsed data as JSON
-        parsedData = {
-          supplier: document.supplierName?.value,
-          date: document.date?.value,
-          total_amount: document.totalAmount?.value,
-          total_tax: document.totalTax?.value,
-          currency: document.locale?.currency,
-          line_items: document.lineItems?.map(item => ({
-            description: item.description,
-            quantity: item.quantity,
-            total: item.totalAmount
-          }))
-        };
+        if (response.data.OCRExitCode === 1 && response.data.ParsedResults) {
+          const extractedText = response.data.ParsedResults[0]?.ParsedText || '';
+          console.log('📊 OCR.Space Extracted Text:', extractedText.substring(0, 200));
 
-        console.log(`✅ Receipt parsed - Merchant: ${merchant}, Total: ${currency} ${totalAmount}`);
+          // Basic text parsing for receipt data (you can enhance this)
+          const lines = extractedText.split('\n');
+          
+          // Try to find total amount (look for patterns like "Total: $50.00")
+          const totalPattern = /(?:total|amount|sum)[:\s]*\$?([0-9]+\.?[0-9]*)/i;
+          const totalMatch = extractedText.match(totalPattern);
+          totalAmount = totalMatch ? parseFloat(totalMatch[1]) : null;
+          
+          merchant = lines[0] || null; // First line often contains merchant name
+          parsingStatus = 'success';
+          
+          parsedData = {
+            extracted_text: extractedText,
+            total_amount: totalAmount,
+            merchant: merchant
+          };
 
-        // Auto-update asset cost if total amount found and asset cost is 0
-        if (totalAmount && totalAmount > 0) {
-          const asset = await db.getAssetById(assetId);
-          if (asset && (!asset.cost || asset.cost === 0)) {
-            await db.updateAsset(assetId, { cost: totalAmount });
-            console.log(`💰 Auto-updated asset cost to ${currency} ${totalAmount}`);
+          console.log(`✅ Receipt parsed - Merchant: ${merchant}, Total: ${totalAmount}`);
+
+          // Auto-update asset cost if total amount found
+          if (totalAmount && totalAmount > 0) {
+            const asset = await db.getAssetById(assetId);
+            if (asset && (!asset.cost || asset.cost === 0)) {
+              await db.updateAsset(assetId, { cost: totalAmount });
+              console.log(`💰 Auto-updated asset cost to ${totalAmount}`);
+            }
           }
+        } else {
+          throw new Error(response.data.ErrorMessage || 'OCR parsing failed');
         }
 
       } catch (parseError) {
-        console.error('⚠️ Mindee parsing error:', parseError.message);
+        console.error('⚠️ OCR.Space parsing error:', parseError.message);
         parsingStatus = 'failed';
         parsedData = { error: parseError.message };
       }
-    } else if (!mindeeClient) {
+    } else if (!OCR_SPACE_API_KEY) {
       parsingStatus = 'disabled';
     } else {
       parsingStatus = 'unsupported_type';
