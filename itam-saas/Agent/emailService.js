@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Only initialize Resend if API key is available
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@itasset.local';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
@@ -9,7 +10,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
  */
 export async function sendPasswordResetEmail(to, resetToken, userName) {
   try {
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       console.warn('⚠️ RESEND_API_KEY not configured, skipping password reset email');
       return null;
     }
@@ -53,7 +54,7 @@ export async function sendPasswordResetEmail(to, resetToken, userName) {
  */
 export async function sendAssetAssignmentEmail(to, userName, assetTag, assetType, category) {
   try {
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       console.warn('⚠️ RESEND_API_KEY not configured, skipping asset assignment email');
       return null;
     }
@@ -98,7 +99,7 @@ export async function sendAssetAssignmentEmail(to, userName, assetTag, assetType
  */
 export async function sendSecurityAlertEmail(to, alertType, details, severity = 'high') {
   try {
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       console.warn('⚠️ RESEND_API_KEY not configured, skipping security alert email');
       return null;
     }
@@ -151,7 +152,7 @@ export async function sendSecurityAlertEmail(to, alertType, details, severity = 
  */
 export async function sendLicenseExpirationEmail(to, licenseName, expirationDate, daysRemaining) {
   try {
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       console.warn('⚠️ RESEND_API_KEY not configured, skipping license expiration email');
       return null;
     }
@@ -201,7 +202,7 @@ export async function sendLicenseExpirationEmail(to, licenseName, expirationDate
  */
 export async function sendWelcomeEmail(to, userName, tempPassword = null) {
   try {
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       console.warn('⚠️ RESEND_API_KEY not configured, skipping welcome email');
       return null;
     }
@@ -253,7 +254,7 @@ export async function sendWelcomeEmail(to, userName, tempPassword = null) {
  */
 export async function sendDeviceUsageAlertEmail(to, deviceName, usageDetails) {
   try {
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       console.warn('⚠️ RESEND_API_KEY not configured, skipping device usage alert email');
       return null;
     }
@@ -296,7 +297,7 @@ export async function sendDeviceUsageAlertEmail(to, deviceName, usageDetails) {
  */
 export async function sendLowStockAlertEmail(to, itemName, currentStock, minStock, unit, isOutOfStock = false) {
   try {
-    if (!process.env.RESEND_API_KEY) {
+    if (!resend) {
       console.warn('⚠️ RESEND_API_KEY not configured, skipping low stock alert email');
       return null;
     }
@@ -348,8 +349,9 @@ export async function sendLowStockAlertEmail(to, itemName, currentStock, minStoc
 }
 
 // Initialize check
-if (process.env.RESEND_API_KEY) {
+if (resend && process.env.RESEND_API_KEY) {
   console.log('✅ Resend email service initialized');
 } else {
   console.warn('⚠️ RESEND_API_KEY not found - email notifications disabled');
+  console.warn('   Set RESEND_API_KEY in Railway environment variables to enable emails');
 }
