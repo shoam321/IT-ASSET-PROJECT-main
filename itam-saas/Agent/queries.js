@@ -469,16 +469,27 @@ export async function deleteAsset(id) {
 export async function searchAssets(query) {
   try {
     const searchTerm = `%${query}%`;
-    const result = await pool.query(
-      `SELECT * FROM assets 
+    const hasCategoryColumn = await assetsHasCategoryColumn();
+    
+    let sql;
+    if (hasCategoryColumn) {
+      sql = `SELECT * FROM assets 
        WHERE asset_tag ILIKE $1 
           OR manufacturer ILIKE $1 
           OR model ILIKE $1 
           OR assigned_user_name ILIKE $1
           OR category ILIKE $1
-       ORDER BY created_at DESC`,
-      [searchTerm]
-    );
+       ORDER BY created_at DESC`;
+    } else {
+      sql = `SELECT * FROM assets 
+       WHERE asset_tag ILIKE $1 
+          OR manufacturer ILIKE $1 
+          OR model ILIKE $1 
+          OR assigned_user_name ILIKE $1
+       ORDER BY created_at DESC`;
+    }
+    
+    const result = await pool.query(sql, [searchTerm]);
     return result.rows;
   } catch (error) {
     console.error('Error searching assets:', error);
