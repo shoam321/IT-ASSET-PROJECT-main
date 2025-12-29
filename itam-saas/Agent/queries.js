@@ -1598,6 +1598,7 @@ export async function getRecordHistory(tableName, recordId) {
  * Upload a receipt for an asset
  */
 export async function createReceipt(assetId, receiptData) {
+  const client = await pool.connect();
   try {
     const { 
       file_name, file_path, file_size, file_type, description, 
@@ -1606,7 +1607,15 @@ export async function createReceipt(assetId, receiptData) {
       parsed_data, parsing_status
     } = receiptData;
     
-    const result = await pool.query(
+    await client.query('BEGIN');
+    
+    // Set RLS context for the transaction
+    await client.query(
+      "SELECT set_config('app.current_user_id', $1, FALSE)",
+      [user_id.toString()]
+    );
+    
+    const result = await client.query(
       `INSERT INTO receipts (
         asset_id, file_name, file_path, file_size, file_type, description, 
         uploaded_by, uploaded_by_name, user_id,
@@ -1622,10 +1631,15 @@ export async function createReceipt(assetId, receiptData) {
         parsed_data, parsing_status
       ]
     );
+    
+    await client.query('COMMIT');
     return result.rows[0];
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error creating receipt:', error);
     throw error;
+  } finally {
+    client.release();
   }
 }
 
