@@ -698,6 +698,83 @@ app.get('/api/audit-logs/:table/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ===== ANALYTICS ROUTES =====
+
+// Get dashboard analytics
+app.get('/api/analytics/dashboard', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const analytics = await db.getDashboardAnalytics();
+    res.json(analytics);
+  } catch (error) {
+    console.error('Error fetching dashboard analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// Export data to CSV
+app.get('/api/analytics/export', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await db.setCurrentUserId(req.user.userId);
+    const { type = 'all' } = req.query;
+    const data = await db.getExportData(type);
+    
+    // Convert to CSV format
+    const convertToCSV = (rows, headers) => {
+      if (!rows || rows.length === 0) return '';
+      
+      const csvHeaders = headers || Object.keys(rows[0]);
+      const csvRows = rows.map(row => 
+        csvHeaders.map(field => {
+          const value = row[field];
+          // Escape quotes and wrap in quotes if contains comma, newline, or quote
+          if (value === null || value === undefined) return '';
+          const str = String(value);
+          if (str.includes(',') || str.includes('\n') || str.includes('"')) {
+            return `"${str.replace(/"/g, '""')}"`;
+          }
+          return str;
+        }).join(',')
+      );
+      
+      return [csvHeaders.join(','), ...csvRows].join('\n');
+    };
+
+    let csvContent = '';
+    
+    if (data.assets) {
+      csvContent += '=== ASSETS ===\n';
+      csvContent += convertToCSV(data.assets);
+      csvContent += '\n\n';
+    }
+    
+    if (data.licenses) {
+      csvContent += '=== LICENSES ===\n';
+      csvContent += convertToCSV(data.licenses);
+      csvContent += '\n\n';
+    }
+    
+    if (data.contracts) {
+      csvContent += '=== CONTRACTS ===\n';
+      csvContent += convertToCSV(data.contracts);
+      csvContent += '\n\n';
+    }
+    
+    if (data.consumables) {
+      csvContent += '=== CONSUMABLES ===\n';
+      csvContent += convertToCSV(data.consumables);
+      csvContent += '\n\n';
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="itam-export-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting data:', error);
+    res.status(500).json({ error: 'Failed to export data' });
+  }
+});
+
 // ===== ASSET ROUTES (Protected) =====
 
 // Get all assets (RLS: users see only their own, admins see all)

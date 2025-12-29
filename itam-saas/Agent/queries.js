@@ -1852,3 +1852,145 @@ export async function findOrCreateGoogleUser(profile) {
   }
 }
 
+// ============ ANALYTICS & DASHBOARD FUNCTIONS ============
+
+/**
+ * Get comprehensive dashboard analytics
+ */
+export async function getDashboardAnalytics() {
+  try {
+    // Overview counts
+    const overviewQuery = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM assets) as total_assets,
+        (SELECT COUNT(*) FROM auth_users WHERE is_active = true) as total_users,
+        (SELECT COUNT(*) FROM licenses) as total_licenses,
+        (SELECT COUNT(*) FROM contracts) as total_contracts,
+        (SELECT COUNT(*) FROM consumables) as total_consumables,
+        (SELECT COUNT(*) FROM consumables WHERE quantity <= min_quantity) as low_stock_items
+    `);
+
+    // Assets by category
+    const assetsByCategoryQuery = await pool.query(`
+      SELECT category, COUNT(*) as count
+      FROM assets
+      WHERE category IS NOT NULL AND category != ''
+      GROUP BY category
+      ORDER BY count DESC
+      LIMIT 10
+    `);
+
+    // Assets by status
+    const assetsByStatusQuery = await pool.query(`
+      SELECT status, COUNT(*) as count
+      FROM assets
+      WHERE status IS NOT NULL AND status != ''
+      GROUP BY status
+      ORDER BY count DESC
+    `);
+
+    // Recent activity from audit logs
+    const recentActivityQuery = await pool.query(`
+      SELECT action, entity_type, entity_id, user_id, username, details, created_at
+      FROM audit_logs
+      ORDER BY created_at DESC
+      LIMIT 20
+    `);
+
+    // Upcoming license expirations
+    const upcomingExpirationsQuery = await pool.query(`
+      SELECT license_name, software_name, vendor, expiration_date,
+             EXTRACT(DAY FROM (expiration_date - CURRENT_DATE)) as days_remaining
+      FROM licenses
+      WHERE expiration_date IS NOT NULL
+        AND expiration_date > CURRENT_DATE
+        AND expiration_date <= CURRENT_DATE + INTERVAL '90 days'
+      ORDER BY expiration_date ASC
+      LIMIT 10
+    `);
+
+    // Active contracts
+    const activeContractsQuery = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM contracts
+      WHERE status = 'Active'
+    `);
+
+    // Security alerts (unresolved)
+    const unresolvedAlertsQuery = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM security_alerts
+      WHERE status = 'active'
+    `);
+
+    return {
+      overview: {
+        ...overviewQuery.rows[0],
+        active_contracts: parseInt(activeContractsQuery.rows[0].count),
+        unresolved_alerts: parseInt(unresolvedAlertsQuery.rows[0].count)
+      },
+      assetsByCategory: assetsByCategoryQuery.rows,
+      assetsByStatus: assetsByStatusQuery.rows,
+      recentActivity: recentActivityQuery.rows,
+      upcomingExpirations: upcomingExpirationsQuery.rows
+    };
+  } catch (error) {
+    console.error('Error fetching dashboard analytics:', error);
+    throw error;
+  }
+}
+
+/**
+ * Export data to CSV format
+ */
+export async function getExportData(type = 'all') {
+  try {
+    const data = {};
+
+    if (type === 'all' || type === 'assets') {
+      const assetsResult = await pool.query(`
+        SELECT asset_tag, asset_type, category, model, manufacturer, serial_number,
+               status, purchase_date, cost, warranty_expiration, location, assigned_to
+        FROM assets
+        ORDER BY created_at DESC
+      `);
+      data.assets = assetsResult.rows;
+    }
+
+    if (type === 'all' || type === 'licenses') {
+      const licensesResult = await pool.query(`
+        SELECT license_name, software_name, vendor, license_type, license_key,
+               expiration_date, quantity, status, cost
+        FROM licenses
+        ORDER BY created_at DESC
+      `);
+      data.licenses = licensesResult.rows;
+    }
+
+    if (type === 'all' || type === 'contracts') {
+      const contractsResult = await pool.query(`
+        SELECT contract_name, vendor, contract_type, start_date, end_date,
+               value, status, renewal_terms
+        FROM contracts
+        ORDER BY created_at DESC
+      `);
+      data.contracts = contractsResult.rows;
+    }
+
+    if (type === 'all' || type === 'consumables') {
+      const consumablesResult = await pool.query(`
+        SELECT name, category, quantity, min_quantity, unit, unit_cost,
+               location, supplier, sku
+        FROM consumables
+        ORDER BY name ASC
+      `);
+      data.consumables = consumablesResult.rows;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error exporting data:', error);
+    throw error;
+  }
+}
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, Monitor, Laptop, Server, Router, Cable, Printer, Smartphone, Tablet, MonitorSpeaker, Keyboard, Mouse, Zap, Headphones, Usb, Container, Wifi, Cloud, Box } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, Monitor, Laptop, Server, Router, Cable, Printer, Smartphone, Tablet, MonitorSpeaker, Keyboard, Mouse, Zap, Headphones, Usb, Container, Wifi, Cloud, Box, BarChart3 } from 'lucide-react';
 import * as dbService from './services/db';
 import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from './config/assetCategories';
 import { useAuth } from './context/AuthContext';
@@ -16,6 +16,7 @@ import QRCodeGenerator from './components/QRCodeGenerator';
 import StockOverview from './components/StockOverview';
 import Consumables from './components/Consumables';
 import CategoryIcon from './components/CategoryIcon';
+import Dashboard from './components/Dashboard';
 import { downloadCsv } from './utils/csvExport';
 
 // Helper function to format dates in a user-friendly way
@@ -1985,6 +1986,8 @@ export default function App() {
     switch(currentScreen) {
       case 'home':
         return renderHomeScreen();
+      case 'dashboard':
+        return <Dashboard />;
       case 'assets':
         return renderAssetsScreen();
       case 'consumables':
@@ -2098,6 +2101,20 @@ export default function App() {
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {isAdmin && (
+            <button
+              onClick={() => { setCurrentScreen('dashboard'); setShowForm(false); }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                currentScreen === 'dashboard' 
+                  ? 'bg-blue-600 text-white' 
+                  : 'text-slate-400 hover:bg-slate-700'
+              }`}
+            >
+              <BarChart3 className="w-5 h-5" />
+              <span>Dashboard</span>
+            </button>
+          )}
+
           {isAdmin && (
             <button
               onClick={() => { setCurrentScreen('assets'); setShowForm(false); }}
