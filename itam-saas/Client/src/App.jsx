@@ -689,7 +689,7 @@ export default function App() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-6">
           <p className="text-slate-400 text-xs md:text-sm mb-2">Total Assets Value</p>
-          <p className="text-2xl md:text-3xl font-bold text-blue-400">${assets.reduce((sum, a) => sum + (a.cost || 0), 0).toLocaleString()}</p>
+          <p className="text-2xl md:text-3xl font-bold text-blue-400">${assets.reduce((sum, a) => sum + (parseFloat(a.cost) || 0), 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}</p>
         </div>
         
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 md:p-6">
