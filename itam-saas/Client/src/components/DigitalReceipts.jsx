@@ -188,6 +188,9 @@ const DigitalReceipts = ({ assetId }) => {
               <label className="block text-sm text-slate-300 mb-2">
                 Select File (Max 10MB - Images, PDF, Word, Excel)
               </label>
+              <p className="text-xs text-blue-400 mb-2">
+                🤖 AI will automatically extract vendor, date, and cost from receipts
+              </p>
               <input
                 type="file"
                 onChange={handleFileSelect}
@@ -243,44 +246,94 @@ const DigitalReceipts = ({ assetId }) => {
           {receipts.map((receipt) => (
             <div
               key={receipt.id}
-              className="flex items-center justify-between p-3 bg-slate-600 border border-slate-500 rounded-lg hover:bg-slate-550 transition"
+              className="p-3 bg-slate-600 border border-slate-500 rounded-lg hover:bg-slate-550 transition"
             >
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <div className="text-blue-400">
-                  {getFileIcon(receipt.file_type)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{receipt.file_name}</p>
-                  {receipt.description && (
-                    <p className="text-slate-400 text-xs truncate">{receipt.description}</p>
-                  )}
-                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
-                    <span>{formatFileSize(receipt.file_size)}</span>
-                    <span>•</span>
-                    <span>{formatDate(receipt.upload_date)}</span>
-                    <span>•</span>
-                    <span>by {receipt.uploaded_by_name}</span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="text-blue-400">
+                    {getFileIcon(receipt.file_type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{receipt.file_name}</p>
+                    {receipt.description && (
+                      <p className="text-slate-400 text-xs truncate">{receipt.description}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1 text-xs text-slate-400">
+                      <span>{formatFileSize(receipt.file_size)}</span>
+                      <span>•</span>
+                      <span>{formatDate(receipt.upload_date)}</span>
+                      <span>•</span>
+                      <span>by {receipt.uploaded_by_name}</span>
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-2 ml-2">
+                  <a
+                    href={`${API_URL}${receipt.file_path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-blue-400 hover:text-blue-300 hover:bg-slate-700 rounded transition"
+                    title="Download"
+                  >
+                    <Download className="w-4 h-4" />
+                  </a>
+                  <button
+                    onClick={() => handleDelete(receipt.id)}
+                    className="p-2 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded transition"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2 ml-2">
-                <a
-                  href={`${API_URL}${receipt.file_path}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 text-blue-400 hover:text-blue-300 hover:bg-slate-700 rounded transition"
-                  title="Download"
-                >
-                  <Download className="w-4 h-4" />
-                </a>
-                <button
-                  onClick={() => handleDelete(receipt.id)}
-                  className="p-2 text-red-400 hover:text-red-300 hover:bg-slate-700 rounded transition"
-                  title="Delete"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
+
+              {/* Show parsed receipt data if available */}
+              {receipt.parsing_status === 'success' && (receipt.merchant || receipt.total_amount) && (
+                <div className="mt-3 pt-3 border-t border-slate-500">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xs font-semibold text-green-400">AI Parsed Data</span>
+                    <span className="px-2 py-0.5 bg-green-900 text-green-300 text-xs rounded">Verified</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {receipt.merchant && (
+                      <div>
+                        <span className="text-slate-400">Vendor:</span>
+                        <span className="text-white ml-2 font-medium">{receipt.merchant}</span>
+                      </div>
+                    )}
+                    {receipt.total_amount && (
+                      <div>
+                        <span className="text-slate-400">Total:</span>
+                        <span className="text-white ml-2 font-medium">
+                          {receipt.currency || '$'}{parseFloat(receipt.total_amount).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    {receipt.purchase_date && (
+                      <div>
+                        <span className="text-slate-400">Date:</span>
+                        <span className="text-white ml-2">{new Date(receipt.purchase_date).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {receipt.tax_amount && (
+                      <div>
+                        <span className="text-slate-400">Tax:</span>
+                        <span className="text-white ml-2">
+                          {receipt.currency || '$'}{parseFloat(receipt.tax_amount).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {receipt.parsing_status === 'failed' && (
+                <div className="mt-3 pt-3 border-t border-slate-500">
+                  <span className="px-2 py-0.5 bg-yellow-900 text-yellow-300 text-xs rounded">
+                    ⚠️ Auto-parsing failed - Manual entry required
+                  </span>
+                </div>
+              )}
             </div>
           ))}
         </div>

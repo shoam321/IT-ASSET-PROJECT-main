@@ -1599,13 +1599,28 @@ export async function getRecordHistory(tableName, recordId) {
  */
 export async function createReceipt(assetId, receiptData) {
   try {
-    const { file_name, file_path, file_size, file_type, description, uploaded_by, uploaded_by_name, user_id } = receiptData;
+    const { 
+      file_name, file_path, file_size, file_type, description, 
+      uploaded_by, uploaded_by_name, user_id,
+      merchant, purchase_date, total_amount, tax_amount, currency,
+      parsed_data, parsing_status
+    } = receiptData;
     
     const result = await pool.query(
-      `INSERT INTO receipts (asset_id, file_name, file_path, file_size, file_type, description, uploaded_by, uploaded_by_name, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO receipts (
+        asset_id, file_name, file_path, file_size, file_type, description, 
+        uploaded_by, uploaded_by_name, user_id,
+        merchant, purchase_date, total_amount, tax_amount, currency,
+        parsed_data, parsing_status
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
-      [assetId, file_name, file_path, file_size, file_type, description || null, uploaded_by, uploaded_by_name, user_id]
+      [
+        assetId, file_name, file_path, file_size, file_type, description || null, 
+        uploaded_by, uploaded_by_name, user_id,
+        merchant, purchase_date, total_amount, tax_amount, currency,
+        parsed_data, parsing_status
+      ]
     );
     return result.rows[0];
   } catch (error) {

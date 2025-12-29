@@ -14,6 +14,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { Client as MindeeClient, product } from 'mindee';
 import pool, { dbAsyncLocalStorage } from './db.js';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
@@ -65,6 +66,17 @@ try {
   }
 } catch {
   console.warn('⚠️ DATABASE_URL is set but could not be parsed as a URL');
+}
+
+// Initialize Mindee client for receipt parsing
+const mindeeClient = process.env.MINDEE_API_KEY 
+  ? new MindeeClient({ apiKey: process.env.MINDEE_API_KEY })
+  : null;
+
+if (mindeeClient) {
+  console.log('✅ Mindee receipt parsing enabled');
+} else {
+  console.warn('⚠️ MINDEE_API_KEY not set - receipt parsing disabled');
 }
 
 // Create uploads directory if it doesn't exist
@@ -1116,6 +1128,64 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
     }
 
     const assetId = parseInt(req.params.id);
+    let parsedData = null;
+    let merchant = null;
+    let purchaseDate = null;
+    let totalAmount = null;
+    let taxAmount = null;
+    let currency = null;
+    let parsingStatus = 'pending';
+
+    // Parse receipt with Mindee if available and file is image/pdf
+    const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (mindeeClient && supportedTypes.includes(req.file.mimetype)) {
+      try {
+        console.log(`📄 Parsing receipt with Mindee: ${req.file.originalname}`);
+        
+        const inputSource = mindeeClient.docFromPath(req.file.path);
+        const apiResponse = await mindeeClient.parse(product.ReceiptV5, inputSource);
+        const prediction = apiResponse.document.inference.prediction;
+
+        merchant = prediction.supplierName?.value || null;
+        purchaseDate = prediction.date?.value || null;
+        totalAmount = prediction.totalAmount?.value || null;
+        taxAmount = prediction.totalTax?.value || null;
+        currency = prediction.locale?.currency || null;
+        parsingStatus = 'success';
+        
+        // Store full parsed data as JSON
+        parsedData = {
+          merchant: prediction.supplierName,
+          date: prediction.date,
+          totalAmount: prediction.totalAmount,
+          totalTax: prediction.totalTax,
+          category: prediction.category,
+          lineItems: prediction.lineItems,
+          locale: prediction.locale
+        };
+
+        console.log(`✅ Receipt parsed - Merchant: ${merchant}, Total: ${currency} ${totalAmount}`);
+
+        // Auto-update asset cost if total amount found and asset cost is 0
+        if (totalAmount && totalAmount > 0) {
+          const asset = await db.getAssetById(assetId);
+          if (asset && (!asset.cost || asset.cost === 0)) {
+            await db.updateAsset(assetId, { cost: totalAmount });
+            console.log(`💰 Auto-updated asset cost to ${currency} ${totalAmount}`);
+          }
+        }
+
+      } catch (parseError) {
+        console.error('⚠️ Mindee parsing error:', parseError.message);
+        parsingStatus = 'failed';
+        parsedData = { error: parseError.message };
+      }
+    } else if (!mindeeClient) {
+      parsingStatus = 'disabled';
+    } else {
+      parsingStatus = 'unsupported_type';
+    }
+
     const receipt = await db.createReceipt(assetId, {
       file_name: req.file.originalname,
       file_path: `/uploads/receipts/${req.file.filename}`,
@@ -1124,7 +1194,14 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
       description: req.body.description || null,
       uploaded_by: req.user.userId,
       uploaded_by_name: req.user.username,
-      user_id: req.user.userId
+      user_id: req.user.userId,
+      merchant,
+      purchase_date: purchaseDate,
+      total_amount: totalAmount,
+      tax_amount: taxAmount,
+      currency,
+      parsed_data: parsedData,
+      parsing_status: parsingStatus
     });
 
     res.status(201).json(receipt);
