@@ -48,7 +48,22 @@ const Consumables = () => {
         }
       });
 
-      if (!response.ok) throw new Error('Failed to fetch consumables');
+      if (!response.ok) {
+        // Try to extract backend error for better UX
+        let details = null;
+        try { details = await response.json(); } catch {}
+
+        if (response.status === 401) {
+          throw new Error('Unauthorized. Please log in again to access Consumables.');
+        }
+        if (response.status === 403) {
+          throw new Error('Forbidden. Admin access is required for Consumables.');
+        }
+        if (response.status === 500 && details?.code === 'MISSING_CONSUMABLES_TABLE') {
+          throw new Error('Consumables tables are missing in the database. Please run the migration in the backend.');
+        }
+        throw new Error(details?.error || 'Failed to fetch consumables');
+      }
       const data = await response.json();
       setConsumables(data);
     } catch (err) {
@@ -74,8 +89,12 @@ const Consumables = () => {
         },
         body: JSON.stringify(formData)
       });
-
-      if (!response.ok) throw new Error('Failed to save consumable');
+      if (!response.ok) {
+        let details = null; try { details = await response.json(); } catch {}
+        if (response.status === 401) throw new Error('Unauthorized. Please log in again.');
+        if (response.status === 403) throw new Error('Forbidden. Admin access is required.');
+        throw new Error(details?.error || 'Failed to save consumable');
+      }
       
       await fetchConsumables();
       resetForm();
@@ -95,8 +114,12 @@ const Consumables = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-
-      if (!response.ok) throw new Error('Failed to delete consumable');
+      if (!response.ok) {
+        let details = null; try { details = await response.json(); } catch {}
+        if (response.status === 401) throw new Error('Unauthorized. Please log in again.');
+        if (response.status === 403) throw new Error('Forbidden. Admin access is required.');
+        throw new Error(details?.error || 'Failed to delete consumable');
+      }
       await fetchConsumables();
     } catch (err) {
       setError(err.message);
@@ -114,10 +137,11 @@ const Consumables = () => {
         },
         body: JSON.stringify(adjustData)
       });
-
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to adjust stock');
+        let errorData = null; try { errorData = await response.json(); } catch {}
+        if (response.status === 401) throw new Error('Unauthorized. Please log in again.');
+        if (response.status === 403) throw new Error('Forbidden. Admin access is required.');
+        throw new Error(errorData?.error || 'Failed to adjust stock');
       }
       
       await fetchConsumables();
@@ -136,8 +160,12 @@ const Consumables = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-
-      if (!response.ok) throw new Error('Failed to fetch transactions');
+      if (!response.ok) {
+        let details = null; try { details = await response.json(); } catch {}
+        if (response.status === 401) throw new Error('Unauthorized. Please log in again.');
+        if (response.status === 403) throw new Error('Forbidden. Admin access is required.');
+        throw new Error(details?.error || 'Failed to fetch transactions');
+      }
       const data = await response.json();
       setTransactions(data);
       setShowTransactions(id);
@@ -217,6 +245,15 @@ const Consumables = () => {
       {error && (
         <div className="p-4 bg-red-900 border border-red-700 rounded-lg">
           <p className="text-red-200">{error}</p>
+          {error?.toLowerCase().includes('log in') && (
+            <p className="text-red-300 text-sm mt-1">Go to Login, then return to Consumables.</p>
+          )}
+          {error?.toLowerCase().includes('forbidden') && (
+            <p className="text-red-300 text-sm mt-1">Ask an admin to grant access.</p>
+          )}
+          {error?.toLowerCase().includes('migration') && (
+            <p className="text-red-300 text-sm mt-1">Admin: run the backend migration to create tables.</p>
+          )}
           <button onClick={() => setError(null)} className="text-sm mt-2 underline">Dismiss</button>
         </div>
       )}

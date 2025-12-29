@@ -10,8 +10,15 @@ const __dirname = dirname(__filename);
 
 dotenv.config();
 
+const connectionString = process.env.DATABASE_URL_OWNER || process.env.DATABASE_URL;
+if (!connectionString) {
+  console.error('❌ No DATABASE_URL or DATABASE_URL_OWNER found in env');
+  console.error('   Set one of them and re-run the migration.');
+  process.exit(1);
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
@@ -27,6 +34,10 @@ async function runMigration() {
     process.exit(0);
   } catch (error) {
     console.error('❌ Migration failed:', error.message);
+    if (String(error.message).toLowerCase().includes('permission denied')) {
+      console.error('ℹ️ Tip: Use an owner connection string via DATABASE_URL_OWNER for migrations that create tables/policies.');
+      console.error('   Example: set DATABASE_URL_OWNER in Railway to the direct admin URL and re-run this script.');
+    }
     await pool.end();
     process.exit(1);
   }
