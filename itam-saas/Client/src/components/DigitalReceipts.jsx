@@ -147,29 +147,20 @@ const DigitalReceipts = ({ assetId }) => {
 
   return (
     <div className="bg-slate-700 border border-slate-600 rounded-lg p-6 shadow-xl">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <FileText className="w-5 h-5 text-blue-400" />
-          <h3 className="text-lg font-semibold text-white">Digital Receipts</h3>
-          <InfoButton
-            title="Digital Receipts"
-            description="Store digital copies of purchase receipts, warranties, and invoices for your assets. Keep all important documents organized and easily accessible for compliance, warranty claims, and audits."
-            examples={[
-              "Upload purchase receipts for proof of ownership",
-              "Store warranty documents for quick reference",
-              "Keep invoices for accounting and tax purposes",
-              "Attach service records and maintenance logs",
-              "Organize contracts and SLAs in one place"
-            ]}
-          />
-        </div>
-        <button
-          onClick={() => setShowUploadForm(!showUploadForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm"
-        >
-          {showUploadForm ? <X className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
-          {showUploadForm ? 'Cancel' : 'Upload Receipt'}
-        </button>
+      <div className="flex items-center gap-2 mb-4">
+        <FileText className="w-5 h-5 text-blue-400" />
+        <h3 className="text-lg font-semibold text-white">Digital Receipts</h3>
+        <InfoButton
+          title="Digital Receipts"
+          description="Store digital copies of purchase receipts, warranties, and invoices for your assets. Keep all important documents organized and easily accessible for compliance, warranty claims, and audits."
+          examples={[
+            "Upload purchase receipts for proof of ownership",
+            "Store warranty documents for quick reference",
+            "Keep invoices for accounting and tax purposes",
+            "Attach service records and maintenance logs",
+            "Organize contracts and SLAs in one place"
+          ]}
+        />
       </div>
 
       {error && (
@@ -178,56 +169,6 @@ const DigitalReceipts = ({ assetId }) => {
           <button onClick={() => setError(null)} className="text-xs mt-1 underline hover:no-underline">
             Dismiss
           </button>
-        </div>
-      )}
-
-      {showUploadForm && (
-        <div className="mb-4 p-4 bg-slate-600 border border-slate-500 rounded-lg">
-          <div className="space-y-3">
-            <div>
-              <label className="block text-sm text-slate-300 mb-2">
-                Select File (Max 10MB - Images, PDF, Word, Excel)
-              </label>
-              <p className="text-xs text-blue-400 mb-2">
-                🤖 AI will automatically extract vendor, date, and cost from receipts
-              </p>
-              <input
-                type="file"
-                onChange={handleFileSelect}
-                accept="image/jpeg,image/jpg,image/png,application/pdf,.doc,.docx,.xls,.xlsx"
-                className="block w-full text-sm text-slate-300
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-lg file:border-0
-                  file:text-sm file:font-semibold
-                  file:bg-blue-600 file:text-white
-                  hover:file:bg-blue-700 file:cursor-pointer"
-              />
-              {selectedFile && (
-                <p className="text-xs text-green-400 mt-1">
-                  Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm text-slate-300 mb-2">Description (Optional)</label>
-              <input
-                type="text"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g., Purchase receipt from Amazon"
-                className="w-full px-3 py-2 bg-slate-700 border border-slate-500 rounded text-white placeholder-slate-400 text-sm"
-              />
-            </div>
-
-            <button
-              onClick={handleUpload}
-              disabled={!selectedFile || uploading}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-500 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition text-sm font-medium"
-            >
-              {uploading ? 'Uploading...' : 'Upload Receipt'}
-            </button>
-          </div>
         </div>
       )}
 

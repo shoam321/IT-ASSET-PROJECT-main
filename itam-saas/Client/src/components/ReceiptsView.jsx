@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Search, Download, Trash2, Calendar, DollarSign, Building, Filter, X } from 'lucide-react';
+import { FileText, Search, Download, Trash2, Calendar, DollarSign, Building, Filter, X, Upload, Plus } from 'lucide-react';
 
 const ReceiptsView = () => {
   const [receipts, setReceipts] = useState([]);
@@ -9,6 +9,11 @@ const ReceiptsView = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all'); // all, success, failed, pending
   const [dateFilter, setDateFilter] = useState('all'); // all, today, week, month
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedAssetId, setSelectedAssetId] = useState('');
+  const [description, setDescription] = useState('');
+  const [uploading, setUploading] = useState(false);
   
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
@@ -77,6 +82,69 @@ const ReceiptsView = () => {
       await fetchAllReceipts();
     } catch (err) {
       setError(err.message);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError('File size must be less than 10MB');
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf', 
+                           'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                           'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+      
+      if (!allowedTypes.includes(file.type)) {
+        setError('Invalid file type. Allowed: Images, PDF, Word, Excel');
+        return;
+      }
+
+      setSelectedFile(file);
+      setError(null);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !selectedAssetId) {
+      setError('Please select a file and an asset');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('receipt', selectedFile);
+      formData.append('description', description);
+
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_URL}/assets/${selectedAssetId}/receipts`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      // Reset form and refresh list
+      setSelectedFile(null);
+      setSelectedAssetId('');
+      setDescription('');
+      setShowUploadForm(false);
+      await fetchAllReceipts();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -157,6 +225,13 @@ const ReceiptsView = () => {
           <h1 className="text-3xl font-bold text-white mb-2">Digital Receipts</h1>
           <p className="text-slate-400">View and manage all purchase receipts across all assets</p>
         </div>
+        <button
+          onClick={() => setShowUploadForm(!showUploadForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+        >
+          {showUploadForm ? <X className="w-5 h-5" /> : <Upload className="w-5 h-5" />}
+          {showUploadForm ? 'Cancel' : 'Upload Receipt'}
+        </button>
       </div>
 
       {error && (
@@ -165,6 +240,74 @@ const ReceiptsView = () => {
           <button onClick={() => setError(null)} className="text-sm mt-2 underline hover:no-underline">
             Dismiss
           </button>
+        </div>
+      )}
+
+      {/* Upload Form */}
+      {showUploadForm && (
+        <div className="bg-slate-700 border border-slate-600 rounded-lg p-6 shadow-xl">
+          <h2 className="text-xl font-semibold text-white mb-4">Upload Receipt</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Select Asset</label>
+              <select
+                value={selectedAssetId}
+                onChange={(e) => setSelectedAssetId(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white"
+              >
+                <option value="">Choose an asset...</option>
+                {Object.values(assets).map(asset => (
+                  <option key={asset.id} value={asset.id}>
+                    {asset.asset_tag} - {asset.manufacturer} {asset.model}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">
+                Select File (Max 10MB - Images, PDF, Word, Excel)
+              </label>
+              <p className="text-xs text-blue-400 mb-2">
+                🤖 AI will automatically extract vendor, date, and cost from image receipts
+              </p>
+              <input
+                type="file"
+                onChange={handleFileSelect}
+                accept="image/jpeg,image/jpg,image/png,application/pdf,.doc,.docx,.xls,.xlsx"
+                className="block w-full text-sm text-slate-300
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-lg file:border-0
+                  file:text-sm file:font-semibold
+                  file:bg-blue-600 file:text-white
+                  hover:file:bg-blue-700 file:cursor-pointer"
+              />
+              {selectedFile && (
+                <p className="text-xs text-green-400 mt-1">
+                  Selected: {selectedFile.name} ({formatFileSize(selectedFile.size)})
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-300 mb-2">Description (Optional)</label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g., Purchase receipt from Amazon"
+                className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
+              />
+            </div>
+
+            <button
+              onClick={handleUpload}
+              disabled={!selectedFile || !selectedAssetId || uploading}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-500 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition font-medium"
+            >
+              {uploading ? 'Uploading...' : 'Upload Receipt'}
+            </button>
+          </div>
         </div>
       )}
 
