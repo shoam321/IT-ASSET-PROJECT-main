@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera } from 'lucide-react';
 import * as dbService from './services/db';
 import { useAuth } from './context/AuthContext';
 import UsageMonitor from './components/UsageMonitor';
@@ -9,6 +9,8 @@ import NetworkTopology from './components/NetworkTopology';
 import AuditTrail from './components/AuditTrail';
 import InfoButton from './components/InfoButton';
 import DigitalReceipts from './components/DigitalReceipts';
+import AssetScanner from './components/AssetScanner';
+import QRCodeGenerator from './components/QRCodeGenerator';
 import { downloadCsv } from './utils/csvExport';
 
 // Helper function to format dates in a user-friendly way
@@ -39,6 +41,9 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showScanner, setShowScanner] = useState(false);
+  const [showQRGenerator, setShowQRGenerator] = useState(false);
+  const [selectedAssetForQR, setSelectedAssetForQR] = useState(null);
   
   // Prevent duplicate submissions
   const isSubmittingRef = useRef(false);
@@ -1207,12 +1212,25 @@ export default function App() {
                       <div className="flex gap-2">
                         <button 
                           onClick={() => handleEditAsset(asset)}
-                          className="text-blue-400 hover:text-blue-300 transition">
+                          className="text-blue-400 hover:text-blue-300 transition"
+                          title="Edit Asset"
+                        >
                           <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedAssetForQR(asset);
+                            setShowQRGenerator(true);
+                          }}
+                          className="text-purple-400 hover:text-purple-300 transition"
+                          title="Generate QR Code"
+                        >
+                          <QrCode className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteAsset(asset.id)}
                           className="text-red-400 hover:text-red-300 transition"
+                          title="Delete Asset"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -2091,6 +2109,16 @@ export default function App() {
             </button>
           )}
 
+          {isAdmin && (
+            <button
+              onClick={() => setShowScanner(true)}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition text-slate-400 hover:bg-slate-700"
+            >
+              <Camera className="w-5 h-5" />
+              <span>Scan Asset QR</span>
+            </button>
+          )}
+
           <button
             onClick={() => { setCurrentScreen('alerts'); setShowForm(false); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
@@ -2225,6 +2253,22 @@ export default function App() {
           {renderScreen()}
         </main>
       </div>
+
+      {/* QR Code Scanner Modal */}
+      {showScanner && (
+        <AssetScanner onClose={() => setShowScanner(false)} />
+      )}
+
+      {/* QR Code Generator Modal */}
+      {showQRGenerator && selectedAssetForQR && (
+        <QRCodeGenerator 
+          asset={selectedAssetForQR} 
+          onClose={() => {
+            setShowQRGenerator(false);
+            setSelectedAssetForQR(null);
+          }} 
+        />
+      )}
     </div>
   );
 }
