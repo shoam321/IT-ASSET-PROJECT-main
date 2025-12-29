@@ -14,7 +14,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-import { Client as MindeeClient, product } from 'mindee';
+import * as mindee from 'mindee';
 import pool, { dbAsyncLocalStorage } from './db.js';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
@@ -68,13 +68,16 @@ try {
   console.warn('⚠️ DATABASE_URL is set but could not be parsed as a URL');
 }
 
-// Initialize Mindee client for receipt parsing
+// Initialize Mindee client for receipt parsing with custom model
 const mindeeClient = process.env.MINDEE_API_KEY 
-  ? new MindeeClient({ apiKey: process.env.MINDEE_API_KEY })
+  ? new mindee.ClientV2({ apiKey: process.env.MINDEE_API_KEY })
   : null;
 
+const MINDEE_MODEL_ID = process.env.MINDEE_MODEL_ID || '67078557-e9f3-4448-9297-4a545addd55b';
+
 if (mindeeClient) {
-  console.log('✅ Mindee receipt parsing enabled');
+  console.log('✅ Mindee receipt parsing enabled (Custom Model)');
+  console.log('📋 Model ID:', MINDEE_MODEL_ID);
 } else {
   console.warn('⚠️ MINDEE_API_KEY not set - receipt parsing disabled');
 }
@@ -1142,27 +1145,33 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
       try {
         console.log(`📄 Parsing receipt with Mindee: ${req.file.originalname}`);
         
-        const inputSource = mindeeClient.docFromPath(req.file.path);
-        const apiResponse = await mindeeClient.parse(product.ReceiptV5, inputSource);
-        const prediction = apiResponse.document.inference.prediction;
+        const inputSource = new mindee.PathInput({ inputPath: req.file.path });
+        
+        const inferenceParams = {
+          modelId: MINDEE_MODEL_ID,
+          confidence: true,
+          rawText: true
+        };
+        
+        const response = await mindeeClient.enqueueAndGetInference(
+          inputSource,
+          inferenceParams
+        );
 
-        merchant = prediction.supplierName?.value || null;
-        purchaseDate = prediction.date?.value || null;
-        totalAmount = prediction.totalAmount?.value || null;
-        taxAmount = prediction.totalTax?.value || null;
-        currency = prediction.locale?.currency || null;
+        const fields = response.inference.result.fields;
+        console.log('📊 Raw Mindee response:', JSON.stringify(fields, null, 2));
+
+        // Extract data from custom model fields
+        // Adjust these field names based on your custom model's output
+        merchant = fields.merchant?.value || fields.vendor?.value || fields.supplier_name?.value || null;
+        purchaseDate = fields.date?.value || fields.purchase_date?.value || null;
+        totalAmount = fields.total?.value || fields.total_amount?.value || null;
+        taxAmount = fields.tax?.value || fields.tax_amount?.value || null;
+        currency = fields.currency?.value || 'USD';
         parsingStatus = 'success';
         
         // Store full parsed data as JSON
-        parsedData = {
-          merchant: prediction.supplierName,
-          date: prediction.date,
-          totalAmount: prediction.totalAmount,
-          totalTax: prediction.totalTax,
-          category: prediction.category,
-          lineItems: prediction.lineItems,
-          locale: prediction.locale
-        };
+        parsedData = fields;
 
         console.log(`✅ Receipt parsed - Merchant: ${merchant}, Total: ${currency} ${totalAmount}`);
 
