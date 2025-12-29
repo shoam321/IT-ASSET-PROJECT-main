@@ -16,7 +16,11 @@ const Dashboard = () => {
       setLoading(true);
       setError(null);
       const token = localStorage.getItem('token');
-      const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
+      if (!token) {
+        throw new Error('Unauthorized. Please login again.');
+      }
+      const API_URL = process.env.REACT_APP_API_URL
+        || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : 'https://it-asset-project-production.up.railway.app/api');
       const response = await fetch(`${API_URL}/analytics/dashboard`, {
         headers: {
           'Authorization': `Bearer ${token}`
