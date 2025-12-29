@@ -192,7 +192,9 @@ const getRolePermissions = (role) => {
  */
 export const authorize = (...allowedPermissions) => {
   return (req, res, next) => {
-    const userPermissions = req.user.permissions || getRolePermissions(req.user.role);
+    const tokenPerms = Array.isArray(req.user.permissions) ? req.user.permissions : [];
+    const rolePerms = getRolePermissions(req.user.role);
+    const userPermissions = Array.from(new Set([...tokenPerms, ...rolePerms]));
     
     const hasPermission = allowedPermissions.some(permission =>
       userPermissions.includes(permission)
