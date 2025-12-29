@@ -69,12 +69,10 @@ try {
   console.warn('⚠️ DATABASE_URL is set but could not be parsed as a URL');
 }
 
-// Initialize Mindee client for receipt parsing with custom model
+// Initialize Mindee client for receipt parsing with V1 API
 const mindeeClient = process.env.MINDEE_API_KEY 
-  ? new mindee.ClientV2({ apiKey: process.env.MINDEE_API_KEY })
+  ? new mindee.Client({ apiKey: process.env.MINDEE_API_KEY })
   : null;
-
-const MINDEE_MODEL_ID = process.env.MINDEE_MODEL_ID || '67078557-e9f3-4448-9297-4a545addd55b';
 
 if (mindeeClient) {
   console.log('✅ Mindee receipt parsing enabled (Standard ReceiptV5)');
@@ -1145,9 +1143,9 @@ app.post('/api/assets/:id/receipts', authenticateToken, requireAdmin, upload.sin
       try {
         console.log(`📄 Parsing receipt with Mindee: ${req.file.originalname}`);
         
-        // Use Mindee's standard Receipt V5 API with ClientV2
+        // Use Mindee's standard Receipt V5 API with V1 Client
         const inputSource = mindeeClient.docFromPath(req.file.path);
-        const response = await mindeeClient.enqueueAndParse(mindee.product.ReceiptV5, inputSource);
+        const response = await mindeeClient.parse(mindee.product.ReceiptV5, inputSource);
 
         const document = response.document.inference.prediction;
         console.log('📊 Mindee Receipt Data:', {
