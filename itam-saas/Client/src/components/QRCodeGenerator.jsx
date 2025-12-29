@@ -14,8 +14,19 @@ const QRCodeGenerator = ({ asset, onClose }) => {
 
   const generateQRCode = async () => {
     try {
-      // Use device_id, asset_tag, or serial_number as QR code data
-      const qrData = asset.device_id || asset.asset_tag || asset.serial_number;
+      // Generate URL with asset details as query params for hybrid offline/online access
+      const baseUrl = window.location.origin;
+      const assetTag = asset.asset_tag || asset.device_id || 'unknown';
+      
+      // Build URL: https://yourdomain.com/assets/LT-12345?type=Laptop&model=Dell+Latitude+5420&sn=ABC123
+      const params = new URLSearchParams();
+      if (asset.asset_type) params.append('type', asset.asset_type);
+      if (asset.manufacturer) params.append('mfg', asset.manufacturer);
+      if (asset.model) params.append('model', asset.model);
+      if (asset.serial_number) params.append('sn', asset.serial_number);
+      if (asset.assigned_user_name) params.append('user', asset.assigned_user_name);
+      
+      const qrData = `${baseUrl}/assets/${assetTag}?${params.toString()}`;
       
       await QRCode.toCanvas(canvasRef.current, qrData, {
         width: 300,
@@ -44,7 +55,18 @@ const QRCodeGenerator = ({ asset, onClose }) => {
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank');
-    const qrData = asset.device_id || asset.asset_tag || asset.serial_number;
+    const baseUrl = window.location.origin;
+    const assetTag = asset.asset_tag || asset.device_id || 'unknown';
+    
+    // Build URL with asset details
+    const params = new URLSearchParams();
+    if (asset.asset_type) params.append('type', asset.asset_type);
+    if (asset.manufacturer) params.append('mfg', asset.manufacturer);
+    if (asset.model) params.append('model', asset.model);
+    if (asset.serial_number) params.append('sn', asset.serial_number);
+    if (asset.assigned_user_name) params.append('user', asset.assigned_user_name);
+    
+    const qrData = `${baseUrl}/assets/${assetTag}?${params.toString()}`;
     
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -80,6 +102,12 @@ const QRCodeGenerator = ({ asset, onClose }) => {
               font-size: 11px;
               margin: 5px 0;
             }
+            .url {
+              font-size: 9px;
+              color: #666;
+              margin-top: 8px;
+              word-break: break-all;
+            }
             canvas {
               margin: 10px 0;
             }
@@ -90,7 +118,10 @@ const QRCodeGenerator = ({ asset, onClose }) => {
             <div class="title">${asset.manufacturer || ''} ${asset.model || ''}</div>
             <canvas id="qr"></canvas>
             <div class="info"><strong>Asset Tag:</strong> ${asset.asset_tag || 'N/A'}</div>
+            <div class="info"><strong>Type:</strong> ${asset.asset_type || 'N/A'}</div>
             <div class="info"><strong>Serial:</strong> ${asset.serial_number || 'N/A'}</div>
+            ${asset.assigned_user_name ? `<div class="info"><strong>User:</strong> ${asset.assigned_user_name}</div>` : ''}
+            <div class="url">Scan to view: ${baseUrl}/assets/${assetTag}</div>
           </div>
           <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
           <script>
@@ -129,7 +160,12 @@ const QRCodeGenerator = ({ asset, onClose }) => {
           <div className="text-center mb-6">
             <p className="text-sm font-medium text-gray-700">{asset.manufacturer} {asset.model}</p>
             <p className="text-xs text-gray-500 mt-1">Asset Tag: {asset.asset_tag || 'N/A'}</p>
+            <p className="text-xs text-gray-500">Type: {asset.asset_type || 'N/A'}</p>
             <p className="text-xs text-gray-500">Serial: {asset.serial_number || 'N/A'}</p>
+            {asset.assigned_user_name && (
+              <p className="text-xs text-gray-500">User: {asset.assigned_user_name}</p>
+            )}
+            <p className="text-xs text-blue-600 mt-2">Scan to view asset details</p>
           </div>
 
           <div className="flex gap-3 w-full">
