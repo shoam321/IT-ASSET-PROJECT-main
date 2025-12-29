@@ -28,10 +28,11 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.11.3",
-    "tesseract.js": "^5.1.1",
     "playwright": "^1.57.0",
     "redis": "^5.10.0",
+    "resend": "^6.6.0",
     "socket.io": "^4.8.3",
+    "tesseract.js": "^5.1.1",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
