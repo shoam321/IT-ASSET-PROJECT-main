@@ -20,7 +20,7 @@ import pool, { dbAsyncLocalStorage } from './db.js';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
 import * as consumablesDb from './consumablesQueries.js';
-import { authenticateToken, generateToken, requireAdmin } from './middleware/auth.js';
+import { authenticateToken, generateToken, requireAdmin, authorize } from './middleware/auth.js';
 import { initializeAlertService, shutdownAlertService } from './alertService.js';
 import { getCached, invalidateCache } from './redis.js';
 import * as emailService from './emailService.js';
@@ -702,7 +702,7 @@ app.get('/api/audit-logs/:table/:id', authenticateToken, async (req, res) => {
 // ===== ANALYTICS ROUTES =====
 
 // Get dashboard analytics (accessible to all authenticated users)
-app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
+app.get('/api/analytics/dashboard', authenticateToken, authorize('analytics:view'), async (req, res) => {
   try {
     const userId = req.user?.userId ?? req.user?.id;
     if (!userId) {
@@ -714,6 +714,13 @@ app.get('/api/analytics/dashboard', authenticateToken, async (req, res) => {
     // Get user from database to verify role
     const user = await authQueries.findUserById(userId);
     const role = typeof user?.role === 'string' ? user.role.toLowerCase() : 'user';
+    // Structured diagnostics to aid troubleshooting 403s
+    console.log('[analytics:view] access', {
+      userId,
+      role,
+      tokenRole: req.user?.role,
+      permissions: req.user?.permissions
+    });
     
     // Admins see all data, regular users see only their own
     const analytics = await db.getDashboardAnalytics(role, userId);

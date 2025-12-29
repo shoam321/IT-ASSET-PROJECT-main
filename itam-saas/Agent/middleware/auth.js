@@ -159,10 +159,32 @@ export const requireAdmin = (req, res, next) => {
  */
 const getRolePermissions = (role) => {
   const permissions = {
-    admin: ['read:all_devices', 'write:all_devices', 'manage:users', 'read:own_devices', 'write:own_devices'],
-    user: ['read:own_devices', 'write:own_devices']
+    admin: [
+      'read:all_devices',
+      'write:all_devices',
+      'manage:users',
+      'read:own_devices',
+      'write:own_devices',
+      'analytics:view'
+    ],
+    // Optional roles for future expansion; supported if present in DB
+    manager: [
+      'read:own_devices',
+      'write:own_devices',
+      'analytics:view'
+    ],
+    analyst: [
+      'analytics:view'
+    ],
+    user: [
+      'read:own_devices',
+      'write:own_devices',
+      // Keep analytics visible to authenticated users as per route intent
+      'analytics:view'
+    ]
   };
-  return permissions[role] || permissions.user;
+  const key = typeof role === 'string' ? role.toLowerCase() : 'user';
+  return permissions[key] || permissions.user;
 };
 
 /**
