@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Package, TrendingUp, TrendingDown, AlertTriangle, HardDrive, Monitor, Smartphone, Cloud, Network } from 'lucide-react';
+import { Search, Package, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
+import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from '../config/assetCategories';
+import CategoryIcon from './CategoryIcon';
 
 const StockOverview = () => {
   const [assets, setAssets] = useState([]);
@@ -30,22 +32,22 @@ const StockOverview = () => {
     }
   };
 
-  // Group assets by type and status
+  // Group assets by category
   const getStockByType = () => {
     const grouped = {};
     
     assets.forEach(asset => {
-      const type = asset.asset_type || 'other';
-      if (!grouped[type]) {
-        grouped[type] = { total: 0, available: 0, inUse: 0, maintenance: 0, items: [] };
+      const category = asset.category || 'other';
+      if (!grouped[category]) {
+        grouped[category] = { total: 0, available: 0, inUse: 0, maintenance: 0, items: [] };
       }
       
-      grouped[type].total++;
-      grouped[type].items.push(asset);
+      grouped[category].total++;
+      grouped[category].items.push(asset);
       
-      if (asset.status === 'Available') grouped[type].available++;
-      else if (asset.status === 'In Use') grouped[type].inUse++;
-      else if (asset.status === 'Maintenance') grouped[type].maintenance++;
+      if (asset.status === 'Available') grouped[category].available++;
+      else if (asset.status === 'In Use') grouped[category].inUse++;
+      else if (asset.status === 'Maintenance') grouped[category].maintenance++;
     });
     
     return grouped;
@@ -54,35 +56,16 @@ const StockOverview = () => {
   const stockData = getStockByType();
 
   // Filter stock categories
-  const filteredStock = Object.entries(stockData).filter(([type, data]) => {
-    const matchesCategory = categoryFilter === 'all' || type === categoryFilter;
-    const matchesSearch = type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredStock = Object.entries(stockData).filter(([categoryId, data]) => {
+    const matchesCategory = categoryFilter === 'all' || categoryId === categoryFilter;
+    const category = getCategoryById(categoryId);
+    const matchesSearch = category.label.toLowerCase().includes(searchTerm.toLowerCase()) ||
       data.items.some(item => 
         item.manufacturer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.model?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     return matchesCategory && matchesSearch;
   });
-
-  const getTypeIcon = (type) => {
-    const icons = {
-      hardware: HardDrive,
-      software: Cloud,
-      network: Network,
-      cloud: Cloud,
-    };
-    return icons[type?.toLowerCase()] || Package;
-  };
-
-  const getTypeColor = (type) => {
-    const colors = {
-      hardware: 'bg-blue-600',
-      software: 'bg-purple-600',
-      network: 'bg-green-600',
-      cloud: 'bg-orange-600',
-    };
-    return colors[type?.toLowerCase()] || 'bg-slate-600';
-  };
 
   const totalAssets = assets.length;
   const totalAvailable = assets.filter(a => a.status === 'Available').length;
@@ -154,8 +137,8 @@ const StockOverview = () => {
             className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white"
           >
             <option value="all">All Categories</option>
-            {Object.keys(stockData).map(type => (
-              <option key={type} value={type}>{type.toUpperCase()}</option>
+            {ASSET_CATEGORIES.map(cat => (
+              <option key={cat.id} value={cat.id}>{cat.label}</option>
             ))}
           </select>
         </div>
@@ -168,20 +151,20 @@ const StockOverview = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredStock.map(([type, data]) => {
-            const Icon = getTypeIcon(type);
-            const colorClass = getTypeColor(type);
+          {filteredStock.map(([categoryId, data]) => {
+            const category = getCategoryById(categoryId);
+            const colorClass = getCategoryColorClasses(categoryId, 'bg');
             const availabilityRate = Math.round((data.available / data.total) * 100);
             
             return (
               <div
-                key={type}
+                key={categoryId}
                 className="group bg-slate-800 border border-slate-700 rounded-2xl p-6 hover:border-blue-500 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
               >
                 {/* Header with Icon */}
                 <div className="flex items-center justify-between mb-4">
                   <div className={`${colorClass} p-3 rounded-xl`}>
-                    <Icon className="w-6 h-6 text-white" />
+                    <CategoryIcon iconName={category.icon} className="w-6 h-6 text-white" />
                   </div>
                   <div className={`px-3 py-1 rounded-full text-xs font-bold ${
                     availabilityRate > 30 ? 'bg-green-900 text-green-300' : 
@@ -193,7 +176,7 @@ const StockOverview = () => {
                 </div>
 
                 {/* Type Name */}
-                <h3 className="text-xl font-bold text-white mb-1 capitalize">{type}</h3>
+                <h3 className="text-xl font-bold text-white mb-1">{category.label}</h3>
                 <p className="text-slate-400 text-sm mb-4">{data.total} Total Units</p>
 
                 {/* Stock Breakdown */}
