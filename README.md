@@ -1,6 +1,11 @@
-# IT Asset Tracker SaaS
+# IT Asset Tracker - Self-Hosted SaaS Platform
 
-A comprehensive IT asset management system built with React, Node.js, and PostgreSQL/Supabase. Automatically discover, track, and manage IT infrastructure across multiple platforms.
+A comprehensive, **fully self-hostable** IT asset management system built with React, Node.js, and PostgreSQL. Deploy on your own infrastructure to maintain complete control over your asset data and operations.
+
+> 🏠 **100% Self-Hosted** - Run entirely on your own servers, no external dependencies required  
+> 🔒 **Data Privacy** - Your asset data never leaves your infrastructure  
+> 🚀 **Easy Deployment** - Simple setup with Docker Compose or manual installation  
+> 💰 **Zero Vendor Lock-in** - Open source, fully customizable, and free to use
 
 ## Features
 
@@ -53,14 +58,31 @@ IT ASSET PROJECT/
 │       └── .env
 ```
 
-## Getting Started
+## Self-Hosting Guide
 
 ### Prerequisites
-- Node.js 16+
-- npm or yarn
-- PostgreSQL database (Supabase recommended)
+- **Node.js 16+** - Runtime for backend and frontend
+- **PostgreSQL 12+** - Database (can run locally or in Docker)
+- **Grafana (Optional)** - For monitoring dashboards
+- **Git** - To clone the repository
 
-### Installation
+### Quick Start with Docker Compose (Recommended)
+
+**Coming Soon:** Full Docker Compose setup with all services (PostgreSQL, Backend, Frontend, Grafana) in one command.
+
+```bash
+# Clone and start all services
+git clone https://github.com/yourusername/IT-ASSET.git
+cd IT-ASSET
+docker-compose up -d
+
+# Access the application
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:5000
+# Grafana: http://localhost:3001
+```
+
+### Manual Installation (Full Control)
 
 1. **Clone the repository**
 ```bash
@@ -80,20 +102,127 @@ cd ../Client
 npm install
 ```
 
-### Configuration
+### Configuration for Self-Hosting
 
-#### Backend (.env)
-```
-DATABASE_URL=postgresql://user:password@host:5432/database
+#### Backend Environment Variables (.env)
+Create `itam-saas/Agent/.env`:
+```env
+# Database Connection (Use your local PostgreSQL)
+DATABASE_URL=postgresql://username:password@localhost:5432/itassets
+
+# Server Configuration
 PORT=5000
-NODE_ENV=development
-TENANT_ID=default_tenant
-TENANT_NAME=Default Tenant
+NODE_ENV=production
+
+# Multi-tenancy (for single-tenant self-hosting, use defaults)
+TENANT_ID=my_company
+TENANT_NAME=My Company IT Assets
+
+# Authentication
+JWT_SECRET=your-secure-random-secret-here
+
+# Email (Optional - for alerts)
+RESEND_API_KEY=your_resend_key_if_needed
 ```
 
-#### Frontend (.env)
-```
+#### Frontend Environment Variables (.env)
+Create `itam-saas/Client/.env`:
+```env
+# Point to your self-hosted backend
 REACT_APP_API_URL=http://localhost:5000/api
+
+# Optional: Self-hosted Grafana for monitoring
+REACT_APP_GRAFANA_URL=http://localhost:3001
+
+# # Production Deployment (Self-Hosted on Your Server)
+
+**Build for Production:**
+```bash
+# Build Frontend
+cd itam-saas/Client
+npm run build
+
+# Serve static files with nginx or any web server
+# Or use Node.js static server:
+npx serve -s build -l 80
+
+# Backend runs as-is:
+cd ../Agent
+NODE_ENV=production node server.js
+```
+
+**Systemd Service (Linux):**
+```bash
+# Create service file: /etc/systemd/system/itassets.service
+[Unit]
+Description=IT Asset Tracker Backend
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/itassets/itam-saas/Agent
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Reverse Proxy (Nginx):**
+```nginx
+server {
+    listen 80;
+    server_name assets.yourdomain.com;
+
+    # Frontend
+    location / {
+        root /opt/itassets/itam-saas/Client/build;
+        try_files $uri /index.html;
+    }
+
+    # Backend API
+    location /api {
+        proxy_pass http://localhost:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+## Self-Hosting Benefits
+
+✅ **Complete Data Control** - All asset data stays on your infrastructure  
+✅ **Customizable** - Modify code to fit your exact requirements  
+✅ **No Subscription Fees** - One-time setup, no recurring costs  
+✅ **Enterprise Security** - Deploy behind your firewall  
+✅ **Compliance Ready** - Meet data residency requirements  
+✅ **Unlimited Users** - No per-user pricing constraints  
+
+##Google SSO (Optional - leave blank for local auth)
+REACT_APP_GOOGLE_CLIENT_ID=
+```
+
+#### PostgreSQL Setup (Self-Hosted)
+
+**Option 1: Local PostgreSQL Installation**
+```bash
+# Install PostgreSQL (Windows)
+winget install PostgreSQL.PostgreSQL
+
+# Or use Docker
+docker run -d \
+  --name itassets-postgres \
+  -e POSTGRES_PASSWORD=yourpassword \
+  -e POSTGRES_DB=itassets \
+  -p 5432:5432 \
+  postgres:15
+```
+
+**Option 2: Use Database Initialization Scripts**
+```bash
+# Initialize database schema
+psql -U yourusername -d itassets -f itam-saas/Agent/init-db.sql
 ```
 
 ### Running the Application
@@ -135,10 +264,16 @@ The application will be available at `http://localhost:3000`
 CREATE TABLE assets (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asset_tag VARCHAR(255) UNIQUE NOT NULL,
-  asset_type VARCHAR(50) NOT NULL,
-  manufacturer VARCHAR(255),
-  model VARCHAR(255),
-  serial_number VARCHAR(255) UNIQUE,
+  aSelf-Hosting Roadmap
+
+- [x] Manual installation guide
+- [x] PostgreSQL integration
+- [x] Environment configuration
+- [ ] **Docker Compose setup** (In Progress)
+- [ ] Kubernetes Helm charts
+- [ ] Automated backup scripts
+- [ ] Multi-tenant support for hosting providers
+- [ ] One-click AWS/Azure/GCP deployment templates
   assigned_user_name VARCHAR(255),
   status VARCHAR(50) DEFAULT 'In Use',
   cost DECIMAL(10, 2) DEFAULT 0,
