@@ -722,6 +722,6 @@
   "timepicker": {},
   "timezone": "browser",
   "title": "IT Asset Dashboard",
-  "uid": "it-assets",
+  "uid": null,
   "version": 0
 }
