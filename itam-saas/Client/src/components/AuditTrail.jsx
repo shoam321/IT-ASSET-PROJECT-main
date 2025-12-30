@@ -460,7 +460,7 @@ export default function AuditTrail() {
             ) : (
               auditLogs.map((log) => (
                 <tr key={log.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                  <td style={{ padding: '12px' }}>{formatTimestamp(log.timestamp)}</td>
+                  <td style={{ padding: '12px', color: '#1e293b', fontWeight: '500' }}>{formatTimestamp(log.timestamp)}</td>
                   <td style={{ padding: '12px' }}>
                     <span style={{
                       display: 'inline-flex',
@@ -469,21 +469,21 @@ export default function AuditTrail() {
                       padding: '4px 8px',
                       borderRadius: '4px',
                       fontSize: '12px',
-                      fontWeight: '500'
+                      fontWeight: '600'
                     }} className={getActionColor(log.action)}>
                       {getActionIcon(log.action)}
                       {log.action}
                     </span>
                   </td>
-                  <td style={{ padding: '12px', fontWeight: '500' }}>{log.table_name}</td>
-                  <td style={{ padding: '12px', fontFamily: 'monospace' }}>#{log.record_id}</td>
-                  <td style={{ padding: '12px' }}>{getUserDisplay(log)}</td>
-                  <td style={{ padding: '12px', fontSize: '12px', color: '#64748b' }}>
+                  <td style={{ padding: '12px', fontWeight: '600', color: '#1e293b' }}>{log.table_name}</td>
+                  <td style={{ padding: '12px', fontFamily: 'monospace', color: '#1e293b', fontWeight: '500' }}>#{log.record_id}</td>
+                  <td style={{ padding: '12px', color: '#1e293b', fontWeight: '500' }}>{getUserDisplay(log)}</td>
+                  <td style={{ padding: '12px', fontSize: '12px', color: '#1e293b' }}>
                     <div>
                       {(() => {
                         const summary = getEntitySummary(log);
                         return summary ? (
-                        <div style={{ marginBottom: '6px', color: '#0f172a' }}>
+                        <div style={{ marginBottom: '6px', color: '#0f172a', fontWeight: '600' }}>
                           <strong>{summary}</strong>
                         </div>
                         ) : null;
@@ -494,25 +494,25 @@ export default function AuditTrail() {
                           {getDiff(normalizeJson(log.old_data), normalizeJson(log.new_data))
                             ?.slice(0, 3)
                             .map((change, i) => (
-                              <div key={i} style={{ marginBottom: '5px' }}>
-                                <strong>{change.field}:</strong> {String(change.from)} → {String(change.to)}
+                              <div key={i} style={{ marginBottom: '5px', color: '#0f172a' }}>
+                                <strong style={{ color: '#0f172a' }}>{change.field}:</strong> <span style={{ color: '#334155' }}>{String(change.from)}</span> → <span style={{ color: '#334155' }}>{String(change.to)}</span>
                               </div>
                             ))}
                         </div>
                       ) : log.action === 'CREATE' ? (
-                        <span>Created</span>
+                        <span style={{ color: '#0f172a', fontWeight: '500' }}>Created</span>
                       ) : log.action === 'DELETE' ? (
-                        <span>Deleted</span>
+                        <span style={{ color: '#0f172a', fontWeight: '500' }}>Deleted</span>
                       ) : log.action === 'LOGIN' ? (
-                        <span>Login</span>
+                        <span style={{ color: '#0f172a', fontWeight: '500' }}>Login</span>
                       ) : log.action === 'LOGOUT' ? (
-                        <span>Logout</span>
+                        <span style={{ color: '#0f172a', fontWeight: '500' }}>Logout</span>
                       ) : (
-                        <span>{log.action}</span>
+                        <span style={{ color: '#0f172a', fontWeight: '500' }}>{log.action}</span>
                       )}
 
                       {(log.ip_address || log.user_agent) && (
-                        <div style={{ marginTop: '6px', color: '#94a3b8' }}>
+                        <div style={{ marginTop: '6px', color: '#475569', fontSize: '11px' }}>
                           {log.ip_address ? <span>IP: {log.ip_address}</span> : null}
                         </div>
                       )}
