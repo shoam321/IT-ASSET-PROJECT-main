@@ -21,8 +21,8 @@ async function checkUsers() {
     const counts = await pool.query(`
       SELECT 
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE is_active = true) as active,
-        COUNT(*) FILTER (WHERE is_active = false) as inactive
+        COUNT(*) FILTER (WHERE status = 'active') as active,
+        COUNT(*) FILTER (WHERE status != 'active') as inactive
       FROM users
     `);
     
@@ -32,9 +32,9 @@ async function checkUsers() {
     console.log(`  Inactive: ${counts.rows[0].inactive}`);
     
     // Show sample data
-    const sample = await pool.query('SELECT id, username, email, is_active FROM users LIMIT 5');
+    const sample = await pool.query('SELECT id, username, email, status FROM users LIMIT 5');
     console.log('\nSample users:');
-    sample.rows.forEach(u => console.log(`  ${u.id}: ${u.username} (${u.email}) - Active: ${u.is_active}`));
+    sample.rows.forEach(u => console.log(`  ${u.id}: ${u.username} (${u.email}) - Status: ${u.status}`));
     
   } catch (error) {
     console.error('Error:', error.message);

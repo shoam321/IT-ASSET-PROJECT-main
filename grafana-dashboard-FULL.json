@@ -133,7 +133,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as value FROM users WHERE LOWER(status) = 'active';",
+          "rawSql": "SELECT COUNT(*) as value FROM users WHERE status = 'active';",
           "refId": "A"
         }
       ],
