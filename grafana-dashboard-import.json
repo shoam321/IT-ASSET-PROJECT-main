@@ -259,7 +259,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as value FROM consumables WHERE quantity <= min_quantity;",,
+          "rawSql": "SELECT COUNT(*) as value FROM consumables WHERE quantity <= min_quantity;",
           "refId": "A"
         }
       ],
@@ -314,7 +314,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(category, 'Uncategorized') as category, COUNT(*) as value FROM assets GROUP BY category ORDER BY value DESC LIMIT 10;",,
+          "rawSql": "SELECT COALESCE(category, 'Uncategorized') as category, COUNT(*) as value FROM assets GROUP BY category ORDER BY value DESC LIMIT 10;",
           "refId": "A"
         }
       ],
@@ -401,7 +401,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(status, 'Unknown') as status, COUNT(*) as value FROM assets GROUP BY status ORDER BY value DESC;",,
+          "rawSql": "SELECT COALESCE(status, 'Unknown') as status, COUNT(*) as value FROM assets GROUP BY status ORDER BY value DESC;",
           "refId": "A"
         }
       ],
@@ -464,7 +464,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT name, quantity, min_quantity, (min_quantity - quantity) as shortage FROM consumables WHERE quantity <= min_quantity ORDER BY shortage DESC LIMIT 20;",,
+          "rawSql": "SELECT name, quantity, min_quantity, (min_quantity - quantity) as shortage FROM consumables WHERE quantity <= min_quantity ORDER BY shortage DESC LIMIT 20;",
           "refId": "A"
         }
       ],
@@ -527,7 +527,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT asset_tag, asset_type, manufacturer, status, created_at FROM assets ORDER BY created_at DESC LIMIT 20;",,
+          "rawSql": "SELECT asset_tag, asset_type, manufacturer, status, created_at FROM assets ORDER BY created_at DESC LIMIT 20;",
           "refId": "A"
         }
       ],
@@ -594,7 +594,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT software_name, license_key, expiration_date, CASE WHEN expiration_date < CURRENT_DATE THEN 'Expired' WHEN expiration_date < CURRENT_DATE + INTERVAL '30 days' THEN 'Expiring Soon' ELSE 'Active' END as license_status FROM licenses WHERE expiration_date IS NOT NULL ORDER BY expiration_date ASC LIMIT 20;",,
+          "rawSql": "SELECT software_name, license_key, expiration_date, CASE WHEN expiration_date < CURRENT_DATE THEN 'Expired' WHEN expiration_date < CURRENT_DATE + INTERVAL '30 days' THEN 'Expiring Soon' ELSE 'Active' END as license_status FROM licenses WHERE expiration_date IS NOT NULL ORDER BY expiration_date ASC LIMIT 20;",
           "refId": "A"
         }
       ],
