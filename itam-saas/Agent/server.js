@@ -25,6 +25,7 @@ import { initializeAlertService, shutdownAlertService } from './alertService.js'
 import { getCached, invalidateCache } from './redis.js';
 import * as emailService from './emailService.js';
 import { startLicenseExpirationChecker, stopLicenseExpirationChecker } from './licenseExpirationChecker.js';
+import { createOrder as createPayPalOrder, captureOrder as capturePayPalOrder, verifyWebhookSignature, allowedCurrencies as paypalCurrencies } from './paypalClient.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -192,7 +193,11 @@ app.use(cors({
 
 // Explicitly handle OPTIONS requests for all routes
 app.options('*', cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Bind a single DB connection to each /api request.
@@ -324,6 +329,21 @@ app.use((req, res, next) => {
 
   next();
 });
+
+const FRONTEND_BASE_URL = process.env.FRONTEND_URL || 'https://it-asset-project.vercel.app';
+const paypalCurrencySet = new Set((paypalCurrencies || []).map(c => c.toUpperCase()));
+
+function toCents(amount) {
+  const num = Number(amount);
+  if (!Number.isFinite(num) || num <= 0) {
+    return null;
+  }
+  return Math.round(num * 100);
+}
+
+function centsToValue(cents) {
+  return (Number(cents || 0) / 100).toFixed(2);
+}
 
 // Initialize database on startup
 async function startServer() {
@@ -1905,6 +1925,206 @@ app.get('/api/alerts/stats', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching alert stats:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ PAYMENTS (PayPal) ============
+
+app.post('/api/payments/paypal/order', authenticateToken, [
+  body('amount').isFloat({ gt: 0 }).withMessage('amount must be a positive number'),
+  body('currency').optional().isString().isLength({ min: 3, max: 3 }).withMessage('currency must be a 3-letter code'),
+  body('description').optional().isString().isLength({ max: 255 })
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const userId = req.user?.userId ?? req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token structure' });
+    }
+    await db.setCurrentUserId(userId);
+
+    const cents = toCents(req.body.amount);
+    if (!cents) {
+      return res.status(400).json({ error: 'amount must be greater than zero' });
+    }
+
+    const currency = (req.body.currency || 'USD').toUpperCase();
+    if (!paypalCurrencySet.has(currency)) {
+      return res.status(400).json({ error: 'Unsupported currency' });
+    }
+
+    const description = req.body.description || 'IT Asset payment';
+    const returnUrl = `${FRONTEND_BASE_URL}/paypal/return`;
+    const cancelUrl = `${FRONTEND_BASE_URL}/paypal/cancel`;
+
+    const order = await createPayPalOrder({
+      amount: centsToValue(cents),
+      currency,
+      description,
+      returnUrl,
+      cancelUrl
+    });
+
+    if (!order?.orderId) {
+      return res.status(500).json({ error: 'Failed to create PayPal order' });
+    }
+
+    await db.createPaymentRecord({
+      orderId: order.orderId,
+      userId,
+      amountCents: cents,
+      currency,
+      status: order.status || 'CREATED',
+      intent: 'CAPTURE',
+      description,
+      metadata: { source: 'api', requested_amount: req.body.amount }
+    });
+
+    res.json({
+      orderId: order.orderId,
+      approveUrl: order.approveUrl,
+      status: order.status || 'CREATED'
+    });
+  } catch (error) {
+    console.error('Error creating PayPal order:', error);
+    res.status(500).json({ error: 'Failed to create order' });
+  }
+});
+
+app.post('/api/payments/paypal/capture', authenticateToken, [
+  body('orderId').isString().notEmpty().withMessage('orderId is required')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { orderId } = req.body;
+  try {
+    const userId = req.user?.userId ?? req.user?.id;
+    const role = req.user?.role;
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token structure' });
+    }
+    await db.setCurrentUserId(userId);
+
+    const payment = await db.getPaymentByOrderId(orderId);
+    if (payment && payment.user_id && payment.user_id !== userId && role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const result = await capturePayPalOrder(orderId);
+
+    if (!result?.captureId) {
+      return res.status(500).json({ error: 'Failed to capture order' });
+    }
+
+    if (payment) {
+      await db.updatePaymentStatus(orderId, {
+        status: result.status || 'CAPTURED',
+        captureId: result.captureId,
+        payerEmail: result.payerEmail,
+        payerName: result.payerName,
+        metadata: result.raw || payment.metadata
+      });
+    } else {
+      const amountCents = result?.amount?.value ? toCents(result.amount.value) : null;
+      await db.createPaymentRecord({
+        orderId,
+        captureId: result.captureId,
+        userId,
+        amountCents: amountCents || 0,
+        currency: (result?.amount?.currency_code || 'USD').toUpperCase(),
+        status: result.status || 'CAPTURED',
+        intent: 'CAPTURE',
+        payerEmail: result.payerEmail,
+        payerName: result.payerName,
+        metadata: result.raw || {}
+      });
+    }
+
+    res.json({
+      status: result.status || 'CAPTURED',
+      captureId: result.captureId,
+      payerEmail: result.payerEmail,
+      payerName: result.payerName
+    });
+  } catch (error) {
+    console.error('Error capturing PayPal order:', error);
+    res.status(500).json({ error: 'Failed to capture order' });
+  }
+});
+
+app.post('/api/payments/paypal/webhook', async (req, res) => {
+  const body = req.body;
+  const rawBody = req.rawBody;
+  const eventId = body?.id;
+  const eventType = body?.event_type;
+
+  if (!rawBody) {
+    return res.status(400).json({ error: 'Missing raw body for verification' });
+  }
+
+  try {
+    const verified = await verifyWebhookSignature(req.headers, body);
+    if (!verified) {
+      return res.status(400).json({ error: 'Invalid webhook signature' });
+    }
+
+    const inserted = await db.logWebhookEvent(eventId, eventType, 'received', body);
+    if (!inserted) {
+      return res.status(200).json({ status: 'duplicate' });
+    }
+
+    const resource = body?.resource || {};
+    const orderId = resource?.id || resource?.supplementary_data?.related_ids?.order_id;
+    const captureId = resource?.id;
+    const amountValue = resource?.amount?.value || resource?.purchase_units?.[0]?.amount?.value;
+    const amountCurrency = (resource?.amount?.currency_code || resource?.purchase_units?.[0]?.amount?.currency_code || 'USD').toUpperCase();
+    const amountCents = amountValue ? toCents(amountValue) : null;
+    const payerEmail = resource?.payer?.email_address || resource?.payer_email;
+    const payerName = resource?.payer?.name ? `${resource.payer.name.given_name || ''} ${resource.payer.name.surname || ''}`.trim() : null;
+
+    if (orderId) {
+      const existing = await db.getPaymentByOrderId(orderId);
+      if (existing) {
+        await db.updatePaymentStatus(orderId, {
+          status: eventType || existing.status,
+          captureId: captureId || existing.capture_id,
+          payerEmail: payerEmail || existing.payer_email,
+          payerName: payerName || existing.payer_name,
+          metadata: resource || existing.metadata
+        });
+      } else {
+        await db.createPaymentRecord({
+          orderId,
+          captureId,
+          userId: null,
+          amountCents: amountCents || 0,
+          currency: amountCurrency,
+          status: eventType || 'WEBHOOK',
+          intent: 'CAPTURE',
+          payerEmail,
+          payerName,
+          metadata: resource || {}
+        });
+      }
+    }
+
+    await db.markWebhookProcessed(eventId, 'processed');
+    res.json({ status: 'ok' });
+  } catch (error) {
+    console.error('PayPal webhook error:', error);
+    try {
+      if (eventId) {
+        await db.markWebhookProcessed(eventId, 'failed');
+      }
+    } catch {}
+    res.status(500).json({ error: 'Failed to process webhook' });
   }
 });
 

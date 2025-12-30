@@ -2005,3 +2005,126 @@ export async function getExportData(type = 'all') {
   }
 }
 
+// ============ PAYMENTS (PayPal) ============
+
+export async function createPaymentRecord({
+  orderId,
+  captureId = null,
+  userId = null,
+  amountCents,
+  currency,
+  status,
+  intent = 'CAPTURE',
+  payerEmail = null,
+  payerName = null,
+  description = null,
+  metadata = {}
+}) {
+  try {
+    const result = await pool.query(
+      `INSERT INTO payments (
+         order_id, capture_id, user_id, amount_cents, currency,
+         status, intent, payer_email, payer_name, description, metadata
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (order_id) DO UPDATE SET
+         capture_id = COALESCE(EXCLUDED.capture_id, payments.capture_id),
+         status = EXCLUDED.status,
+         payer_email = COALESCE(EXCLUDED.payer_email, payments.payer_email),
+         payer_name = COALESCE(EXCLUDED.payer_name, payments.payer_name),
+         metadata = COALESCE(EXCLUDED.metadata, payments.metadata),
+         updated_at = NOW()
+       RETURNING *` ,
+      [orderId, captureId, userId, amountCents, currency, status, intent, payerEmail, payerName, description, metadata]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error creating payment record:', error);
+    throw error;
+  }
+}
+
+export async function getPaymentByOrderId(orderId) {
+  try {
+    const result = await pool.query('SELECT * FROM payments WHERE order_id = $1', [orderId]);
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error fetching payment by order id:', error);
+    throw error;
+  }
+}
+
+export async function getPaymentByCaptureId(captureId) {
+  try {
+    const result = await pool.query('SELECT * FROM payments WHERE capture_id = $1', [captureId]);
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error fetching payment by capture id:', error);
+    throw error;
+  }
+}
+
+export async function updatePaymentStatus(orderId, updates = {}) {
+  const fields = [];
+  const values = [];
+  if (updates.status) {
+    fields.push(`status = $${fields.length + 1}`);
+    values.push(updates.status);
+  }
+  if (updates.captureId) {
+    fields.push(`capture_id = $${fields.length + 1}`);
+    values.push(updates.captureId);
+  }
+  if (updates.payerEmail) {
+    fields.push(`payer_email = $${fields.length + 1}`);
+    values.push(updates.payerEmail);
+  }
+  if (updates.payerName) {
+    fields.push(`payer_name = $${fields.length + 1}`);
+    values.push(updates.payerName);
+  }
+  if (updates.metadata) {
+    fields.push(`metadata = $${fields.length + 1}`);
+    values.push(updates.metadata);
+  }
+
+  if (fields.length === 0) return null;
+
+  values.push(orderId);
+  const sql = `UPDATE payments SET ${fields.join(', ')}, updated_at = NOW() WHERE order_id = $${fields.length + 1} RETURNING *`;
+  try {
+    const result = await pool.query(sql, values);
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error updating payment status:', error);
+    throw error;
+  }
+}
+
+export async function logWebhookEvent(eventId, eventType, status, payload) {
+  try {
+    const result = await pool.query(
+      `INSERT INTO webhook_events (event_id, event_type, status, payload)
+       VALUES ($1,$2,$3,$4)
+       ON CONFLICT (event_id) DO NOTHING
+       RETURNING id`,
+      [eventId, eventType, status, payload]
+    );
+    return result.rowCount > 0;
+  } catch (error) {
+    console.error('Error logging webhook event:', error);
+    throw error;
+  }
+}
+
+export async function markWebhookProcessed(eventId, status = 'processed') {
+  try {
+    await pool.query(
+      `UPDATE webhook_events SET status = $1, processed_at = NOW() WHERE event_id = $2`,
+      [status, eventId]
+    );
+  } catch (error) {
+    console.error('Error updating webhook event status:', error);
+    throw error;
+  }
+}
+
