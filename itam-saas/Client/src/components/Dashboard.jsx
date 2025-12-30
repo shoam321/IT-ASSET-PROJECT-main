@@ -126,7 +126,7 @@ const Dashboard = () => {
               <p><strong>1. Create Grafana Dashboard:</strong></p>
               <ul className="list-disc ml-5 space-y-1">
                 <li>Login to <a href={GRAFANA_URL} target="_blank" rel="noopener noreferrer" className="underline">Grafana</a></li>
-                <li>Create new dashboard with UID: <code className="bg-blue-100 px-2 py-1 rounded font-mono">it-assets</code></li>
+                <li>Dashboard UID: <code className="bg-blue-100 px-2 py-1 rounded font-mono">adgfqcl</code> (already created)</li>
                 <li>Name: <code className="bg-blue-100 px-2 py-1 rounded">IT Asset Dashboard</code></li>
               </ul>
               
@@ -166,7 +166,7 @@ const Dashboard = () => {
 // Grafana Panel Component
 const GrafanaPanel = ({ grafanaUrl, panelId, title, height, timeRange, fullWidth, expanded, onToggleExpand }) => {
   const panelHeight = expanded ? height * 1.5 : height;
-  const panelUrl = `${grafanaUrl}/d-solo/it-assets/it-asset-dashboard?orgId=1&${timeRange}&timezone=browser&panelId=${panelId}&theme=light`;
+  const panelUrl = `${grafanaUrl}/d-solo/adgfqcl/it-asset-dashboard?orgId=1&${timeRange}&timezone=browser&panelId=${panelId}&theme=light`;
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
