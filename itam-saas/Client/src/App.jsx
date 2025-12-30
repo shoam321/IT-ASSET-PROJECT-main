@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, Monitor, Laptop, Server, Router, Cable, Printer, Smartphone, Tablet, MonitorSpeaker, Keyboard, Mouse, Zap, Headphones, Usb, Container, Wifi, Cloud, Box, BarChart3 } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, Monitor, Laptop, Server, Router, Cable, Printer, Smartphone, Tablet, MonitorSpeaker, Keyboard, Mouse, Zap, Headphones, Usb, Container, Wifi, Cloud, Box, BarChart3, CreditCard } from 'lucide-react';
 import * as dbService from './services/db';
 import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from './config/assetCategories';
 import { useAuth } from './context/AuthContext';
@@ -17,6 +17,7 @@ import StockOverview from './components/StockOverview';
 import Consumables from './components/Consumables';
 import CategoryIcon from './components/CategoryIcon';
 import Dashboard from './components/Dashboard';
+import PayPalCheckout from './components/PayPalCheckout';
 import { downloadCsv } from './utils/csvExport';
 
 // Helper function to format dates in a user-friendly way
@@ -2010,6 +2011,8 @@ export default function App() {
         return <NetworkTopology />;
       case 'stock':
         return <StockOverview />;
+      case 'payments':
+        return <PayPalCheckout />;
       case 'audit':
         return <AuditTrail />;
       default:
@@ -2288,6 +2291,18 @@ export default function App() {
               <span>Audit Trail</span>
             </button>
           )}
+
+          <button
+            onClick={() => { setCurrentScreen('payments'); setShowForm(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+              currentScreen === 'payments' 
+                ? 'bg-blue-600 text-white' 
+                : 'text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            <CreditCard className="w-5 h-5" />
+            <span>Payments</span>
+          </button>
         </nav>
 
         {/* User Info & Logout */}
