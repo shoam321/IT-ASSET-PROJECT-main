@@ -74,7 +74,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as \"Total Assets\" FROM assets;",
+          "rawSql": "SELECT COUNT(*) as value FROM assets;",
           "refId": "A"
         }
       ],
@@ -133,7 +133,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as \"Total Users\" FROM auth_users WHERE is_active = true;",
+          "rawSql": "SELECT COUNT(*) as value FROM auth_users WHERE is_active = true;",
           "refId": "A"
         }
       ],
@@ -192,7 +192,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as \"Total Licenses\" FROM licenses;",
+          "rawSql": "SELECT COUNT(*) as value FROM licenses;",
           "refId": "A"
         }
       ],
@@ -259,7 +259,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as \"Low Stock Alert\" FROM consumables WHERE quantity <= min_quantity;",
+          "rawSql": "SELECT COUNT(*) as value FROM consumables WHERE quantity <= min_quantity;",,
           "refId": "A"
         }
       ],
@@ -314,7 +314,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(category, 'Uncategorized') as category, COUNT(*) as count FROM assets GROUP BY category ORDER BY count DESC LIMIT 10;",
+          "rawSql": "SELECT COALESCE(category, 'Uncategorized') as category, COUNT(*) as value FROM assets GROUP BY category ORDER BY value DESC LIMIT 10;",,
           "refId": "A"
         }
       ],
@@ -401,7 +401,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COALESCE(status, 'Unknown') as status, COUNT(*) as count FROM assets GROUP BY status ORDER BY count DESC;",
+          "rawSql": "SELECT COALESCE(status, 'Unknown') as status, COUNT(*) as value FROM assets GROUP BY status ORDER BY value DESC;",,
           "refId": "A"
         }
       ],
@@ -464,7 +464,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT name, quantity, min_quantity as \"Minimum Stock\", (min_quantity - quantity) as \"Shortage\" FROM consumables WHERE quantity <= min_quantity ORDER BY (min_quantity - quantity) DESC LIMIT 20;",
+          "rawSql": "SELECT name, quantity, min_quantity, (min_quantity - quantity) as shortage FROM consumables WHERE quantity <= min_quantity ORDER BY shortage DESC LIMIT 20;",,
           "refId": "A"
         }
       ],
@@ -527,7 +527,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT asset_tag as \"Asset Tag\", asset_type as \"Type\", manufacturer, status, created_at as \"Added Date\" FROM assets WHERE created_at >= NOW() - INTERVAL '30 days' ORDER BY created_at DESC LIMIT 20;",
+          "rawSql": "SELECT asset_tag, asset_type, manufacturer, status, created_at FROM assets ORDER BY created_at DESC LIMIT 20;",,
           "refId": "A"
         }
       ],
@@ -594,7 +594,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT software_name as \"Software\", license_key as \"License Key\", expiration_date as \"Expiration Date\", CASE WHEN expiration_date < CURRENT_DATE THEN 'Expired' WHEN expiration_date < CURRENT_DATE + INTERVAL '30 days' THEN 'Expiring Soon' ELSE 'Active' END as \"Status\" FROM licenses WHERE expiration_date IS NOT NULL ORDER BY expiration_date ASC LIMIT 20;",
+          "rawSql": "SELECT software_name, license_key, expiration_date, CASE WHEN expiration_date < CURRENT_DATE THEN 'Expired' WHEN expiration_date < CURRENT_DATE + INTERVAL '30 days' THEN 'Expiring Soon' ELSE 'Active' END as license_status FROM licenses WHERE expiration_date IS NOT NULL ORDER BY expiration_date ASC LIMIT 20;",,
           "refId": "A"
         }
       ],
@@ -681,7 +681,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT DATE_TRUNC('day', created_at) as time, COUNT(*) as \"Assets Added\" FROM assets WHERE created_at >= NOW() - INTERVAL '30 days' GROUP BY DATE_TRUNC('day', created_at) ORDER BY time ASC;",
+          "rawSql": "SELECT DATE_TRUNC('day', created_at) as time, COUNT(*) as value FROM assets WHERE created_at >= NOW() - INTERVAL '30 days' GROUP BY DATE_TRUNC('day', created_at) ORDER BY time ASC;",
           "refId": "A"
         }
       ],
