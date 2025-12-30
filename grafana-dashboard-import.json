@@ -133,7 +133,7 @@
           },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as value FROM auth_users WHERE is_active = true;",
+          "rawSql": "SELECT COUNT(*) as value FROM users WHERE is_active = true;",
           "refId": "A"
         }
       ],
@@ -694,7 +694,26 @@
   "schemaVersion": 42,
   "tags": ["it-assets", "monitoring"],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "PostgreSQL",
+          "value": "PostgreSQL"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data Source",
+        "multi": false,
+        "name": "POSTGRES_UID",
+        "options": [],
+        "query": "grafana-postgresql-datasource",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
   },
   "time": {
     "from": "now-30d",
