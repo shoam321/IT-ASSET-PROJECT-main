@@ -33,23 +33,23 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
+    <div className="space-y-6 p-6 bg-slate-900 min-h-screen text-slate-100">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-slate-800 rounded-lg shadow-lg border border-slate-700 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-purple-100 rounded-lg">
-              <BarChart3 className="h-8 w-8 text-purple-600" />
+            <div className="p-3 bg-slate-700 rounded-lg">
+              <BarChart3 className="h-8 w-8 text-blue-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">IT Asset Monitoring Dashboard</h1>
-              <p className="text-sm text-gray-600 mt-1">Real-time analytics powered by Grafana</p>
+              <h1 className="text-2xl font-bold text-white">IT Asset Monitoring Dashboard</h1>
+              <p className="text-sm text-slate-300 mt-1">Real-time analytics powered by Grafana</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={handleRefresh}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh All
@@ -58,7 +58,7 @@ const Dashboard = () => {
               href={GRAFANA_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
               <ExternalLink className="h-4 w-4" />
               Open Grafana
@@ -117,34 +117,34 @@ const Dashboard = () => {
       </div>
 
       {/* Setup Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 shadow-lg">
         <div className="flex items-start gap-3">
-          <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+          <Info className="h-5 w-5 text-blue-400 mt-0.5" />
           <div>
-            <h3 className="text-lg font-semibold text-blue-900 mb-3">Grafana Dashboard Setup Instructions</h3>
-            <div className="text-sm text-blue-800 space-y-2">
+            <h3 className="text-lg font-semibold text-white mb-3">Grafana Dashboard Setup Instructions</h3>
+            <div className="text-sm text-slate-200 space-y-2">
               <p><strong>1. Create Grafana Dashboard:</strong></p>
               <ul className="list-disc ml-5 space-y-1">
-                <li>Login to <a href={GRAFANA_URL} target="_blank" rel="noopener noreferrer" className="underline">Grafana</a></li>
-                <li>Dashboard UID: <code className="bg-blue-100 px-2 py-1 rounded font-mono">adgfqcl</code> (already created)</li>
-                <li>Name: <code className="bg-blue-100 px-2 py-1 rounded">IT Asset Dashboard</code></li>
+                <li>Login to <a href={GRAFANA_URL} target="_blank" rel="noopener noreferrer" className="underline text-blue-300">Grafana</a></li>
+                <li>Dashboard UID: <code className="bg-slate-700 px-2 py-1 rounded font-mono">adgfqcl</code> (already created)</li>
+                <li>Name: <code className="bg-slate-700 px-2 py-1 rounded">IT Asset Dashboard</code></li>
               </ul>
               
               <p className="mt-3"><strong>2. Add Panels (Sample Queries):</strong></p>
               <ul className="list-disc ml-5 space-y-1">
                 <li><strong>Panel 1-4 (Stats):</strong> Total counts for assets, users, licenses, low stock items</li>
-                <li><strong>Panel 5 (Pie):</strong> <code className="bg-blue-100 px-1 rounded font-mono text-xs">SELECT category, COUNT(*) FROM assets GROUP BY category</code></li>
-                <li><strong>Panel 6 (Bar):</strong> <code className="bg-blue-100 px-1 rounded font-mono text-xs">SELECT status, COUNT(*) FROM assets GROUP BY status</code></li>
-                <li><strong>Panel 7 (Table):</strong> <code className="bg-blue-100 px-1 rounded font-mono text-xs">SELECT * FROM consumables WHERE quantity &lt; minimum_stock</code></li>
-                <li><strong>Panel 8 (Table):</strong> <code className="bg-blue-100 px-1 rounded font-mono text-xs">SELECT * FROM assets ORDER BY created_at DESC LIMIT 20</code></li>
+                <li><strong>Panel 5 (Pie):</strong> <code className="bg-slate-700 px-1 rounded font-mono text-xs">SELECT category, COUNT(*) FROM assets GROUP BY category</code></li>
+                <li><strong>Panel 6 (Bar):</strong> <code className="bg-slate-700 px-1 rounded font-mono text-xs">SELECT status, COUNT(*) FROM assets GROUP BY status</code></li>
+                <li><strong>Panel 7 (Table):</strong> <code className="bg-slate-700 px-1 rounded font-mono text-xs">SELECT * FROM consumables WHERE quantity &lt; minimum_stock</code></li>
+                <li><strong>Panel 8 (Table):</strong> <code className="bg-slate-700 px-1 rounded font-mono text-xs">SELECT * FROM assets ORDER BY created_at DESC LIMIT 20</code></li>
               </ul>
 
               <p className="mt-3"><strong>3. Configure Data Source:</strong></p>
               <ul className="list-disc ml-5 space-y-1">
                 <li>Type: PostgreSQL</li>
-                <li>Host: <code className="bg-blue-100 px-1 rounded font-mono text-xs">caboose.proxy.rlwy.net:31886</code></li>
-                <li>Database: <code className="bg-blue-100 px-1 rounded font-mono text-xs">railway</code></li>
-                <li>User: <code className="bg-blue-100 px-1 rounded font-mono text-xs">grafana_reader</code></li>
+                <li>Host: <code className="bg-slate-700 px-1 rounded font-mono text-xs">caboose.proxy.rlwy.net:31886</code></li>
+                <li>Database: <code className="bg-slate-700 px-1 rounded font-mono text-xs">railway</code></li>
+                <li>User: <code className="bg-slate-700 px-1 rounded font-mono text-xs">grafana_reader</code></li>
               </ul>
 
               <p className="mt-3"><strong>4. Enable Public Dashboard:</strong></p>
@@ -152,8 +152,8 @@ const Dashboard = () => {
                 <li>Dashboard Settings → General → Enable "Public Dashboard" for iframe embedding</li>
               </ul>
 
-              <p className="mt-3 text-xs text-blue-700">
-                📚 Detailed queries available in <code className="bg-blue-100 px-1 rounded">GRAFANA_SETUP.md</code>
+              <p className="mt-3 text-xs text-slate-300">
+                📚 Detailed queries available in <code className="bg-slate-700 px-1 rounded">GRAFANA_SETUP.md</code>
               </p>
             </div>
           </div>
@@ -166,21 +166,21 @@ const Dashboard = () => {
 // Grafana Panel Component
 const GrafanaPanel = ({ grafanaUrl, panelId, title, height, timeRange, fullWidth, expanded, onToggleExpand }) => {
   const panelHeight = expanded ? height * 1.5 : height;
-  const panelUrl = `${grafanaUrl}/d-solo/adgfqcl/it-asset-dashboard?orgId=1&${timeRange}&timezone=browser&panelId=${panelId}&theme=light`;
+  const panelUrl = `${grafanaUrl}/d-solo/adgfqcl/it-asset-dashboard?orgId=1&${timeRange}&timezone=browser&panelId=${panelId}&theme=dark`;
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-        <h4 className="text-sm font-semibold text-gray-700">{title}</h4>
+    <div className="bg-slate-800 rounded-lg shadow-lg border border-slate-700 overflow-hidden hover:shadow-xl transition-shadow">
+      <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-4 py-3 border-b border-slate-700 flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-white">{title}</h4>
         <button
           onClick={onToggleExpand}
-          className="text-gray-500 hover:text-gray-700 transition-colors p-1 hover:bg-white rounded"
+          className="text-slate-300 hover:text-white transition-colors p-1 hover:bg-slate-600 rounded"
           title={expanded ? "Collapse panel" : "Expand panel"}
         >
           <Maximize2 className="h-4 w-4" />
         </button>
       </div>
-      <div className="relative bg-white" style={{ height: panelHeight }}>
+      <div className="relative bg-slate-900" style={{ height: panelHeight }}>
         <iframe
           src={panelUrl}
           width="100%"
@@ -192,8 +192,8 @@ const GrafanaPanel = ({ grafanaUrl, panelId, title, height, timeRange, fullWidth
           loading="lazy"
         />
         {/* Fallback message if iframe fails */}
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 -z-10">
-          <div className="text-center text-gray-500">
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-800 -z-10">
+          <div className="text-center text-slate-400">
             <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">Loading panel...</p>
             <p className="text-xs mt-1">Configure Grafana dashboard to view data</p>
