@@ -244,7 +244,17 @@ export default function AuditTrail() {
   }
 
   return (
-    <div className="audit-trail-container" style={{ padding: '20px' }}>
+    <div
+      className="audit-trail-container"
+      style={{
+        padding: '20px',
+        background: '#ffffff',
+        borderRadius: '12px',
+        boxShadow: '0 10px 30px rgba(15, 23, 42, 0.15)',
+        border: '1px solid #e2e8f0',
+        color: '#0f172a'
+      }}
+    >
       <div style={{ marginBottom: '30px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
           <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: 0 }}>
