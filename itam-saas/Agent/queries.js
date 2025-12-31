@@ -6,46 +6,17 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ============ RLS HELPERS ============
+
 /**
  * Set the current user ID for PostgreSQL Row-Level Security (RLS)
-/**
- * Search assets
  */
-export async function searchAssets(query, organizationId = null) {
+export async function setCurrentUserId(userId) {
   try {
-    const searchTerm = `%${query}%`;
-    const hasCategoryColumn = await assetsHasCategoryColumn();
-    const hasOrganizationId = await assetsHasOrganizationIdColumn();
-    const params = [searchTerm];
+    const shouldLogRls = String(process.env.DEBUG_RLS || '').toLowerCase() === 'true';
 
-    let sql = `SELECT * FROM assets WHERE (
-      asset_tag ILIKE $1
-      OR manufacturer ILIKE $1
-      OR model ILIKE $1
-      OR assigned_user_name ILIKE $1`;
-
-    if (hasCategoryColumn) {
-      sql += `
-      OR category ILIKE $1`;
-    }
-
-    sql += `
-    )`;
-
-    if (hasOrganizationId) {
-      sql += ' AND organization_id = $2';
-      params.push(organizationId);
-    }
-
-    sql += ' ORDER BY created_at DESC';
-
-    const result = await pool.query(sql, params);
-    return result.rows;
-  } catch (error) {
-    console.error('Error searching assets:', error);
-    throw error;
-  }
-}
+    if (userId === undefined || userId === null) {
+      console.warn('⚠️ setCurrentUserId called with undefined/null userId, using 0');
       userId = 0;
     }
 
@@ -59,6 +30,45 @@ export async function searchAssets(query, organizationId = null) {
     throw error;
   }
 }
+
+/** Lightweight DB/session diagnostics */
+export async function getDbSessionInfo() {
+  try {
+    const r = await pool.query(
+      "SELECT current_database() AS database, current_user AS \"user\", current_setting('search_path', true) AS search_path"
+    );
+    return r.rows[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Presence checks for consumables tables */
+export async function getConsumablesSchemaDiagnostics() {
+  try {
+    const r = await pool.query(
+      "SELECT to_regclass('public.consumables') AS consumables, to_regclass('public.consumable_transactions') AS consumable_transactions"
+    );
+    return r.rows[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+// ============ GRAFANA DASHBOARD HELPERS ============
+
+export async function listGrafanaDashboards(organizationId, client = pool) {
+  const result = await client.query(
+    'SELECT id, name, description, embed_url, created_by, created_at, updated_at FROM grafana_dashboards WHERE organization_id = $1 ORDER BY created_at DESC',
+    [organizationId]
+  );
+  return result.rows;
+}
+
+export async function createGrafanaDashboard(organizationId, { name, description, embedUrl, createdBy }, client = pool) {
+  const result = await client.query(
+    `INSERT INTO grafana_dashboards (organization_id, name, description, embed_url, created_by)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (organization_id, name)
        DO UPDATE SET description = EXCLUDED.description, embed_url = EXCLUDED.embed_url, updated_at = CURRENT_TIMESTAMP
      RETURNING id, name, description, embed_url, created_by, created_at, updated_at`,
