@@ -13,10 +13,16 @@ const PayPalCheckout = () => {
 
   const apiUrl = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
+  // Debug: Log auth state
+  console.log('PayPal Auth Debug:', { hasUser: !!user, hasToken: !!token, user });
+
   const createOrder = async () => {
+    console.log('CreateOrder called - Auth check:', { hasUser: !!user, hasToken: !!token });
+    
     if (!token || !user) {
       setStatus('error');
       setMessage('Please log in first');
+      console.error('Auth failed - token:', !!token, 'user:', !!user);
       return;
     }
 
