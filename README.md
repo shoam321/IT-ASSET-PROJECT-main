@@ -62,6 +62,23 @@ IT ASSET PROJECT/
 
 - Billing `/api/billing` returning 400 for users not linked to an organization: see [BILLING_ORG_CONTEXT_FIX.md](BILLING_ORG_CONTEXT_FIX.md)
 
+## Operating the SaaS (Hosted)
+
+Use this when you run the product as a hosted SaaS (recommended for distribution) with a custom domain and managed infra.
+
+- Domains: point a custom app domain (for example, `app.example.com`) to Vercel for the React frontend, and an API domain (for example, `api.example.com`) to Railway for the Agent backend. Enable HTTPS on both.
+- Frontend env (Vercel build-time):
+  - `REACT_APP_API_URL=https://api.example.com/api`
+  - `REACT_APP_PAYPAL_CLIENT_ID=<your-live-client-id>`
+  - `REACT_APP_PAYPAL_REGULAR_PLAN_ID=<P-... live plan id>`
+- Backend env (Railway runtime):
+  - `DATABASE_URL` for the managed Postgres instance
+  - `JWT_SECRET` for auth
+  - `PAYPAL_REGULAR_PLAN_ID=<P-... live plan id>` (must match the frontend)
+- CI/CD: protect `main`, merge via PR, and auto-deploy to Vercel (frontend) and Railway (backend) on merge. Keep a staging environment (staging domains + staging PayPal plan) for smoke tests before production.
+- Billing flow: users must belong to an organization. If no org exists, `/api/billing` returns `needsOrganization=true` and the UI hides the PayPal button until the user creates/joins an org.
+- PayPal setup: create a live Subscription Plan in PayPal, copy the `P-...` ID into both frontend and backend envs, then redeploy frontend so the build picks up the new plan.
+
 ## Self-Hosting Guide
 
 ### Prerequisites
