@@ -21,10 +21,10 @@ const PayPalCheckout = () => {
     
     if (!token || !user) {
       setStatus('error');
-      setMessage('Please log in first');
-      console.error('Auth failed - token:', !!token, 'user:', !!user);
-      return;
-    }
+      const [status, setStatus] = useState(null);
+      const [message, setMessage] = useState('');
+      const [sdkReady, setSdkReady] = useState(false);
+      const paypalRef = useRef(null);
 
     // Input validation
     const amountNum = parseFloat(amount);
@@ -40,116 +40,21 @@ const PayPalCheckout = () => {
       return;
     }
 
-    if (!['USD', 'EUR', 'GBP', 'ILS'].includes(currency)) {
-      setStatus('error');
-      setMessage('Invalid currency selected');
-      return;
-    }
 
-    setLoading(true);
-    setStatus(null);
-    setMessage('');
-
-    try {
-      const response = await fetch(`${apiUrl}/payments/paypal/order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({
-          amount: amountNum,
-          currency,
-          description: `Payment of ${currency} ${amountNum.toFixed(2)}`
-        })
-      });
 
-      const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create order');
-      }
 
-      setOrderId(data.orderId);
-      setStatus('created');
-      setMessage('Order created! Redirecting to PayPal...');
 
-      // Redirect to PayPal approval
-      if (data.approveUrl) {
-        setTimeout(() => {
-          window.location.href = data.approveUrl;
-        }, 1500);
-      }
-    } catch (error) {
-      setStatus('error');
-      setMessage(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const captureOrder = async () => {
     if (!orderId || !token || !user) {
-      setStatus('error');
-      setMessage('Missing order ID or authentication');
-      return;
     }
-
-    setLoading(true);
-    setStatus(null);
     setMessage('');
-
-    try {
-      const response = await fetch(`${apiUrl}/payments/paypal/capture`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ orderId })
-      });
-
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to capture payment');
-      }
-
-      setStatus('success');
-      setMessage(`Payment successful! Capture ID: ${data.captureId}`);
-      setOrderId(null);
       setAmount('10.00');
-    } catch (error) {
-      setStatus('error');
-      setMessage(error.message);
     } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="max-w-md mx-auto p-6 bg-slate-700 border border-slate-600 rounded-lg shadow-lg">
-      <div className="flex items-center gap-2 mb-6">
-        <CreditCard className="w-6 h-6 text-blue-400" />
-        <h2 className="text-2xl font-bold text-white">PayPal Checkout</h2>
       </div>
-
       {!user && (
-        <div className="mb-4 p-4 rounded-lg bg-yellow-900 bg-opacity-30 border border-yellow-700">
-          <p className="text-yellow-200 text-sm">⚠️ You must be logged in to make payments</p>
-        </div>
       )}
-
-      {status && (
-        <div className={`mb-4 p-4 rounded-lg flex items-start gap-3 ${
-          status === 'success' ? 'bg-green-900 bg-opacity-30 border border-green-700' :
-          status === 'error' ? 'bg-red-900 bg-opacity-30 border border-red-700' :
-          'bg-blue-900 bg-opacity-30 border border-blue-700'
-        }`}>
-          {status === 'success' && <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />}
-          {status === 'error' && <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />}
-          {status === 'created' && <Loader className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5 animate-spin" />}
-          <p className={`text-sm font-medium ${
             status === 'success' ? 'text-green-200' :
             status === 'error' ? 'text-red-200' :
             'text-blue-200'
