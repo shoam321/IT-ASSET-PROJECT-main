@@ -377,9 +377,16 @@ app.use((req, res, next) => {
 const FRONTEND_BASE_URL = process.env.FRONTEND_URL || 'https://it-asset-project.vercel.app';
 const paypalCurrencySet = new Set((paypalCurrencies || []).map(c => c.toUpperCase()));
 
-// Ensure multi-tenant org schema exists (idempotent, safe for reruns)
+// Ensure multi-tenant org schema exists (idempotent). Uses DATABASE_OWNER_URL when available.
 async function ensureOrgSchema() {
-  await db.withSystemContext(async (client) => {
+  // Lazy-load pg here to avoid import cycles.
+  const { Pool } = await import('pg');
+  const ownerDsn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
+  if (!ownerDsn) throw new Error('DATABASE_URL not configured');
+
+  const ownerPool = new Pool({ connectionString: ownerDsn, ssl: ownerDsn.includes('railway') ? { rejectUnauthorized: false } : false });
+  const client = await ownerPool.connect();
+  try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS organizations (
         id SERIAL PRIMARY KEY,
@@ -405,7 +412,10 @@ async function ensureOrgSchema() {
     await client.query(
       'CREATE INDEX IF NOT EXISTS idx_auth_users_organization_id ON auth_users(organization_id)'
     );
-  });
+  } finally {
+    client.release();
+    await ownerPool.end();
+  }
 }
 
 function toCents(amount) {
@@ -433,7 +443,8 @@ async function startServer() {
         await ensureOrgSchema();
       } catch (schemaError) {
         console.error('❌ Failed to ensure org schema:', schemaError.message);
-        throw schemaError;
+        console.error('ℹ️ If this is a permission issue, run itam-saas/Agent/run-org-migration.js with DATABASE_OWNER_URL set to a schema owner.');
+        // Do not rethrow; continue startup so existing endpoints remain available.
       }
       
       // Initialize alert service after database is ready
@@ -724,6 +735,11 @@ app.post('/api/organizations/bootstrap', authenticateToken, [
       if (error?.constraint === 'organizations_domain_key') {
         return res.status(409).json({ error: 'An organization with this domain already exists' });
       }
+    }
+    if (error?.code === '42703' && msg.includes('organization_id')) {
+      return res.status(500).json({
+        error: 'Organization schema not installed. Run run-org-migration.js with DATABASE_OWNER_URL (schema owner) or rerun with proper privileges.'
+      });
     }
     console.error('Organization bootstrap error:', error);
     return res.status(500).json({ error: msg });
