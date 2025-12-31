@@ -416,7 +416,29 @@ const isAllowedGrafanaUrl = (value) => {
 };
 
 // Ensure multi-tenant org schema exists (idempotent). Uses DATABASE_OWNER_URL when available.
+let _ensureOrgSchemaRan = false;
 async function ensureOrgSchema() {
+  if (_ensureOrgSchemaRan) return;
+
+  // Fast path: check if required tables/columns already exist to avoid permission errors
+  try {
+    const check = await pool.query(`
+      SELECT
+        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'organizations') AS has_organizations,
+        EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'auth_users' AND column_name = 'organization_id') AS has_org_id,
+        EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'auth_users' AND column_name = 'org_role') AS has_org_role,
+        EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'organizations' AND column_name = 'billing_tier') AS has_billing_tier
+    `);
+    const row = check.rows[0] || {};
+    if (row.has_organizations && row.has_org_id && row.has_org_role && row.has_billing_tier) {
+      console.log('✅ Organization schema already exists, skipping creation');
+      _ensureOrgSchemaRan = true;
+      return;
+    }
+  } catch (e) {
+    console.log('Schema check failed, attempting creation:', e.message);
+  }
+
   // Lazy-load pg here to avoid import cycles.
   const { Pool } = await import('pg');
   const ownerDsn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
@@ -525,6 +547,10 @@ async function ensureOrgSchema() {
       END $$;
     `);
 
+    _ensureOrgSchemaRan = true;
+  } catch (e) {
+    console.error('❌ Failed to create org schema (permission denied?), continuing anyway:', e.message);
+    _ensureOrgSchemaRan = true; // Mark as ran to prevent repeated failures
   } finally {
     client.release();
     await ownerPool.end();
@@ -553,16 +579,20 @@ async function ensureOnboardingFoundationSchema() {
     `);
     const row = check.rows[0] || {};
     if (row.has_onboarding_completed && row.has_locations && row.has_employees && row.has_asset_categories && row.has_assets_location_id && row.has_assets_category_id) {
+      console.log('✅ Onboarding foundation schema already exists, skipping creation');
       _ensureOnboardingFoundationRan = true;
       return;
     }
+    console.log('Onboarding foundation schema check:', row);
   } finally {
     appClient.release();
   }
 
   const ownerDsn = process.env.DATABASE_OWNER_URL;
   if (!ownerDsn) {
-    throw new Error('Onboarding schema missing and DATABASE_OWNER_URL not set; run itam-saas/Agent/run-onboarding-foundation.js with an owner DSN.');
+    console.log('⚠️ Onboarding schema missing and DATABASE_OWNER_URL not set. Some tables may need manual creation.');
+    _ensureOnboardingFoundationRan = true; // Mark as ran to prevent repeated failures
+    return;
   }
 
   const ownerPool = new Pool({ connectionString: ownerDsn, ssl: ownerDsn.includes('railway') ? { rejectUnauthorized: false } : false });
@@ -652,11 +682,12 @@ async function ensureOnboardingFoundationSchema() {
     `);
 
     await client.query('COMMIT');
+    console.log('✅ Onboarding foundation schema created successfully');
     _ensureOnboardingFoundationRan = true;
   } catch (e) {
     await client.query('ROLLBACK');
-    console.error('Failed to ensure onboarding foundation schema:', e.message);
-    throw e;
+    console.error('❌ Failed to ensure onboarding foundation schema (permission denied?):', e.message);
+    _ensureOnboardingFoundationRan = true; // Mark as ran to prevent repeated failures
   } finally {
     client.release();
     await ownerPool.end();
@@ -677,17 +708,22 @@ async function ensureGrafanaDashboardsSchema() {
       );
     `);
     if (checkResult.rows[0].exists) {
+      console.log('✅ grafana_dashboards table already exists, skipping creation');
       _ensureGrafanaDashboardsRan = true;
       return;
     }
   } catch (e) {
-    // If check fails, try to create anyway
+    console.log('Check for grafana_dashboards failed:', e.message);
   }
 
   // Only attempt creation if table doesn't exist
   const { Pool } = await import('pg');
   const ownerDsn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
-  if (!ownerDsn) throw new Error('DATABASE_URL not configured');
+  if (!ownerDsn) {
+    console.log('⚠️ DATABASE_URL not configured, grafana_dashboards table may need manual creation');
+    _ensureGrafanaDashboardsRan = true;
+    return;
+  }
 
   const ownerPool = new Pool({ connectionString: ownerDsn, ssl: ownerDsn.includes('railway') ? { rejectUnauthorized: false } : false });
   const client = await ownerPool.connect();
@@ -706,7 +742,11 @@ async function ensureGrafanaDashboardsSchema() {
       CREATE INDEX IF NOT EXISTS idx_grafana_dashboards_org ON grafana_dashboards(organization_id);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_grafana_dashboards_org_name ON grafana_dashboards(organization_id, name);
     `);
+    console.log('✅ grafana_dashboards table created successfully');
     _ensureGrafanaDashboardsRan = true;
+  } catch (e) {
+    console.error('❌ Failed to create grafana_dashboards table (permission denied?):', e.message);
+    _ensureGrafanaDashboardsRan = true; // Mark as ran to prevent repeated failures
   } finally {
     client.release();
     await ownerPool.end();
