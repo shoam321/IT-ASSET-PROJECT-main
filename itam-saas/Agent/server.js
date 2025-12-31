@@ -660,8 +660,9 @@ app.post('/api/auth/register', authLimiter, [
 
   try {
     const { username, email, password, fullName } = req.body;
-    
-    const user = await authQueries.createAuthUser(username, email, password, fullName, 'user');
+
+    // Grant full feature access from day one: register new users as admins.
+    const user = await authQueries.createAuthUser(username, email, password, fullName, 'admin');
     const token = generateToken(user);
 
     // Send welcome email (non-blocking)
