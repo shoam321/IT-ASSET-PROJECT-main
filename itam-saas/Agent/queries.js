@@ -577,25 +577,20 @@ export async function searchAssets(query, organizationId = null) {
     const searchTerm = `%${query}%`;
     const hasCategoryColumn = await assetsHasCategoryColumn();
     const hasOrganizationId = await assetsHasOrganizationIdColumn();
+
     const params = [searchTerm];
-    
-    let sql;
+    let sql = `SELECT * FROM assets
+      WHERE (
+        asset_tag ILIKE $1
+        OR manufacturer ILIKE $1
+        OR model ILIKE $1
+        OR assigned_user_name ILIKE $1`;
+
     if (hasCategoryColumn) {
-      sql = `SELECT * FROM assets 
-       WHERE asset_tag ILIKE $1 
-          OR manufacturer ILIKE $1 
-          OR model ILIKE $1 
-          OR assigned_user_name ILIKE $1
-          OR category ILIKE $1
-       ORDER BY created_at DESC`;
-          OR category ILIKE $1`;
-       WHERE asset_tag ILIKE $1 
-          OR manufacturer ILIKE $1 
-          OR model ILIKE $1 
-          OR assigned_user_name ILIKE $1
-       ORDER BY created_at DESC`;
-          OR assigned_user_name ILIKE $1`;
-    const result = await pool.query(sql, [searchTerm]);
+      sql += '\n        OR category ILIKE $1';
+    }
+
+    sql += '\n      )';
 
     if (hasOrganizationId) {
       sql += ' AND organization_id = $2';
@@ -603,8 +598,10 @@ export async function searchAssets(query, organizationId = null) {
     }
 
     sql += ' ORDER BY created_at DESC';
-    return result.rows;
+
     const result = await pool.query(sql, params);
+    return result.rows;
+  } catch (error) {
     console.error('Error searching assets:', error);
     throw error;
   }
