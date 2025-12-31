@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { CreditCard, AlertCircle, CheckCircle, Loader } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const PayPalCheckout = () => {
+  const { user } = useAuth();
   const [amount, setAmount] = useState('10.00');
   const [currency, setCurrency] = useState('USD');
   const [loading, setLoading] = useState(false);
@@ -10,10 +12,11 @@ const PayPalCheckout = () => {
   const [orderId, setOrderId] = useState(null);
 
   const apiUrl = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
-  const token = localStorage.getItem('token');
 
   const createOrder = async () => {
-    if (!token) {
+    const token = localStorage.getItem('token');
+    
+    if (!token || !user) {
       setStatus('error');
       setMessage('Please log in first');
       return;
@@ -82,7 +85,9 @@ const PayPalCheckout = () => {
   };
 
   const captureOrder = async () => {
-    if (!orderId || !token) {
+    const token = localStorage.getItem('token');
+    
+    if (!orderId || !token || !user) {
       setStatus('error');
       setMessage('Missing order ID or authentication');
       return;
@@ -126,6 +131,12 @@ const PayPalCheckout = () => {
         <CreditCard className="w-6 h-6 text-blue-400" />
         <h2 className="text-2xl font-bold text-white">PayPal Checkout</h2>
       </div>
+
+      {!user && (
+        <div className="mb-4 p-4 rounded-lg bg-yellow-900 bg-opacity-30 border border-yellow-700">
+          <p className="text-yellow-200 text-sm">⚠️ You must be logged in to make payments</p>
+        </div>
+      )}
 
       {status && (
         <div className={`mb-4 p-4 rounded-lg flex items-start gap-3 ${
@@ -177,16 +188,16 @@ const PayPalCheckout = () => {
         {!orderId ? (
           <button
             onClick={createOrder}
-            disabled={loading}
+            disabled={loading || !user}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-500 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2"
           >
             {loading ? <Loader className="w-5 h-5 animate-spin" /> : <CreditCard className="w-5 h-5" />}
-            {loading ? 'Creating Order...' : 'Pay with PayPal'}
+            {loading ? 'Creating Order...' : !user ? 'Login Required' : 'Pay with PayPal'}
           </button>
         ) : (
           <button
             onClick={captureOrder}
-            disabled={loading}
+            disabled={loading || !user}
             className="w-full bg-green-600 hover:bg-green-700 disabled:bg-slate-500 text-white font-semibold py-3 rounded-lg transition flex items-center justify-center gap-2"
           >
             {loading ? <Loader className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
