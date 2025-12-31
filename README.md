@@ -58,6 +58,10 @@ IT ASSET PROJECT/
 │       └── .env
 ```
 
+## Notes & Troubleshooting
+
+- Billing `/api/billing` returning 400 for users not linked to an organization: see [BILLING_ORG_CONTEXT_FIX.md](BILLING_ORG_CONTEXT_FIX.md)
+
 ## Self-Hosting Guide
 
 ### Prerequisites
