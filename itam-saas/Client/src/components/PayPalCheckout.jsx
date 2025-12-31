@@ -7,6 +7,14 @@ const PayPalCheckout = () => {
   const effectiveToken = token || localStorage.getItem('authToken');
   const [amount, setAmount] = useState('10.00');
   const [currency, setCurrency] = useState('USD');
+  const defaultBuyerCountryForCurrency = (cur) => {
+    const upper = (cur || '').toUpperCase();
+    if (upper === 'ILS') return 'IL';
+    if (upper === 'GBP') return 'GB';
+    if (upper === 'EUR') return 'DE';
+    return 'US';
+  };
+  const [buyerCountry, setBuyerCountry] = useState(defaultBuyerCountryForCurrency('USD'));
   const [status, setStatus] = useState(null);
   const [message, setMessage] = useState('');
   const [sdkReady, setSdkReady] = useState(false);
@@ -27,7 +35,8 @@ const PayPalCheckout = () => {
     const existing = document.querySelector('script[data-paypal-sdk]');
     if (existing) {
       const existingCurrency = existing.getAttribute('data-paypal-currency');
-      if (existingCurrency === currency) {
+      const existingBuyerCountry = existing.getAttribute('data-paypal-buyer-country');
+      if (existingCurrency === currency && existingBuyerCountry === buyerCountry) {
         setSdkReady(true);
         return undefined;
       }
@@ -38,11 +47,13 @@ const PayPalCheckout = () => {
     const script = document.createElement('script');
     // Be explicit about components/locale to avoid PayPal loading extra experiences (e.g. fastlane/card-fields)
     // and to reduce noisy console warnings in some locales.
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons&intent=capture&locale=en_US`;
+    // NOTE: `buyer-country` drives the checkout experience (including phone/country code handling).
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons&intent=capture&buyer-country=${buyerCountry}`;
     script.type = 'text/javascript';
     script.async = true;
     script.setAttribute('data-paypal-sdk', 'true');
     script.setAttribute('data-paypal-currency', currency);
+    script.setAttribute('data-paypal-buyer-country', buyerCountry);
     script.onload = () => setSdkReady(true);
     script.onerror = () => {
       setStatus('error');
@@ -53,7 +64,7 @@ const PayPalCheckout = () => {
     return () => {
       script.remove();
     };
-  }, [effectiveToken, currency, clientId]);
+  }, [effectiveToken, currency, buyerCountry, clientId]);
 
   useEffect(() => {
     if (!sdkReady || !window.paypal || !paypalRef.current || !effectiveToken) return;
@@ -169,7 +180,11 @@ const PayPalCheckout = () => {
             />
             <select
               value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
+              onChange={(e) => {
+                const nextCurrency = e.target.value;
+                setCurrency(nextCurrency);
+                setBuyerCountry(defaultBuyerCountryForCurrency(nextCurrency));
+              }}
               disabled={!effectiveToken}
               className="px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
             >
@@ -179,6 +194,21 @@ const PayPalCheckout = () => {
               <option value="ILS">ILS</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-200 mb-2">Buyer Country (phone code)</label>
+          <select
+            value={buyerCountry}
+            onChange={(e) => setBuyerCountry(e.target.value)}
+            disabled={!effectiveToken}
+            className="w-full px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+          >
+            <option value="US">United States (+1)</option>
+            <option value="IL">Israel (+972)</option>
+            <option value="GB">United Kingdom (+44)</option>
+            <option value="DE">Germany (+49)</option>
+          </select>
         </div>
 
         <div ref={paypalRef} className="min-h-[150px]"></div>
