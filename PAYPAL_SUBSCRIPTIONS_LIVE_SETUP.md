@@ -19,6 +19,11 @@ Set:
 - `REACT_APP_PAYPAL_CLIENT_ID` = your PayPal **Client ID**
 - `REACT_APP_PAYPAL_REGULAR_PLAN_ID` = your PayPal **Plan ID** (e.g. `P-...`)
 
+Notes:
+- For Create React App, `REACT_APP_*` variables are **build-time**. After changing them in Vercel, trigger a **new deployment**.
+- Ensure you set variables for the correct Vercel environments (at minimum **Production**, and usually **Preview**).
+- If the Billing page shows `Missing REACT_APP_PAYPAL_REGULAR_PLAN_ID`, Vercel does not currently have that variable set for the deployed build.
+
 ### Backend (Railway)
 Set:
 - `PAYPAL_MODE=live`
