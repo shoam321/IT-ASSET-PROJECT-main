@@ -3,7 +3,7 @@ import { CreditCard, AlertCircle, CheckCircle, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const PayPalCheckout = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [amount, setAmount] = useState('10.00');
   const [currency, setCurrency] = useState('USD');
   const [loading, setLoading] = useState(false);
@@ -14,8 +14,6 @@ const PayPalCheckout = () => {
   const apiUrl = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
   const createOrder = async () => {
-    const token = localStorage.getItem('token');
-    
     if (!token || !user) {
       setStatus('error');
       setMessage('Please log in first');
@@ -85,8 +83,6 @@ const PayPalCheckout = () => {
   };
 
   const captureOrder = async () => {
-    const token = localStorage.getItem('token');
-    
     if (!orderId || !token || !user) {
       setStatus('error');
       setMessage('Missing order ID or authentication');
