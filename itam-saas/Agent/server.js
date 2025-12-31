@@ -423,8 +423,34 @@ let _ensureOnboardingFoundationRan = false;
 async function ensureOnboardingFoundationSchema() {
   if (_ensureOnboardingFoundationRan) return;
   const { Pool } = await import('pg');
-  const ownerDsn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
-  if (!ownerDsn) throw new Error('DATABASE_URL not configured');
+  // Fast path: if the schema is already present, skip owner operations (avoid permission errors on app DSN)
+  const appClient = await pool.connect();
+  try {
+    const check = await appClient.query(`
+      SELECT
+        EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'auth_users' AND column_name = 'onboarding_completed'
+        ) AS has_onboarding_completed,
+        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'locations') AS has_locations,
+        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'employees') AS has_employees,
+        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'asset_categories') AS has_asset_categories,
+        EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'assets' AND column_name = 'location_id') AS has_assets_location_id,
+        EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'assets' AND column_name = 'category_id') AS has_assets_category_id
+    `);
+    const row = check.rows[0] || {};
+    if (row.has_onboarding_completed && row.has_locations && row.has_employees && row.has_asset_categories && row.has_assets_location_id && row.has_assets_category_id) {
+      _ensureOnboardingFoundationRan = true;
+      return;
+    }
+  } finally {
+    appClient.release();
+  }
+
+  const ownerDsn = process.env.DATABASE_OWNER_URL;
+  if (!ownerDsn) {
+    throw new Error('Onboarding schema missing and DATABASE_OWNER_URL not set; run itam-saas/Agent/run-onboarding-foundation.js with an owner DSN.');
+  }
 
   const ownerPool = new Pool({ connectionString: ownerDsn, ssl: ownerDsn.includes('railway') ? { rejectUnauthorized: false } : false });
   const client = await ownerPool.connect();
@@ -505,6 +531,7 @@ async function ensureOnboardingFoundationSchema() {
     throw e;
   } finally {
     client.release();
+    await ownerPool.end();
   }
 }
 
