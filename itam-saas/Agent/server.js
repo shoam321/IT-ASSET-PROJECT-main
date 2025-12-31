@@ -665,8 +665,8 @@ app.post('/api/organizations/bootstrap', authenticateToken, [
 
     // IMPORTANT: use system context so we can create/assign even when user has no org yet.
     // This endpoint is still protected by JWT and only affects the current user.
-    const org = await db.withSystemContext(async () => {
-      return await authQueries.createOrganizationForExistingUser(userId, req.body.name, req.body.domain || null);
+    const org = await db.withSystemContext(async (client) => {
+      return await authQueries.createOrganizationForExistingUser(userId, req.body.name, req.body.domain || null, client);
     });
 
     const updatedUser = await authQueries.findUserById(userId);

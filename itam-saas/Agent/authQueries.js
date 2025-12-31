@@ -256,15 +256,20 @@ export async function ensureDefaultAdmin() {
  * - Only allowed when the user currently has organization_id IS NULL.
  * - Does NOT change the user's global role (admin/user).
  */
-export async function createOrganizationForExistingUser(userId, orgName, orgDomain = null) {
+export async function createOrganizationForExistingUser(userId, orgName, orgDomain = null, client = null) {
   if (!userId) throw new Error('userId is required');
   if (!orgName || !String(orgName).trim()) throw new Error('orgName is required');
 
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
+  const externalClient = client;
+  const localClient = externalClient ? null : await pool.connect();
+  const c = externalClient || localClient;
 
-    const userRes = await client.query(
+  try {
+    if (!externalClient) {
+      await c.query('BEGIN');
+    }
+
+    const userRes = await c.query(
       'SELECT id, organization_id FROM auth_users WHERE id = $1 FOR UPDATE',
       [userId]
     );
@@ -272,7 +277,7 @@ export async function createOrganizationForExistingUser(userId, orgName, orgDoma
     if (!user) throw new Error('User not found');
     if (user.organization_id) throw new Error('User is already assigned to an organization');
 
-    const orgRes = await client.query(
+    const orgRes = await c.query(
       `INSERT INTO organizations (name, domain)
        VALUES ($1, $2)
        RETURNING id, name, domain, plan, created_at`,
@@ -281,19 +286,26 @@ export async function createOrganizationForExistingUser(userId, orgName, orgDoma
 
     const organizationId = orgRes.rows[0].id;
 
-    await client.query(
+    await c.query(
       `UPDATE auth_users
        SET organization_id = $2, org_role = 'owner'
        WHERE id = $1 AND organization_id IS NULL`,
       [userId, organizationId]
     );
 
-    await client.query('COMMIT');
+    if (!externalClient) {
+      await c.query('COMMIT');
+    }
+
     return orgRes.rows[0];
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (!externalClient) {
+      await c.query('ROLLBACK');
+    }
     throw error;
   } finally {
-    client.release();
+    if (localClient) {
+      localClient.release();
+    }
   }
 }
