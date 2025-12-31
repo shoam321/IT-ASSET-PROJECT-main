@@ -16,6 +16,7 @@ const Billing = () => {
   const [billing, setBilling] = useState(null);
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState('');
+  const [needsOrganization, setNeedsOrganization] = useState(false);
 
   const [sdkReady, setSdkReady] = useState(false);
   const paypalRef = useRef(null);
@@ -23,13 +24,15 @@ const Billing = () => {
   const canSubscribe = useMemo(() => {
     if (!effectiveToken) return false;
     if (!clientId || !regularPlanId) return false;
+    if (needsOrganization) return false;
     return true;
-  }, [effectiveToken, clientId, regularPlanId]);
+  }, [effectiveToken, clientId, regularPlanId, needsOrganization]);
 
   const fetchBilling = useCallback(async () => {
     if (!effectiveToken) return;
     setBillingLoading(true);
     setBillingError('');
+    setNeedsOrganization(false);
     try {
       const response = await fetch(`${apiUrl}/billing`, {
         headers: {
@@ -37,7 +40,20 @@ const Billing = () => {
         }
       });
       const data = await response.json();
+
+      if (response.ok && data?.needsOrganization) {
+        setNeedsOrganization(true);
+        setBilling(null);
+        return;
+      }
+
       if (!response.ok) {
+        // Backwards-compatible handling if the server responds with 400 for missing organization.
+        if (String(data?.error || '').toLowerCase().includes('not assigned to an organization')) {
+          setNeedsOrganization(true);
+          setBilling(null);
+          return;
+        }
         setBillingError(data?.error || 'Failed to load billing');
         setBilling(null);
         return;
@@ -193,6 +209,11 @@ const Billing = () => {
 
           {billingLoading && <div className="text-xs text-slate-400">Loading billing…</div>}
           {billingError && <div className="text-xs text-red-300">{billingError}</div>}
+          {needsOrganization && (
+            <div className="text-xs text-yellow-200">
+              Your account is not linked to an organization yet. Create or join an organization to manage billing.
+            </div>
+          )}
 
           {tier === 'enterprise' && (
             <div className="text-sm text-slate-200">Your company is on Enterprise.</div>
@@ -207,7 +228,11 @@ const Billing = () => {
               {!regularPlanId && (
                 <div className="text-xs text-red-300 mb-2">Missing `REACT_APP_PAYPAL_REGULAR_PLAN_ID`.</div>
               )}
-              <div ref={paypalRef} className="min-h-[120px]"></div>
+              {!needsOrganization ? (
+                <div ref={paypalRef} className="min-h-[120px]"></div>
+              ) : (
+                <div className="text-xs text-slate-300">Subscription options will appear after organization setup.</div>
+              )}
             </div>
           )}
         </div>

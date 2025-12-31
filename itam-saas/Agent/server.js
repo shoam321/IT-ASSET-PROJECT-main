@@ -2246,9 +2246,19 @@ app.post('/api/payments/paypal/webhook', async (req, res) => {
 app.get('/api/billing', authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.userId ?? req.user?.id;
-    const organizationId = req.user?.organizationId || null;
+    let organizationId = req.user?.organizationId || null;
     if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
-    if (!organizationId) return res.status(400).json({ error: 'User is not assigned to an organization' });
+
+    // Prefer token claim, but fall back to DB for backwards compatibility and post-bootstrap tokens.
+    if (!organizationId) {
+      const dbUser = await authQueries.findUserById(userId);
+      organizationId = dbUser?.organization_id || null;
+    }
+
+    // Not an error state for the client UI; user simply needs to bootstrap an organization.
+    if (!organizationId) {
+      return res.json({ billing: null, needsOrganization: true });
+    }
 
     await db.setCurrentUserId(userId);
     const billing = await db.getOrganizationBilling(organizationId);
@@ -2273,9 +2283,19 @@ app.post('/api/billing/paypal/subscription/approve', paymentLimiter, authenticat
 
   try {
     const userId = req.user?.userId ?? req.user?.id;
-    const organizationId = req.user?.organizationId || null;
+    let organizationId = req.user?.organizationId || null;
     if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
-    if (!organizationId) return res.status(400).json({ error: 'User is not assigned to an organization' });
+
+    if (!organizationId) {
+      const dbUser = await authQueries.findUserById(userId);
+      organizationId = dbUser?.organization_id || null;
+    }
+
+    if (!organizationId) {
+      return res.status(409).json({
+        error: 'You must create or join an organization before subscribing.'
+      });
+    }
 
     // Defense-in-depth: verify org_role in DB (don’t trust JWT claim alone)
     const dbUser = await authQueries.findUserById(userId);
