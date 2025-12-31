@@ -232,6 +232,17 @@ app.use(cors({
   maxAge: 86400 // 24 hours
 }));
 
+// Ensure allowed origins always receive the CORS headers (including error responses)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app'))) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Vary', 'Origin');
+  }
+  next();
+});
+
 // Apply general rate limiting to all API routes
 app.use('/api/', apiLimiter);
 
