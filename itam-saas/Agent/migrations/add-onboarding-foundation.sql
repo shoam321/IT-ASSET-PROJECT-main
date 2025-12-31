@@ -45,6 +45,15 @@ ALTER TABLE assets ADD COLUMN IF NOT EXISTS location_id INTEGER;
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS category_id INTEGER;
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS location VARCHAR(255);
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS assigned_to INTEGER;
+
+-- Ensure billing columns exist on organizations
+ALTER TABLE organizations
+  ADD COLUMN IF NOT EXISTS billing_tier VARCHAR(50) DEFAULT 'regular',
+  ADD COLUMN IF NOT EXISTS subscription_status VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS paypal_subscription_id VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS subscription_started_at TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS subscription_current_period_end TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS subscription_updated_at TIMESTAMP;
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_assets_location_id') THEN
