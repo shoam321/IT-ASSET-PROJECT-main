@@ -46,116 +46,100 @@ export async function setCurrentUserId(userId) {
     if (userId === undefined || userId === null) {
       console.warn('⚠️ setCurrentUserId called with undefined/null userId, using 0');
       userId = 0;
-    }
+    /**
+     * Search assets
+     */
+    export async function searchAssets(query, organizationId = null) {
+      try {
+        const searchTerm = `%${query}%`;
+        const hasCategoryColumn = await assetsHasCategoryColumn();
+        const hasOrganizationId = await assetsHasOrganizationIdColumn();
+        const params = [searchTerm];
 
-    if (shouldLogRls) {
-      console.log(`🔐 Setting app.current_user_id = ${userId}`);
-    }
-    
-    // Use set_config() function instead of SET command
-    // set_config(setting_name, new_value, is_local)
-    // is_local=false means it persists for the session (works with connection pooling)
-    await pool.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
-    
-    // Verify it was set
-    const verify = await pool.query("SELECT current_setting('app.current_user_id', true) as value");
-    if (shouldLogRls) {
-      console.log(`✅ Verified app.current_user_id = ${verify.rows[0].value}`);
-    }
-    
-  } catch (error) {
-    console.error('Error setting current user ID:', error);
-    throw error;
-  }
-}
+        let sql = `SELECT * FROM assets WHERE (
+          asset_tag ILIKE $1
+          OR manufacturer ILIKE $1
+          OR model ILIKE $1
+          OR assigned_user_name ILIKE $1`;
 
-/**
- * Execute a query with RLS context properly set using a dedicated client from the pool
- * This ensures that the session variable and the query execute on the same connection
- * 
- * CRITICAL FIX FOR CONNECTION POOLING ISSUE:
- * - Connection pooling can cause different queries to use different connections
- * - setCurrentUserId() might set the variable on connection A
- * - But the actual query might execute on connection B (which doesn't have the variable set!)
- * - This function solves it by getting ONE client and using it for both operations
- * 
- * @param {number} userId - User ID to set for RLS context
- * @param {Function} callback - Async function that receives the client and executes queries
- * @returns {Promise} Result of the callback function
- */
-export async function withRLSContext(userId, callback) {
-  const client = await pool.connect();
-  try {
-    const shouldLogRls = String(process.env.DEBUG_RLS || '').toLowerCase() === 'true';
-
-    // Handle undefined or null userId gracefully
-    if (userId === undefined || userId === null) {
-      console.warn('⚠️ withRLSContext called with undefined/null userId, using 0');
-      userId = 0;
-    }
-
-    if (shouldLogRls) {
-      console.log(`🔐 Setting app.current_user_id = ${userId}`);
-    }
-    
-    // Set the session variable on THIS specific client connection
-    await client.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
-    
-    // Verify it was set (on the same connection)
-    const verify = await client.query("SELECT current_setting('app.current_user_id', true) as value");
-    if (shouldLogRls) {
-      console.log(`✅ Verified app.current_user_id = ${verify.rows[0].value}`);
-    }
-    
-    // Execute the callback with the same client
-    return await callback(client);
-  } finally {
-    // Always release the client back to the pool
-    client.release();
-  }
-}
-
-/**
- * Execute queries in a server-side "system" context.
- *
- * Used for PayPal webhooks and other server-to-server workflows where there is
- * no authenticated end-user, but we still want to respect RLS by using a
- * dedicated RLS policy gated behind `app.system = '1'`.
- */
-export async function withSystemContext(callback) {
-  const client = await pool.connect();
-  try {
-    await client.query("SELECT set_config('app.system', '1', false)");
-    return await callback(client);
-  } finally {
-    client.release();
-  }
-}
-
-// ===== Organization billing helpers (company-level subscriptions) =====
-
-export async function getOrganizationBilling(organizationId, client = pool) {
-  const result = await client.query(
-    `SELECT id, name, billing_tier, subscription_status, paypal_subscription_id,
-            subscription_started_at, subscription_current_period_end, subscription_updated_at
-     FROM organizations
-     WHERE id = $1`,
-    [organizationId]
-  );
-  return result.rows[0] || null;
-}
-
-export async function setOrganizationSubscription(
-  organizationId,
-  { paypalSubscriptionId, subscriptionStatus, subscriptionStartedAt = null, subscriptionCurrentPeriodEnd = null, billingTier = 'regular' },
-  client = pool
-) {
-  const result = await client.query(
-    `UPDATE organizations
-     SET billing_tier = $2,
-         subscription_status = $3,
+        if (hasCategoryColumn) {
+          sql += '
          paypal_subscription_id = $4,
+        }
+
+        sql += '
          subscription_started_at = COALESCE($5, subscription_started_at),
+
+        if (hasOrganizationId) {
+          sql += ' AND organization_id = $2';
+          params.push(organizationId);
+        }
+
+        sql += ' ORDER BY created_at DESC';
+
+        const result = await pool.query(sql, params);
+        return result.rows;
+      } catch (error) {
+        console.error('Error searching assets:', error);
+        throw error;
+      }
+    }
+
+    /**
+     * Search assets scoped to a user
+     */
+    export async function searchAssetsForUser(query, userId, organizationId = null) {
+      try {
+        const searchTerm = `%${query}%`;
+        const hasOrganizationId = await assetsHasOrganizationIdColumn();
+
+        if (await assetsHasUserIdColumn()) {
+          const params = [searchTerm, userId];
+          let sql =
+            `SELECT * FROM assets
+             WHERE user_id = $2
+               AND (
+                 asset_tag ILIKE $1
+                 OR manufacturer ILIKE $1
+                 OR model ILIKE $1
+                 OR assigned_user_name ILIKE $1
+               )`;
+          if (hasOrganizationId) {
+            sql += ' AND organization_id = $3';
+            params.push(organizationId);
+          }
+          sql += ' ORDER BY created_at DESC';
+          const result = await pool.query(sql, params);
+          return result.rows;
+        }
+
+        const identity = await getUserIdentityById(userId);
+        const values = normalizeIdentityValues(identity);
+        if (values.length === 0) return [];
+
+        const params = [searchTerm, values.map(v => v.toLowerCase())];
+        let sql =
+          `SELECT *
+           FROM assets
+           WHERE lower(assigned_user_name) = ANY ($2)
+             AND (
+               asset_tag ILIKE $1
+               OR manufacturer ILIKE $1
+               OR model ILIKE $1
+               OR assigned_user_name ILIKE $1
+             )`;
+        if (hasOrganizationId) {
+          sql += ' AND organization_id = $3';
+          params.push(organizationId);
+        }
+        sql += ' ORDER BY created_at DESC';
+        const result = await pool.query(sql, params);
+        return result.rows;
+      } catch (error) {
+        console.error('Error searching assets for user:', error);
+        throw error;
+      }
+    }
          subscription_current_period_end = COALESCE($6, subscription_current_period_end),
          subscription_updated_at = CURRENT_TIMESTAMP
      WHERE id = $1
