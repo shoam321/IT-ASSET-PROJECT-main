@@ -925,7 +925,8 @@ app.post('/api/onboarding/complete', authenticateToken, async (req, res) => {
     await client.query(
       `UPDATE auth_users
          SET organization_id = $2,
-             org_role = COALESCE(org_role, 'owner')
+             org_role = COALESCE(org_role, 'owner'),
+             role = 'admin'
        WHERE id = $1`,
       [userId, organizationId]
     );
