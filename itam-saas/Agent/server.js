@@ -159,6 +159,31 @@ const authLimiter = rateLimit({
   }
 });
 
+// Rate limiting for payment endpoints
+const paymentLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // 20 payment attempts per hour per IP
+  message: 'Too many payment requests. Please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    console.warn(`⚠️ Payment rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json({
+      error: 'Too many payment requests. Please try again in an hour.'
+    });
+  }
+});
+
+// General API rate limiter
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per 15 min per IP
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false
+});
+
 // CORS configuration
 const allowedOrigins = process.env.REACT_APP_URL 
   ? process.env.REACT_APP_URL.split(',').map(origin => origin.trim())
@@ -190,6 +215,9 @@ app.use(cors({
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   maxAge: 86400 // 24 hours
 }));
+
+// Apply general rate limiting to all API routes
+app.use('/api/', apiLimiter);
 
 // Explicitly handle OPTIONS requests for all routes
 app.options('*', cors());
@@ -1930,7 +1958,7 @@ app.get('/api/alerts/stats', authenticateToken, async (req, res) => {
 
 // ============ PAYMENTS (PayPal) ============
 
-app.post('/api/payments/paypal/order', authenticateToken, [
+app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
   body('amount').isFloat({ gt: 0 }).withMessage('amount must be a positive number'),
   body('currency').optional().isString().isLength({ min: 3, max: 3 }).withMessage('currency must be a 3-letter code'),
   body('description').optional().isString().isLength({ max: 255 })
@@ -1995,7 +2023,7 @@ app.post('/api/payments/paypal/order', authenticateToken, [
   }
 });
 
-app.post('/api/payments/paypal/capture', authenticateToken, [
+app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
   body('orderId').isString().notEmpty().withMessage('orderId is required')
 ], async (req, res) => {
   const errors = validationResult(req);
