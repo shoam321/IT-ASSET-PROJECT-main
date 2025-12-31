@@ -1961,6 +1961,36 @@ app.get('/api/alerts/stats', authenticateToken, async (req, res) => {
 
 // ============ PAYMENTS (PayPal) ============
 
+// Payments history (stored in DB).
+// - Regular users: only their own payments
+// - Admins: can request all payments with ?all=true
+app.get('/api/payments', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId ?? req.user?.id;
+    const role = req.user?.role;
+    if (!userId) {
+      return res.status(401).json({ error: 'Invalid token structure' });
+    }
+
+    await db.setCurrentUserId(userId);
+
+    const limit = req.query.limit;
+    const offset = req.query.offset;
+    const all = String(req.query.all || '').toLowerCase() === 'true';
+
+    if (all && role === 'admin') {
+      const rows = await db.getAllPayments({ limit, offset });
+      return res.json({ payments: rows });
+    }
+
+    const rows = await db.getPaymentsForUser(userId, { limit, offset });
+    return res.json({ payments: rows });
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+    res.status(500).json({ error: 'Failed to fetch payments' });
+  }
+});
+
 app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
   body('amount').isFloat({ gt: 0 }).withMessage('amount must be a positive number'),
   body('currency').optional().isString().isLength({ min: 3, max: 3 }).withMessage('currency must be a 3-letter code'),

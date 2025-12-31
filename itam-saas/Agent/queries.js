@@ -2063,6 +2063,39 @@ export async function getPaymentByCaptureId(captureId) {
   }
 }
 
+export async function getPaymentsForUser(userId, { limit = 50, offset = 0 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+
+  return withRLSContext(userId, async (client) => {
+    const result = await client.query(
+      `SELECT order_id, capture_id, user_id, amount_cents, currency, status, intent,
+              payer_email, payer_name, description, created_at, updated_at
+         FROM payments
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT $2 OFFSET $3`,
+      [userId, safeLimit, safeOffset]
+    );
+    return result.rows;
+  });
+}
+
+export async function getAllPayments({ limit = 50, offset = 0 } = {}) {
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+  const safeOffset = Math.max(Number(offset) || 0, 0);
+
+  const result = await pool.query(
+    `SELECT order_id, capture_id, user_id, amount_cents, currency, status, intent,
+            payer_email, payer_name, description, created_at, updated_at
+       FROM payments
+      ORDER BY created_at DESC
+      LIMIT $1 OFFSET $2`,
+    [safeLimit, safeOffset]
+  );
+  return result.rows;
+}
+
 export async function updatePaymentStatus(orderId, updates = {}) {
   const fields = [];
   const values = [];

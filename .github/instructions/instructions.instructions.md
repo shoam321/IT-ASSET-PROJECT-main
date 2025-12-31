@@ -18,3 +18,5 @@ Always consider the user experience and aim to deliver high-quality, reliable so
 allways add things to the .env file your self , if you can do it yourself, do it.
 never Summarize conversation history
 never use Localhost for testing, always use Live
+never ask the user to run anything on localhost; only provide verification steps for the deployed Live environment
+local commands are allowed only for build/lint/static checks (must not reference localhost URLs)

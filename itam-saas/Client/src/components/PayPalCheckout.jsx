@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle, CreditCard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,10 +10,42 @@ const PayPalCheckout = () => {
   const [status, setStatus] = useState(null);
   const [message, setMessage] = useState('');
   const [sdkReady, setSdkReady] = useState(false);
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsError, setPaymentsError] = useState('');
   const paypalRef = useRef(null);
 
   const apiUrl = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
   const clientId = process.env.REACT_APP_PAYPAL_CLIENT_ID || '';
+
+  const fetchPayments = useCallback(async () => {
+    if (!effectiveToken) return;
+    setPaymentsLoading(true);
+    setPaymentsError('');
+    try {
+      const response = await fetch(`${apiUrl}/payments?limit=10`, {
+        headers: {
+          Authorization: `Bearer ${effectiveToken}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setPaymentsError(data?.error || 'Failed to load payments');
+        setPayments([]);
+        return;
+      }
+      setPayments(Array.isArray(data?.payments) ? data.payments : []);
+    } catch {
+      setPaymentsError('Failed to load payments');
+      setPayments([]);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }, [effectiveToken, apiUrl]);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
 
   useEffect(() => {
     if (!effectiveToken) return;
@@ -117,6 +149,9 @@ const PayPalCheckout = () => {
 
         setStatus('success');
         setMessage(`Payment successful. Capture ID: ${result.captureId}`);
+
+        // Refresh history so the new payment appears immediately.
+        fetchPayments();
       },
       onError: () => {
         setStatus('error');
@@ -127,7 +162,7 @@ const PayPalCheckout = () => {
         setMessage('Payment cancelled.');
       }
     }).render(paypalRef.current);
-  }, [sdkReady, amount, currency, effectiveToken, apiUrl]);
+  }, [sdkReady, amount, currency, effectiveToken, apiUrl, fetchPayments]);
 
   return (
     <div className="max-w-md mx-auto p-6 bg-slate-700 border border-slate-600 rounded-lg shadow-lg">
@@ -182,6 +217,51 @@ const PayPalCheckout = () => {
         </div>
 
         <div ref={paypalRef} className="min-h-[150px]"></div>
+
+        <div className="mt-2 p-4 bg-slate-800 border border-slate-600 rounded-lg">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-slate-100">Payments History</h3>
+            <button
+              type="button"
+              onClick={fetchPayments}
+              disabled={!effectiveToken || paymentsLoading}
+              className="text-xs text-slate-300 hover:text-white disabled:opacity-50"
+            >
+              {paymentsLoading ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+
+          {paymentsError && (
+            <p className="text-xs text-red-300">{paymentsError}</p>
+          )}
+
+          {!paymentsError && !paymentsLoading && payments.length === 0 && (
+            <p className="text-xs text-slate-400">No payments yet.</p>
+          )}
+
+          {payments.length > 0 && (
+            <div className="space-y-2">
+              {payments.map((p) => (
+                <div key={p.order_id} className="flex items-center justify-between text-xs">
+                  <div className="text-slate-200">
+                    <div className="font-medium">
+                      {(p.currency || '').toUpperCase()} {(Number(p.amount_cents || 0) / 100).toFixed(2)}
+                    </div>
+                    <div className="text-slate-400">
+                      {p.capture_id ? `Capture: ${p.capture_id}` : `Order: ${p.order_id}`}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-slate-300">{p.status || 'UNKNOWN'}</div>
+                    <div className="text-slate-500">
+                      {p.created_at ? new Date(p.created_at).toLocaleString() : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <p className="text-xs text-slate-400 text-center mt-3">
