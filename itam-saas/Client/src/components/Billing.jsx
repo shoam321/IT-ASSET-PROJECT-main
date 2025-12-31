@@ -20,6 +20,8 @@ const Billing = () => {
 
   const [sdkReady, setSdkReady] = useState(false);
   const paypalRef = useRef(null);
+  const paypalButtonsRef = useRef(null);
+  const paypalRenderNonceRef = useRef(0);
 
   const canSubscribe = useMemo(() => {
     if (!effectiveToken) return false;
@@ -100,24 +102,52 @@ const Billing = () => {
     document.body.appendChild(script);
 
     return () => {
-      script.remove();
+      // Intentionally do NOT remove the PayPal SDK script.
+      // Removing it during React route/component changes can break in-flight SDK renders
+      // and cause: "Detected container element removed from DOM".
     };
   }, [effectiveToken, clientId]);
 
   useEffect(() => {
     if (!sdkReady || !window.paypal || !paypalRef.current) return;
-    if (!canSubscribe) return;
+    if (!canSubscribe) {
+      // Ensure we clean up any previously rendered buttons.
+      try {
+        paypalButtonsRef.current?.close?.();
+      } catch {}
+      paypalButtonsRef.current = null;
+      if (paypalRef.current) {
+        paypalRef.current.innerHTML = '';
+      }
+      return;
+    }
 
     // If already enterprise or active subscription, don't render subscribe button.
     const tier = String(billing?.billing_tier || '').toLowerCase();
     const subStatus = String(billing?.subscription_status || '').toLowerCase();
     if (tier === 'enterprise' || subStatus === 'active') {
+      try {
+        paypalButtonsRef.current?.close?.();
+      } catch {}
+      paypalButtonsRef.current = null;
       paypalRef.current.innerHTML = '';
       return;
     }
 
-    paypalRef.current.innerHTML = '';
-    window.paypal.Buttons({
+    // Close any prior instance before touching the container.
+    try {
+      paypalButtonsRef.current?.close?.();
+    } catch {}
+    paypalButtonsRef.current = null;
+
+    // Bump a nonce so async SDK callbacks can detect if they've been superseded.
+    paypalRenderNonceRef.current += 1;
+    const renderNonce = paypalRenderNonceRef.current;
+
+    const container = paypalRef.current;
+    container.innerHTML = '';
+
+    const buttons = window.paypal.Buttons({
       style: { layout: 'vertical', color: 'blue', shape: 'rect', label: 'subscribe' },
       createSubscription: (data, actions) => {
         setStatus(null);
@@ -158,7 +188,26 @@ const Billing = () => {
         setStatus('error');
         setMessage('Subscription cancelled.');
       }
-    }).render(paypalRef.current);
+    });
+
+    paypalButtonsRef.current = buttons;
+    buttons.render(container).catch((error) => {
+      // Ignore if a newer render superseded this one.
+      if (renderNonce !== paypalRenderNonceRef.current) return;
+      console.error('PayPal Buttons render error:', error);
+      setStatus('error');
+      setMessage('Failed to load subscription button. Please refresh.');
+    });
+
+    return () => {
+      // Ensure SDK sees a clean teardown (prevents "container removed" exceptions)
+      // when navigating away or when dependencies change.
+      paypalRenderNonceRef.current += 1;
+      try {
+        paypalButtonsRef.current?.close?.();
+      } catch {}
+      paypalButtonsRef.current = null;
+    };
   }, [sdkReady, canSubscribe, apiUrl, effectiveToken, regularPlanId, billing]);
 
   const tier = String(billing?.billing_tier || '').toLowerCase();
