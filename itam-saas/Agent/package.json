@@ -10,6 +10,7 @@
     "migrate": "node migrations/run.js",
     "migrate:all": "node migrations/add-cost-column.js && node migrations/run-multi-tenancy-migration.js && node migrations/run-audit-migration.js && node migrations/run-receipts-migration.js && node migrations/run-google-sso-migration.js && node migrations/run-fix-devices-ownership-claim.js",
     "migrate:consumables": "node migrations/run-consumables-migration.js",
+    "migrate:org-billing": "node migrations/run-organization-billing-migration.js",
     "migrate:user-asset-ownership": "node run-user-asset-ownership-migration.js",
     "test:assets-isolation": "node tests/assets-isolation-smoke.js"
   },

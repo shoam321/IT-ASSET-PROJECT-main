@@ -104,6 +104,92 @@ export async function withRLSContext(userId, callback) {
 }
 
 /**
+ * Execute queries in a server-side "system" context.
+ *
+ * Used for PayPal webhooks and other server-to-server workflows where there is
+ * no authenticated end-user, but we still want to respect RLS by using a
+ * dedicated RLS policy gated behind `app.system = '1'`.
+ */
+export async function withSystemContext(callback) {
+  const client = await pool.connect();
+  try {
+    await client.query("SELECT set_config('app.system', '1', false)");
+    return await callback(client);
+  } finally {
+    client.release();
+  }
+}
+
+// ===== Organization billing helpers (company-level subscriptions) =====
+
+export async function getOrganizationBilling(organizationId, client = pool) {
+  const result = await client.query(
+    `SELECT id, name, billing_tier, subscription_status, paypal_subscription_id,
+            subscription_started_at, subscription_current_period_end, subscription_updated_at
+     FROM organizations
+     WHERE id = $1`,
+    [organizationId]
+  );
+  return result.rows[0] || null;
+}
+
+export async function setOrganizationSubscription(
+  organizationId,
+  { paypalSubscriptionId, subscriptionStatus, subscriptionStartedAt = null, subscriptionCurrentPeriodEnd = null, billingTier = 'regular' },
+  client = pool
+) {
+  const result = await client.query(
+    `UPDATE organizations
+     SET billing_tier = $2,
+         subscription_status = $3,
+         paypal_subscription_id = $4,
+         subscription_started_at = COALESCE($5, subscription_started_at),
+         subscription_current_period_end = COALESCE($6, subscription_current_period_end),
+         subscription_updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1
+     RETURNING id, billing_tier, subscription_status, paypal_subscription_id,
+               subscription_started_at, subscription_current_period_end, subscription_updated_at`,
+    [
+      organizationId,
+      billingTier,
+      subscriptionStatus,
+      paypalSubscriptionId,
+      subscriptionStartedAt,
+      subscriptionCurrentPeriodEnd
+    ]
+  );
+  return result.rows[0] || null;
+}
+
+export async function setOrganizationBillingTier(
+  organizationId,
+  { billingTier, subscriptionStatus = null },
+  client = pool
+) {
+  const result = await client.query(
+    `UPDATE organizations
+     SET billing_tier = $2,
+         subscription_status = COALESCE($3, subscription_status),
+         subscription_updated_at = CURRENT_TIMESTAMP
+     WHERE id = $1
+     RETURNING id, billing_tier, subscription_status, paypal_subscription_id,
+               subscription_started_at, subscription_current_period_end, subscription_updated_at`,
+    [organizationId, billingTier, subscriptionStatus]
+  );
+  return result.rows[0] || null;
+}
+
+export async function getOrganizationByPayPalSubscriptionId(paypalSubscriptionId, client = pool) {
+  const result = await client.query(
+    `SELECT id, name, billing_tier, subscription_status, paypal_subscription_id
+     FROM organizations
+     WHERE paypal_subscription_id = $1`,
+    [paypalSubscriptionId]
+  );
+  return result.rows[0] || null;
+}
+
+/**
  * Verify database tables exist (no automatic creation)
  */
 export async function initDatabase() {

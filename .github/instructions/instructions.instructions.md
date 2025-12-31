@@ -20,3 +20,9 @@ never Summarize conversation history
 never use Localhost for testing, always use Live
 never ask the user to run anything on localhost; only provide verification steps for the deployed Live environment
 local commands are allowed only for build/lint/static checks (must not reference localhost URLs)
+
+# Planning style
+# Use ONLY 1-minute micro plans:
+# - Break work into steps that each take <= ~1 minute.
+# - Keep plans short (max 3-5 micro steps at a time).
+# - After each micro step, provide a brief status update and the next micro step.

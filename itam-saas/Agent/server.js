@@ -26,6 +26,7 @@ import { getCached, invalidateCache } from './redis.js';
 import * as emailService from './emailService.js';
 import { startLicenseExpirationChecker, stopLicenseExpirationChecker } from './licenseExpirationChecker.js';
 import { createOrder as createPayPalOrder, captureOrder as capturePayPalOrder, verifyWebhookSignature, allowedCurrencies as paypalCurrencies } from './paypalClient.js';
+import { getSubscription as getPayPalSubscription } from './paypalSubscriptions.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,6 +124,18 @@ const upload = multer({
     }
   }
 });
+
+// ===== Billing (company-level) =====
+const normalizePayPalSubscriptionStatus = (status) => {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'ACTIVE') return 'active';
+  if (normalized === 'APPROVAL_PENDING') return 'approval_pending';
+  if (normalized === 'APPROVED') return 'approved';
+  if (normalized === 'SUSPENDED') return 'suspended';
+  if (normalized === 'CANCELLED') return 'canceled';
+  if (normalized === 'EXPIRED') return 'expired';
+  return normalized ? normalized.toLowerCase() : 'unknown';
+};
 
 // Socket.IO configuration
 const io = new Server(httpServer, {
@@ -2185,6 +2198,171 @@ app.post('/api/payments/paypal/webhook', async (req, res) => {
         await db.markWebhookProcessed(eventId, 'failed');
       }
     } catch {}
+    res.status(500).json({ error: 'Failed to process webhook' });
+  }
+});
+
+// ============ BILLING (Company subscriptions) ============
+
+// Get current organization's billing status
+app.get('/api/billing', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.userId ?? req.user?.id;
+    const organizationId = req.user?.organizationId || null;
+    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+    if (!organizationId) return res.status(400).json({ error: 'User is not assigned to an organization' });
+
+    await db.setCurrentUserId(userId);
+    const billing = await db.getOrganizationBilling(organizationId);
+    if (!billing) return res.status(404).json({ error: 'Organization not found' });
+
+    return res.json({ billing });
+  } catch (error) {
+    console.error('Error fetching billing status:', error);
+    res.status(500).json({ error: 'Failed to fetch billing status' });
+  }
+});
+
+// Store an approved PayPal subscription against the current organization.
+// This is called from the client after PayPal returns subscriptionID.
+app.post('/api/billing/paypal/subscription/approve', paymentLimiter, authenticateToken, [
+  body('subscriptionId').isString().notEmpty().withMessage('subscriptionId is required')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const userId = req.user?.userId ?? req.user?.id;
+    const organizationId = req.user?.organizationId || null;
+    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+    if (!organizationId) return res.status(400).json({ error: 'User is not assigned to an organization' });
+
+    // Defense-in-depth: verify org_role in DB (don’t trust JWT claim alone)
+    const dbUser = await authQueries.findUserById(userId);
+    const orgRole = String(dbUser?.org_role || '').toLowerCase();
+    if (!['owner', 'admin'].includes(orgRole)) {
+      return res.status(403).json({ error: 'Only organization owners/admins can manage billing' });
+    }
+
+    await db.setCurrentUserId(userId);
+
+    const { subscriptionId } = req.body;
+    const subscription = await getPayPalSubscription(subscriptionId);
+    const expectedPlanId = process.env.PAYPAL_REGULAR_PLAN_ID;
+    if (expectedPlanId && subscription?.plan_id && subscription.plan_id !== expectedPlanId) {
+      return res.status(400).json({ error: 'Subscription plan does not match REGULAR plan' });
+    }
+
+    const normalizedStatus = normalizePayPalSubscriptionStatus(subscription?.status);
+    const startedAt = subscription?.start_time ? new Date(subscription.start_time) : null;
+    const nextBilling = subscription?.billing_info?.next_billing_time ? new Date(subscription.billing_info.next_billing_time) : null;
+
+    const updated = await db.setOrganizationSubscription(
+      organizationId,
+      {
+        paypalSubscriptionId: subscriptionId,
+        subscriptionStatus: normalizedStatus,
+        subscriptionStartedAt: startedAt,
+        subscriptionCurrentPeriodEnd: nextBilling,
+        billingTier: 'regular'
+      }
+    );
+
+    return res.json({ billing: updated, paypalStatus: subscription?.status || null });
+  } catch (error) {
+    console.error('Error approving subscription:', error);
+    res.status(500).json({ error: 'Failed to approve subscription' });
+  }
+});
+
+// Activate Enterprise for a specific organization (platform admin)
+app.post('/api/billing/enterprise/activate', authenticateToken, requireAdmin, [
+  body('organizationId').isInt({ gt: 0 }).withMessage('organizationId is required')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const organizationId = Number(req.body.organizationId);
+
+    const updated = await db.withSystemContext(async (client) => {
+      return await db.setOrganizationBillingTier(
+        organizationId,
+        { billingTier: 'enterprise', subscriptionStatus: 'active' },
+        client
+      );
+    });
+
+    if (!updated) return res.status(404).json({ error: 'Organization not found' });
+    return res.json({ billing: updated });
+  } catch (error) {
+    console.error('Error activating enterprise:', error);
+    res.status(500).json({ error: 'Failed to activate enterprise' });
+  }
+});
+
+// PayPal subscription webhooks (server-to-server)
+app.post('/api/billing/paypal/webhook', async (req, res) => {
+  const body = req.body;
+  const rawBody = req.rawBody;
+  const eventId = body?.id;
+  const eventType = body?.event_type;
+
+  if (!rawBody) {
+    return res.status(400).json({ error: 'Missing raw body for verification' });
+  }
+
+  try {
+    const verified = await verifyWebhookSignature(req.headers, body);
+    if (!verified) {
+      return res.status(400).json({ error: 'Invalid webhook signature' });
+    }
+
+    const resource = body?.resource || {};
+    const subscriptionId = resource?.id;
+    if (!subscriptionId) {
+      return res.json({ status: 'ignored' });
+    }
+
+    const statusFromResource = resource?.status;
+    let status = statusFromResource ? normalizePayPalSubscriptionStatus(statusFromResource) : 'unknown';
+
+    // Fall back to event type mapping if resource.status isn’t present
+    const type = String(eventType || '').toUpperCase();
+    if (!statusFromResource) {
+      if (type === 'BILLING.SUBSCRIPTION.ACTIVATED') status = 'active';
+      else if (type === 'BILLING.SUBSCRIPTION.CANCELLED') status = 'canceled';
+      else if (type === 'BILLING.SUBSCRIPTION.SUSPENDED') status = 'suspended';
+      else if (type === 'BILLING.SUBSCRIPTION.EXPIRED') status = 'expired';
+    }
+
+    const nextBilling = resource?.billing_info?.next_billing_time ? new Date(resource.billing_info.next_billing_time) : null;
+    const startedAt = resource?.start_time ? new Date(resource.start_time) : null;
+
+    await db.withSystemContext(async (client) => {
+      const org = await db.getOrganizationByPayPalSubscriptionId(subscriptionId, client);
+      if (!org) return;
+
+      await db.setOrganizationSubscription(
+        org.id,
+        {
+          paypalSubscriptionId: subscriptionId,
+          subscriptionStatus: status,
+          subscriptionStartedAt: startedAt,
+          subscriptionCurrentPeriodEnd: nextBilling,
+          billingTier: 'regular'
+        },
+        client
+      );
+    });
+
+    res.json({ status: 'ok', eventId, eventType });
+  } catch (error) {
+    console.error('PayPal billing webhook error:', error);
     res.status(500).json({ error: 'Failed to process webhook' });
   }
 });
