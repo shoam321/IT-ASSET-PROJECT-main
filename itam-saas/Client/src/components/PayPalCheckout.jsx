@@ -36,7 +36,9 @@ const PayPalCheckout = () => {
     }
 
     const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}`;
+    // Be explicit about components/locale to avoid PayPal loading extra experiences (e.g. fastlane/card-fields)
+    // and to reduce noisy console warnings in some locales.
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&currency=${currency}&components=buttons&intent=capture&locale=en_US`;
     script.type = 'text/javascript';
     script.async = true;
     script.setAttribute('data-paypal-sdk', 'true');
