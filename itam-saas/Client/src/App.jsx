@@ -1457,6 +1457,7 @@ export default function App() {
       </div>
     </>
   );
+  };
 
   const renderLicensesScreen = () => (
     <>
