@@ -92,6 +92,93 @@ export default function App() {
     status: 'Active',
     notes: ''
   });
+
+  const COUNTRY_DIAL_CODES = [
+    { code: '+1', label: 'United States/Canada (+1)' },
+    { code: '+7', label: 'Russia/Kazakhstan (+7)' },
+    { code: '+20', label: 'Egypt (+20)' },
+    { code: '+27', label: 'South Africa (+27)' },
+    { code: '+30', label: 'Greece (+30)' },
+    { code: '+31', label: 'Netherlands (+31)' },
+    { code: '+32', label: 'Belgium (+32)' },
+    { code: '+33', label: 'France (+33)' },
+    { code: '+34', label: 'Spain (+34)' },
+    { code: '+36', label: 'Hungary (+36)' },
+    { code: '+39', label: 'Italy (+39)' },
+    { code: '+40', label: 'Romania (+40)' },
+    { code: '+41', label: 'Switzerland (+41)' },
+    { code: '+43', label: 'Austria (+43)' },
+    { code: '+44', label: 'United Kingdom (+44)' },
+    { code: '+45', label: 'Denmark (+45)' },
+    { code: '+46', label: 'Sweden (+46)' },
+    { code: '+47', label: 'Norway (+47)' },
+    { code: '+48', label: 'Poland (+48)' },
+    { code: '+49', label: 'Germany (+49)' },
+    { code: '+52', label: 'Mexico (+52)' },
+    { code: '+55', label: 'Brazil (+55)' },
+    { code: '+61', label: 'Australia (+61)' },
+    { code: '+62', label: 'Indonesia (+62)' },
+    { code: '+63', label: 'Philippines (+63)' },
+    { code: '+65', label: 'Singapore (+65)' },
+    { code: '+81', label: 'Japan (+81)' },
+    { code: '+82', label: 'South Korea (+82)' },
+    { code: '+86', label: 'China (+86)' },
+    { code: '+90', label: 'Turkey (+90)' },
+    { code: '+91', label: 'India (+91)' },
+    { code: '+92', label: 'Pakistan (+92)' },
+    { code: '+94', label: 'Sri Lanka (+94)' },
+    { code: '+95', label: 'Myanmar (+95)' },
+    { code: '+98', label: 'Iran (+98)' },
+    { code: '+212', label: 'Morocco (+212)' },
+    { code: '+351', label: 'Portugal (+351)' },
+    { code: '+353', label: 'Ireland (+353)' },
+    { code: '+358', label: 'Finland (+358)' },
+    { code: '+380', label: 'Ukraine (+380)' },
+    { code: '+420', label: 'Czechia (+420)' },
+    { code: '+852', label: 'Hong Kong (+852)' },
+    { code: '+886', label: 'Taiwan (+886)' },
+    { code: '+971', label: 'United Arab Emirates (+971)' },
+    { code: '+972', label: 'Israel (+972)' },
+    { code: '+973', label: 'Bahrain (+973)' },
+    { code: '+974', label: 'Qatar (+974)' },
+    { code: '+975', label: 'Bhutan (+975)' },
+    { code: '+976', label: 'Mongolia (+976)' },
+    { code: '+977', label: 'Nepal (+977)' },
+    { code: '+995', label: 'Georgia (+995)' }
+  ];
+
+  const normalizePhone = (raw) => (raw || '').toString().trim().replace(/[\s\-().]/g, '');
+
+  const splitPhone = (raw) => {
+    const cleaned = normalizePhone(raw);
+    if (!cleaned) return { countryCode: '', nationalNumber: '' };
+
+    if (cleaned.startsWith('+')) {
+      const digits = cleaned.slice(1);
+      const candidates = [...COUNTRY_DIAL_CODES].sort((a, b) => b.code.length - a.code.length);
+      for (const { code } of candidates) {
+        const c = code.slice(1);
+        if (digits.startsWith(c)) {
+          return { countryCode: code, nationalNumber: digits.slice(c.length).replace(/\D/g, '') };
+        }
+      }
+      // Fallback: take up to 4 digits as country code
+      const match = /^\+(\d{1,4})(.*)$/.exec(cleaned);
+      if (match) {
+        return { countryCode: `+${match[1]}`, nationalNumber: (match[2] || '').replace(/\D/g, '') };
+      }
+    }
+
+    return { countryCode: '', nationalNumber: cleaned.replace(/\D/g, '') };
+  };
+
+  const formatPhone = (countryCode, nationalNumber) => {
+    const cc = (countryCode || '').toString().trim();
+    const nn = (nationalNumber || '').toString().replace(/\D/g, '');
+    if (!cc) return nn;
+    const normalizedCc = cc.startsWith('+') ? cc : `+${cc.replace(/\D/g, '')}`;
+    return `${normalizedCc}${nn}`;
+  };
   const [contractFormData, setContractFormData] = useState({
     contract_name: '',
     vendor: '',
@@ -1606,9 +1693,52 @@ export default function App() {
               type="tel"
               placeholder="Phone"
               value={userFormData.phone}
-              onChange={(e) => setUserFormData({...userFormData, phone: e.target.value})}
-              className="px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
+              onChange={(e) => setUserFormData({ ...userFormData, phone: e.target.value })}
+              className="hidden"
             />
+            {(() => {
+              const { countryCode, nationalNumber } = splitPhone(userFormData.phone);
+              return (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="tel"
+                    list="countryDialCodes"
+                    placeholder="+972"
+                    value={countryCode}
+                    onChange={(e) => {
+                      const nextCode = e.target.value;
+                      setUserFormData({
+                        ...userFormData,
+                        phone: formatPhone(nextCode, nationalNumber)
+                      });
+                    }}
+                    className="w-40 px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
+                    aria-label="Country code"
+                  />
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    placeholder="Phone number"
+                    value={nationalNumber}
+                    onChange={(e) => {
+                      const nextNational = e.target.value;
+                      setUserFormData({
+                        ...userFormData,
+                        phone: formatPhone(countryCode, nextNational)
+                      });
+                    }}
+                    className="flex-1 px-4 py-2 bg-slate-600 border border-slate-500 rounded text-white placeholder-slate-400"
+                    aria-label="Phone number"
+                  />
+                  <datalist id="countryDialCodes">
+                    {COUNTRY_DIAL_CODES.map(({ code, label }) => (
+                      <option key={code} value={code}>{label}</option>
+                    ))}
+                  </datalist>
+                </div>
+              );
+            })()}
             <input
               id="user_role"
               name="user_role"
