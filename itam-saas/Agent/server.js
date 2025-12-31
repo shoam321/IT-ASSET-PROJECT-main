@@ -3044,7 +3044,9 @@ app.post('/api/grafana/dashboards', authenticateToken, requireAdmin, [
     }
 
     const { name, description, embedUrl } = req.body;
+    console.log('[Grafana URL Check] embedUrl:', embedUrl, 'isAllowed:', isAllowedGrafanaUrl(embedUrl));
     if (!isAllowedGrafanaUrl(embedUrl)) {
+      console.log('[Grafana URL Check] Allowed hosts:', parseAllowedGrafanaHosts());
       return res.status(400).json({ error: 'Embed URL host not allowed. Set GRAFANA_ALLOWED_HOSTS.' });
     }
 
