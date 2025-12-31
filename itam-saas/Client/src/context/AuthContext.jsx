@@ -58,11 +58,27 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = (authToken, userData) => {
+  const login = async (authToken, userData) => {
     localStorage.setItem('authToken', authToken);
-    localStorage.setItem('authUser', JSON.stringify(userData));
     setToken(authToken);
-    setUser(userData);
+
+    // If userData is missing org context, hydrate from /auth/me
+    let hydratedUser = userData;
+    if (authToken && (!userData || userData.organization_id === undefined)) {
+      try {
+        const resp = await fetch(`${API_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${authToken}` }
+        });
+        if (resp.ok) {
+          hydratedUser = await resp.json();
+        }
+      } catch {
+        // Ignore network failures; fall back to provided userData
+      }
+    }
+
+    localStorage.setItem('authUser', JSON.stringify(hydratedUser));
+    setUser(hydratedUser);
   };
 
   const logout = () => {

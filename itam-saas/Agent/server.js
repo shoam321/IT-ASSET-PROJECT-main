@@ -807,7 +807,10 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
       role: user.role,
       isActive: user.is_active,
       createdAt: user.created_at,
-      lastLogin: user.last_login
+      lastLogin: user.last_login,
+      organization_id: user.organization_id,
+      org_role: user.org_role,
+      onboarding_completed: user.onboarding_completed
     });
   } catch (error) {
     console.error('Get user error:', error);
