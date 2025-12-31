@@ -31,3 +31,5 @@ Thumbs.db
 # Dependencies lock
 package-lock.json
 yarn.lock
+.vercel
+.env*.local

@@ -1,6 +1,7 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "build",
+  "buildCommand": "cd itam-saas/Client && npm install && npm run build",
+  "outputDirectory": "itam-saas/Client/build",
+  "installCommand": "cd itam-saas/Client && npm install",
   "rewrites": [
     {
       "source": "/(.*)",
