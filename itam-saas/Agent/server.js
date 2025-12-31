@@ -668,6 +668,23 @@ let _ensureGrafanaDashboardsRan = false;
 async function ensureGrafanaDashboardsSchema() {
   if (_ensureGrafanaDashboardsRan) return;
 
+  // Check if table exists first using regular pool
+  try {
+    const checkResult = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'grafana_dashboards'
+      );
+    `);
+    if (checkResult.rows[0].exists) {
+      _ensureGrafanaDashboardsRan = true;
+      return;
+    }
+  } catch (e) {
+    // If check fails, try to create anyway
+  }
+
+  // Only attempt creation if table doesn't exist
   const { Pool } = await import('pg');
   const ownerDsn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
   if (!ownerDsn) throw new Error('DATABASE_URL not configured');
