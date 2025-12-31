@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Login from './Login';
 import Register from './Register';
-import Onboarding from './Onboarding';
+import OnboardingWizard from './OnboardingWizard';
 import App from '../App';
 import { Loader, AlertCircle } from 'lucide-react';
 
@@ -139,7 +139,7 @@ function OrgGate() {
 
   if (needsOrg) {
     return (
-      <Onboarding
+      <OnboardingWizard
         onComplete={() => {
           // After successful org creation, refresh status so App renders with new token/org.
           checkStatus();

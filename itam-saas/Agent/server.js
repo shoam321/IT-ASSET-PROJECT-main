@@ -418,6 +418,96 @@ async function ensureOrgSchema() {
   }
 }
 
+// Ensure onboarding foundation tables/columns exist (idempotent, owner DSN when available)
+let _ensureOnboardingFoundationRan = false;
+async function ensureOnboardingFoundationSchema() {
+  if (_ensureOnboardingFoundationRan) return;
+  const { Pool } = await import('pg');
+  const ownerDsn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
+  if (!ownerDsn) throw new Error('DATABASE_URL not configured');
+
+  const ownerPool = new Pool({ connectionString: ownerDsn, ssl: ownerDsn.includes('railway') ? { rejectUnauthorized: false } : false });
+  const client = await ownerPool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // auth_users.onboarding_completed
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'auth_users' AND column_name = 'onboarding_completed'
+        ) THEN
+          ALTER TABLE auth_users ADD COLUMN onboarding_completed BOOLEAN DEFAULT FALSE;
+        END IF;
+      END$$;
+    `);
+
+    // Locations table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS locations (
+        id SERIAL PRIMARY KEY,
+        organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        is_default BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_locations_org ON locations(organization_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_locations_org_default ON locations(organization_id) WHERE is_default;
+    `);
+
+    // Employees (ghost users)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS employees (
+        id SERIAL PRIMARY KEY,
+        organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        full_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
+        department VARCHAR(255),
+        status VARCHAR(50) DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_employees_org ON employees(organization_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_org_email ON employees(organization_id, email) WHERE email IS NOT NULL;
+    `);
+
+    // Asset categories (with icon_name for frontend icons)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS asset_categories (
+        id SERIAL PRIMARY KEY,
+        organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) NOT NULL,
+        icon_name VARCHAR(100) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (organization_id, slug)
+      );
+      CREATE INDEX IF NOT EXISTS idx_asset_categories_org ON asset_categories(organization_id);
+    `);
+
+    // Optional FK hooks on assets (compatible with legacy schema)
+    await client.query(`
+      ALTER TABLE assets ADD COLUMN IF NOT EXISTS location_id INTEGER;
+      ALTER TABLE assets ADD COLUMN IF NOT EXISTS category_id INTEGER;
+      ALTER TABLE assets ADD CONSTRAINT IF NOT EXISTS fk_assets_location_id FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL;
+      ALTER TABLE assets ADD CONSTRAINT IF NOT EXISTS fk_assets_category_id FOREIGN KEY (category_id) REFERENCES asset_categories(id) ON DELETE SET NULL;
+    `);
+
+    await client.query('COMMIT');
+    _ensureOnboardingFoundationRan = true;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    console.error('Failed to ensure onboarding foundation schema:', e.message);
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
 function toCents(amount) {
   const num = Number(amount);
   if (!Number.isFinite(num) || num <= 0) {
@@ -743,6 +833,169 @@ app.post('/api/organizations/bootstrap', authenticateToken, [
     }
     console.error('Organization bootstrap error:', error);
     return res.status(500).json({ error: msg });
+  }
+});
+
+// Onboarding completion (multi-step, transactional)
+app.post('/api/onboarding/complete', authenticateToken, async (req, res) => {
+  const userId = req.user?.userId ?? req.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+
+  const payload = req.body || {};
+  const userType = payload.userType === 'B2B' ? 'B2B' : 'PRIVATE';
+
+  // Ensure schema exists before running the transaction (owner DSN)
+  try {
+    await ensureOnboardingFoundationSchema();
+  } catch (err) {
+    return res.status(500).json({ error: 'Onboarding schema not installed: ' + (err?.message || 'unknown error') });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // RLS/system context for the transaction
+    await client.query("SELECT set_config('app.system', '1', false)");
+    await client.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
+
+    const orgName = userType === 'B2B'
+      ? (payload.organization?.name || 'New Organization')
+      : 'Personal Workspace';
+    const orgDomain = payload.organization?.domain || null;
+    const primaryLocationName = userType === 'B2B'
+      ? (payload.organization?.primaryLocation || 'Main Office')
+      : 'Home';
+
+    // Create org and attach user as owner (idempotent per user)
+    const orgResult = await client.query(
+      `INSERT INTO organizations (name, domain)
+       VALUES ($1, $2)
+       ON CONFLICT (domain) WHERE domain IS NOT NULL DO UPDATE SET name = EXCLUDED.name
+       RETURNING id, name, domain`,
+      [String(orgName).trim(), orgDomain]
+    );
+    const organizationId = orgResult.rows[0].id;
+
+    await client.query(
+      `UPDATE auth_users
+         SET organization_id = $2,
+             org_role = COALESCE(org_role, 'owner')
+       WHERE id = $1`,
+      [userId, organizationId]
+    );
+
+    // Seed default location
+    let locationId;
+    const locResult = await client.query(
+      `INSERT INTO locations (organization_id, name, is_default)
+       VALUES ($1, $2, true)
+       ON CONFLICT (organization_id) WHERE is_default DO NOTHING
+       RETURNING id`,
+      [organizationId, primaryLocationName]
+    );
+    if (locResult.rows[0]?.id) {
+      locationId = locResult.rows[0].id;
+    } else {
+      const existingLoc = await client.query(
+        'SELECT id FROM locations WHERE organization_id = $1 AND is_default = true LIMIT 1',
+        [organizationId]
+      );
+      locationId = existingLoc.rows[0]?.id || null;
+    }
+
+    // Seed default categories with icon_name
+    const defaultCategories = [
+      { name: 'Laptop', slug: 'laptop', icon: 'laptop' },
+      { name: 'Mobile', slug: 'mobile', icon: 'smartphone' },
+      { name: 'Monitor', slug: 'monitor', icon: 'monitor' },
+      { name: 'License', slug: 'license', icon: 'key' }
+    ];
+    const slugToId = new Map();
+    for (const cat of defaultCategories) {
+      const catResult = await client.query(
+        `INSERT INTO asset_categories (organization_id, name, slug, icon_name)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (organization_id, slug) DO UPDATE SET name = EXCLUDED.name, icon_name = EXCLUDED.icon_name
+         RETURNING id, slug`,
+        [organizationId, cat.name, cat.slug, cat.icon]
+      );
+      slugToId.set(catResult.rows[0].slug, catResult.rows[0].id);
+    }
+
+    // Ghost employees (B2B only)
+    const employeeEmailToId = new Map();
+    if (userType === 'B2B' && Array.isArray(payload.initialEmployees)) {
+      for (const emp of payload.initialEmployees) {
+        const fullName = emp?.fullName || emp?.email || 'Team Member';
+        const email = emp?.email || null;
+        const empResult = await client.query(
+          `INSERT INTO employees (organization_id, full_name, email, status)
+           VALUES ($1, $2, $3, 'active')
+           ON CONFLICT (organization_id, email) WHERE email IS NOT NULL DO UPDATE SET full_name = EXCLUDED.full_name, status = 'active'
+           RETURNING id, email, full_name`,
+          [organizationId, fullName, email]
+        );
+        const row = empResult.rows[0];
+        if (row?.email) employeeEmailToId.set(row.email, row.id);
+      }
+    }
+
+    // First asset (optional but recommended)
+    if (payload.firstAsset) {
+      const { categorySlug, modelName, serialNumber, assignedToEmail } = payload.firstAsset;
+      const categoryId = slugToId.get(categorySlug) || slugToId.get('laptop') || null;
+      const categoryLabel = categorySlug || 'laptop';
+      const assignedEmployeeId = assignedToEmail ? employeeEmailToId.get(assignedToEmail) : null;
+      const assignedName = userType === 'B2B'
+        ? (payload.initialEmployees?.find((e) => e.email === assignedToEmail)?.fullName || assignedToEmail || 'Unassigned')
+        : (req.user?.username || req.user?.email || 'Me');
+
+      // Keep legacy columns populated for compatibility
+      await client.query(
+        `INSERT INTO assets (
+           asset_tag, asset_type, manufacturer, model, serial_number,
+           assigned_user_name, status, cost, discovered,
+           user_id, category, category_id, location, location_id, assigned_to
+         ) VALUES ($1, $2, $3, $4, $5, $6, 'In Use', 0, false, $7, $8, $9, $10, $11, $12)
+         RETURNING id`,
+        [
+          `AST-${Date.now()}`,
+          'hardware',
+          null,
+          modelName || 'Quick Add',
+          serialNumber || 'N/A',
+          assignedName,
+          userId, // owner for visibility
+          categoryLabel,
+          categoryId,
+          primaryLocationName,
+          locationId,
+          assignedEmployeeId || null
+        ]
+      );
+    }
+
+    // Mark onboarding complete
+    await client.query('UPDATE auth_users SET onboarding_completed = TRUE WHERE id = $1', [userId]);
+
+    await client.query('COMMIT');
+
+    const updatedUser = await authQueries.findUserById(userId);
+    const token = generateToken(updatedUser);
+
+    // TODO: Trigger Welcome Email via Resend once API key wired.
+
+    return res.status(201).json({
+      organization: { id: organizationId, name: orgName },
+      token
+    });
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch {}
+    console.error('Onboarding completion error:', error);
+    return res.status(500).json({ error: error?.message || 'Failed to complete onboarding' });
+  } finally {
+    client.release();
   }
 });
 

@@ -37,6 +37,15 @@ const formatCurrency = (amount) => {
   return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+// Recent asset marker (first 24h)
+const isRecentlyCreated = (createdAt) => {
+  if (!createdAt) return false;
+  const ts = new Date(createdAt).getTime();
+  if (Number.isNaN(ts)) return false;
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  return Date.now() - ts < oneDayMs;
+};
+
 export default function App() {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
@@ -1118,7 +1127,21 @@ export default function App() {
     );
   };
 
-  const renderAssetsScreen = () => (
+  const renderAssetsScreen = () => {
+    const locationCount = assets.reduce((set, a) => {
+      const key = a?.location_id ?? (a?.location || '').trim();
+      if (key) set.add(String(key));
+      return set;
+    }, new Set()).size;
+    const employeeCount = assets.reduce((set, a) => {
+      const key = (a?.assigned_user_name || '').trim();
+      if (key) set.add(key.toLowerCase());
+      return set;
+    }, new Set()).size;
+    const showLocationNudge = locationCount < 2;
+    const showEmployeeNudge = employeeCount < 3;
+
+    return (
     <>
       {error && (
         <div className="mb-6 p-4 bg-red-900 border border-red-700 rounded-lg">
@@ -1276,6 +1299,33 @@ export default function App() {
         </div>
       </div>
 
+      {(showLocationNudge || showEmployeeNudge) && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {showLocationNudge && (
+            <div className="bg-slate-700 border border-blue-700/60 rounded-lg p-4 flex items-start gap-3 shadow-lg">
+              <div className="mt-0.5">
+                <Boxes className="w-5 h-5 text-blue-300" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-white font-semibold text-sm">Add a second location</p>
+                <p className="text-slate-300 text-sm">You have one default location. Create another for remote or branch offices to keep assets organized.</p>
+              </div>
+            </div>
+          )}
+          {showEmployeeNudge && (
+            <div className="bg-slate-700 border border-emerald-700/60 rounded-lg p-4 flex items-start gap-3 shadow-lg">
+              <div className="mt-0.5">
+                <Users className="w-5 h-5 text-emerald-300" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-white font-semibold text-sm">Invite your team</p>
+                <p className="text-slate-300 text-sm">You have a few assignees. Invite team members so they can manage their own gear.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="bg-slate-700 border border-slate-600 rounded-lg overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[800px]">
@@ -1314,10 +1364,18 @@ export default function App() {
                 </tr>
               ) : (
                 filteredAssets.map((asset) => {
+                  const isNew = isRecentlyCreated(asset?.created_at);
                   const category = asset.category ? getCategoryById(asset.category) : null;
                   return (
-                  <tr key={asset.id} className="border-b border-slate-600 hover:bg-slate-600 transition">
-                    <td className="px-3 lg:px-6 py-4 text-white font-medium">{asset.asset_tag}</td>
+                  <tr key={asset.id} className={`border-b border-slate-600 hover:bg-slate-600 transition ${isNew ? 'ring-1 ring-blue-500/40' : ''}`}>
+                    <td className="px-3 lg:px-6 py-4 text-white font-medium">
+                      <div className="flex items-center gap-2">
+                        <span>{asset.asset_tag}</span>
+                        {isNew && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-blue-900 text-blue-200">Just added</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-3 lg:px-6 py-4">
                       {category ? (
                         <div className="flex items-center gap-2">
