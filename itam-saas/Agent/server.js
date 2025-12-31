@@ -520,7 +520,7 @@ async function ensureOrgSchema() {
         ) THEN
           CREATE POLICY organizations_insert_policy ON organizations
             FOR INSERT
-            WITH CHECK (current_setting('app.system', TRUE) = '1');
+            WITH CHECK (current_setting('app.system', TRUE)::TEXT = '1');
         END IF;
       END $$;
     `);
@@ -1047,9 +1047,10 @@ app.post('/api/onboarding/complete', authenticateToken, async (req, res) => {
   try {
     await client.query('BEGIN');
 
-    // RLS/system context for the transaction
-    await client.query("SELECT set_config('app.system', '1', false)");
-    await client.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
+    // RLS/system context for the transaction (use true for transaction scope)
+    // This ensures the session variables persist through the entire transaction
+    await client.query("SET LOCAL app.system = '1'");
+    await client.query("SET LOCAL app.current_user_id = $1", [userId.toString()]);
 
     const orgName = userType === 'B2B'
       ? (payload.organization?.name || 'New Organization')
