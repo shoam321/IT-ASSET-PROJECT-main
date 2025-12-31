@@ -524,6 +524,7 @@ async function ensureOnboardingFoundationSchema() {
       ALTER TABLE assets ADD COLUMN IF NOT EXISTS location_id INTEGER;
       ALTER TABLE assets ADD COLUMN IF NOT EXISTS category_id INTEGER;
       ALTER TABLE assets ADD COLUMN IF NOT EXISTS location VARCHAR(255);
+      ALTER TABLE assets ADD COLUMN IF NOT EXISTS assigned_to INTEGER;
       ALTER TABLE assets ADD CONSTRAINT IF NOT EXISTS fk_assets_location_id FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL;
       ALTER TABLE assets ADD CONSTRAINT IF NOT EXISTS fk_assets_category_id FOREIGN KEY (category_id) REFERENCES asset_categories(id) ON DELETE SET NULL;
     `);
