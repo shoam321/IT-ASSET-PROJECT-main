@@ -1,17 +1,22 @@
 # Railway Production Database Credentials
 
-**SAVED LOCATION:** `itam-saas/Agent/.env`
+**SAVED LOCATION:** `itam-saas/Agent/.env` (gitignored)
+
+⚠️ **SECURITY WARNING**: Never commit database credentials to git.
+Credentials are stored in:
+- Local: `itam-saas/Agent/.env` file (gitignored)
+- Production: Railway environment variables
 
 ```
-DATABASE_URL=postgresql://postgres:KOcMWUlOIOsQudIVqzANkoVSWfWTpvDm@caboose.proxy.rlwy.net:31886/railway
+DATABASE_URL=postgresql://[user]:[password]@[host]:[port]/railway
 ```
 
 ## Connection Details
-- **Host:** caboose.proxy.rlwy.net
-- **Port:** 31886
+- **Host:** Railway proxy (configured in .env)
+- **Port:** Configured in Railway
 - **Database:** railway
-- **User:** postgres
-- **Password:** KOcMWUlOIOsQudIVqzANkoVSWfWTpvDm
+- **User:** Configured in .env
+- **Password:** Stored securely in .env (gitignored)
 
 ## Usage
 

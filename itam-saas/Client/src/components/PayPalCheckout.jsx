@@ -19,6 +19,26 @@ const PayPalCheckout = () => {
       return;
     }
 
+    // Input validation
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setStatus('error');
+      setMessage('Please enter a valid amount greater than 0');
+      return;
+    }
+
+    if (amountNum > 100000) {
+      setStatus('error');
+      setMessage('Amount exceeds maximum limit of 100,000');
+      return;
+    }
+
+    if (!['USD', 'EUR', 'GBP', 'ILS'].includes(currency)) {
+      setStatus('error');
+      setMessage('Invalid currency selected');
+      return;
+    }
+
     setLoading(true);
     setStatus(null);
     setMessage('');
@@ -31,9 +51,9 @@ const PayPalCheckout = () => {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          amount: parseFloat(amount),
+          amount: amountNum,
           currency,
-          description: `Payment of ${currency} ${amount}`
+          description: `Payment of ${currency} ${amountNum.toFixed(2)}`
         })
       });
 

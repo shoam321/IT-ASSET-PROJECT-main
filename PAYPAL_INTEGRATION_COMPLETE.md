@@ -13,8 +13,8 @@ The PayPal payment integration has been **fully completed and deployed** to prod
 
 - **PayPal Configuration**: Live mode enabled with credentials
   - Mode: **LIVE** (real charges will be processed)
-  - Client ID: `Ad-X3L4_CkphHnLVR2DNxzJE3UdvhJFzIvTshJyxoozbP_O5FBTGJ1FsxMIYagoNQVZ8xLtYMuPLdTnE`
-  - Webhook ID: `AYL1AVXy_tuURy5_Zc8G1U13xktJ6LVQ5pXLyAQaukzWUAlLRxdqWXzCUEmYV4ztJNcEPDfJRxUOJ8op`
+  - Client ID: Configured in Railway environment variables
+  - Webhook ID: Configured in Railway environment variables
 
 - **Database Tables**: Created and verified
   - `payments` table with RLS policies (tracks all payment transactions)
