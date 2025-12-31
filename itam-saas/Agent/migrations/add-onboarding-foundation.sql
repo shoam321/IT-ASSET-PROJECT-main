@@ -43,6 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_asset_categories_org ON asset_categories(organiza
 
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS location_id INTEGER;
 ALTER TABLE assets ADD COLUMN IF NOT EXISTS category_id INTEGER;
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS location VARCHAR(255);
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_assets_location_id') THEN
