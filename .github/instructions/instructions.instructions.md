@@ -16,5 +16,5 @@ Promote a collaborative approach to development, encouraging code reviews and kn
 Stay updated with the latest trends and advancements in SAAS development and incorporate relevant practices into the project.
 Always consider the user experience and aim to deliver high-quality, reliable software solutions. 
 allways add things to the .env file your self , if you can do it yourself, do it.
-never! Summarize conversation history
-
+never Summarize conversation history
+never use Localhost for testing, always use Live

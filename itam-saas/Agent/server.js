@@ -45,6 +45,21 @@ const app = express();
 const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
+const parseAllowedOrigins = () => {
+  const sources = [process.env.FRONTEND_URL, process.env.REACT_APP_URL].filter(Boolean);
+  const parsed = sources
+    .flatMap((value) => value.split(','))
+    .map((value) => value.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+
+  // Defaults are intentionally minimal; Vercel preview deployments are allowed via suffix check.
+  if (parsed.length) return Array.from(new Set(parsed));
+  return [
+    'https://it-asset-project.vercel.app',
+    'https://it-asset-project-git-main-shoams-projects-578cf60a.vercel.app'
+  ];
+};
+
 // Startup diagnostics (do not print secrets)
 console.log('🔧 Environment:', {
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -114,13 +129,7 @@ const io = new Server(httpServer, {
   cors: {
     origin: function (origin, callback) {
       if (!origin) return callback(null, true);
-      const allowedOrigins = process.env.REACT_APP_URL 
-        ? process.env.REACT_APP_URL.split(',').map(o => o.trim())
-        : [
-            'https://it-asset-project.vercel.app',
-            'http://localhost:3000',
-            'http://localhost:5000'
-          ];
+      const allowedOrigins = parseAllowedOrigins();
       
       // Allow any Vercel deployment
       if (origin.endsWith('.vercel.app') || allowedOrigins.includes(origin)) {
@@ -185,13 +194,7 @@ const apiLimiter = rateLimit({
 });
 
 // CORS configuration
-const allowedOrigins = process.env.REACT_APP_URL 
-  ? process.env.REACT_APP_URL.split(',').map(origin => origin.trim())
-  : [
-    'https://it-asset-project.vercel.app',
-    'https://it-asset-project-git-main-shoams-projects-578cf60a.vercel.app',
-    'http://localhost:3000'
-  ];
+const allowedOrigins = parseAllowedOrigins();
 console.log('🔧 CORS Origins:', allowedOrigins);
 
 // Trust Railway proxy for proper IP forwarding
