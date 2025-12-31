@@ -8,200 +8,57 @@ const __dirname = path.dirname(__filename);
 
 /**
  * Set the current user ID for PostgreSQL Row-Level Security (RLS)
- * 
- * HOW IT WORKS:
- * - Sets PostgreSQL session variable 'app.current_user_id' = userId from JWT
- * - RLS policies check this variable using: current_setting('app.current_user_id', true)::integer
- * - Database automatically filters queries based on user_id and role
- * 
- * ADMIN vs USER ACCESS:
- * - Admin users (role='admin'): See ALL devices and usage data from ALL users
- * - Regular users (role='user'): See ONLY their own devices and usage data
- * - RLS policies defined in migrations/add-multi-tenancy.sql
- * 
- * WHO IS ADMIN:
- * - Recommended: create the first admin with `node create-admin.js`
- * - Dev-only bootstrap: start server with `AUTO_CREATE_ADMIN=true`
- *   - If no admin exists, one is created with password from `ADMIN_INITIAL_PASSWORD`
- *     or a generated strong password printed once to the console.
- * - Admins can create more users/admins via API (future feature)
- * 
- * IMPORTANT FIXES LEARNED:
- * - Use set_config() function (not SET command) because SET doesn't support $1 parameters
- * - SET command causes "syntax error at or near $1" 
- * - set_config() is the proper way to set session variables with parameterized queries
- * - With connection pooling, set_config(..., false) persists for the connection session
- * - Must call this BEFORE any database query that needs user filtering
- * 
- * SECURITY BENEFITS:
- * - Defense-in-depth: Even if app code has bugs, database enforces access rules
- * - Database-level security prevents SQL injection from bypassing filters
- * - Zero-trust: Every query is filtered at database level, not app level
+/**
+ * Search assets
  */
-export async function setCurrentUserId(userId) {
+export async function searchAssets(query, organizationId = null) {
   try {
-    const shouldLogRls = String(process.env.DEBUG_RLS || '').toLowerCase() === 'true';
+    const searchTerm = `%${query}%`;
+    const hasCategoryColumn = await assetsHasCategoryColumn();
+    const hasOrganizationId = await assetsHasOrganizationIdColumn();
+    const params = [searchTerm];
 
-    // Handle undefined or null userId gracefully
-    if (userId === undefined || userId === null) {
-      console.warn('⚠️ setCurrentUserId called with undefined/null userId, using 0');
+    let sql = `SELECT * FROM assets WHERE (
+      asset_tag ILIKE $1
+      OR manufacturer ILIKE $1
+      OR model ILIKE $1
+      OR assigned_user_name ILIKE $1`;
+
+    if (hasCategoryColumn) {
+      sql += `
+      OR category ILIKE $1`;
+    }
+
+    sql += `
+    )`;
+
+    if (hasOrganizationId) {
+      sql += ' AND organization_id = $2';
+      params.push(organizationId);
+    }
+
+    sql += ' ORDER BY created_at DESC';
+
+    const result = await pool.query(sql, params);
+    return result.rows;
+  } catch (error) {
+    console.error('Error searching assets:', error);
+    throw error;
+  }
+}
       userId = 0;
-    /**
-     * Search assets
-     */
-    export async function searchAssets(query, organizationId = null) {
-      try {
-        const searchTerm = `%${query}%`;
-        const hasCategoryColumn = await assetsHasCategoryColumn();
-        const hasOrganizationId = await assetsHasOrganizationIdColumn();
-        const params = [searchTerm];
-
-        let sql = `SELECT * FROM assets WHERE (
-          asset_tag ILIKE $1
-          OR manufacturer ILIKE $1
-          OR model ILIKE $1
-          OR assigned_user_name ILIKE $1`;
-
-        if (hasCategoryColumn) {
-          sql += '
-         paypal_subscription_id = $4,
-        }
-
-        sql += '
-         subscription_started_at = COALESCE($5, subscription_started_at),
-
-        if (hasOrganizationId) {
-          sql += ' AND organization_id = $2';
-          params.push(organizationId);
-        }
-
-        sql += ' ORDER BY created_at DESC';
-
-        const result = await pool.query(sql, params);
-        return result.rows;
-      } catch (error) {
-        console.error('Error searching assets:', error);
-        throw error;
-      }
     }
 
-    /**
-     * Search assets scoped to a user
-     */
-    export async function searchAssetsForUser(query, userId, organizationId = null) {
-      try {
-        const searchTerm = `%${query}%`;
-        const hasOrganizationId = await assetsHasOrganizationIdColumn();
+    await pool.query('SELECT set_config($1, $2, false)', ['app.current_user_id', userId.toString()]);
 
-        if (await assetsHasUserIdColumn()) {
-          const params = [searchTerm, userId];
-          let sql =
-            `SELECT * FROM assets
-             WHERE user_id = $2
-               AND (
-                 asset_tag ILIKE $1
-                 OR manufacturer ILIKE $1
-                 OR model ILIKE $1
-                 OR assigned_user_name ILIKE $1
-               )`;
-          if (hasOrganizationId) {
-            sql += ' AND organization_id = $3';
-            params.push(organizationId);
-          }
-          sql += ' ORDER BY created_at DESC';
-          const result = await pool.query(sql, params);
-          return result.rows;
-        }
-
-        const identity = await getUserIdentityById(userId);
-        const values = normalizeIdentityValues(identity);
-        if (values.length === 0) return [];
-
-        const params = [searchTerm, values.map(v => v.toLowerCase())];
-        let sql =
-          `SELECT *
-           FROM assets
-           WHERE lower(assigned_user_name) = ANY ($2)
-             AND (
-               asset_tag ILIKE $1
-               OR manufacturer ILIKE $1
-               OR model ILIKE $1
-               OR assigned_user_name ILIKE $1
-             )`;
-        if (hasOrganizationId) {
-          sql += ' AND organization_id = $3';
-          params.push(organizationId);
-        }
-        sql += ' ORDER BY created_at DESC';
-        const result = await pool.query(sql, params);
-        return result.rows;
-      } catch (error) {
-        console.error('Error searching assets for user:', error);
-        throw error;
-      }
+    if (shouldLogRls) {
+      console.log(`🔐 RLS current_user_id set to ${userId}`);
     }
-         subscription_current_period_end = COALESCE($6, subscription_current_period_end),
-         subscription_updated_at = CURRENT_TIMESTAMP
-     WHERE id = $1
-     RETURNING id, billing_tier, subscription_status, paypal_subscription_id,
-               subscription_started_at, subscription_current_period_end, subscription_updated_at`,
-    [
-      organizationId,
-      billingTier,
-      subscriptionStatus,
-      paypalSubscriptionId,
-      subscriptionStartedAt,
-      subscriptionCurrentPeriodEnd
-    ]
-  );
-  return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error setting current user ID:', error);
+    throw error;
+  }
 }
-
-export async function setOrganizationBillingTier(
-  organizationId,
-  { billingTier, subscriptionStatus = null },
-  client = pool
-) {
-  const result = await client.query(
-    `UPDATE organizations
-     SET billing_tier = $2,
-         subscription_status = COALESCE($3, subscription_status),
-         subscription_updated_at = CURRENT_TIMESTAMP
-     WHERE id = $1
-     RETURNING id, billing_tier, subscription_status, paypal_subscription_id,
-               subscription_started_at, subscription_current_period_end, subscription_updated_at`,
-    [organizationId, billingTier, subscriptionStatus]
-  );
-  return result.rows[0] || null;
-}
-
-export async function getOrganizationByPayPalSubscriptionId(paypalSubscriptionId, client = pool) {
-  const result = await client.query(
-    `SELECT id, name, billing_tier, subscription_status, paypal_subscription_id
-     FROM organizations
-     WHERE paypal_subscription_id = $1`,
-    [paypalSubscriptionId]
-  );
-  return result.rows[0] || null;
-}
-
-// ===== Grafana dashboard embeds (per-organization) =====
-
-export async function listGrafanaDashboards(organizationId, client = pool) {
-  const result = await client.query(
-    `SELECT id, name, description, embed_url, created_by, created_at, updated_at
-       FROM grafana_dashboards
-      WHERE organization_id = $1
-      ORDER BY created_at ASC` ,
-    [organizationId]
-  );
-  return result.rows;
-}
-
-export async function createGrafanaDashboard(organizationId, { name, description, embedUrl, createdBy }, client = pool) {
-  const result = await client.query(
-    `INSERT INTO grafana_dashboards (organization_id, name, description, embed_url, created_by)
-     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (organization_id, name)
        DO UPDATE SET description = EXCLUDED.description, embed_url = EXCLUDED.embed_url, updated_at = CURRENT_TIMESTAMP
      RETURNING id, name, description, embed_url, created_by, created_at, updated_at`,
@@ -774,13 +631,12 @@ export async function searchAssets(query, organizationId = null) {
 /**
  * Search assets scoped to a user
  */
-export async function searchAssetsForUser(query, userId) {
-  try {
 export async function searchAssetsForUser(query, userId, organizationId = null) {
-    if (await assetsHasUserIdColumn()) {
-      const result = await pool.query(
+  try {
+    const searchTerm = `%${query}%`;
     const hasOrganizationId = await assetsHasOrganizationIdColumn();
-        `SELECT * FROM assets
+
+    if (await assetsHasUserIdColumn()) {
       const params = [searchTerm, userId];
       let sql =
         `SELECT * FROM assets
@@ -818,20 +674,9 @@ export async function searchAssetsForUser(query, userId, organizationId = null) 
     if (hasOrganizationId) {
       sql += ' AND organization_id = $3';
       params.push(organizationId);
-         WHERE user_id = $2
+    }
     sql += ' ORDER BY created_at DESC';
     const result = await pool.query(sql, params);
-       FROM assets
-       WHERE lower(assigned_user_name) = ANY ($2)
-         AND (
-           asset_tag ILIKE $1
-           OR manufacturer ILIKE $1
-           OR model ILIKE $1
-           OR assigned_user_name ILIKE $1
-         )
-       ORDER BY created_at DESC`,
-      [searchTerm, values.map(v => v.toLowerCase())]
-    );
     return result.rows;
   } catch (error) {
     console.error('Error searching assets for user:', error);
