@@ -561,8 +561,21 @@ async function ensureOnboardingFoundationSchema() {
       ALTER TABLE assets ADD COLUMN IF NOT EXISTS category_id INTEGER;
       ALTER TABLE assets ADD COLUMN IF NOT EXISTS location VARCHAR(255);
       ALTER TABLE assets ADD COLUMN IF NOT EXISTS assigned_to INTEGER;
+      ALTER TABLE assets ADD COLUMN IF NOT EXISTS organization_id INTEGER;
       ALTER TABLE assets ADD CONSTRAINT IF NOT EXISTS fk_assets_location_id FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE SET NULL;
       ALTER TABLE assets ADD CONSTRAINT IF NOT EXISTS fk_assets_category_id FOREIGN KEY (category_id) REFERENCES asset_categories(id) ON DELETE SET NULL;
+      ALTER TABLE assets ADD CONSTRAINT IF NOT EXISTS fk_assets_org_id FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE;
+      CREATE INDEX IF NOT EXISTS idx_assets_org_id ON assets(organization_id);
+    `);
+
+    // Best-effort backfill: attach existing assets to their owner's organization when possible
+    await client.query(`
+      UPDATE assets a
+         SET organization_id = u.organization_id
+        FROM auth_users u
+       WHERE a.organization_id IS NULL
+         AND a.user_id = u.id
+         AND u.organization_id IS NOT NULL;
     `);
 
     await client.query('COMMIT');
@@ -721,8 +734,8 @@ app.post('/api/auth/register', authLimiter, [
   try {
     const { username, email, password, fullName } = req.body;
 
-    // Grant full feature access from day one: register new users as admins.
-    const user = await authQueries.createAuthUser(username, email, password, fullName, 'admin');
+    // Default new users to standard role; org onboarding can elevate within their tenant.
+    const user = await authQueries.createAuthUser(username, email, password, fullName, 'user');
     const token = generateToken(user);
 
     // Send welcome email (non-blocking)
@@ -1344,83 +1357,71 @@ app.get('/api/analytics/export', authenticateToken, requireAdmin, async (req, re
 
 // ===== ASSET ROUTES (Protected) =====
 
+async function resolveUserOrgContext(req) {
+  const userId = req.user?.userId ?? req.user?.id;
+  if (!userId) {
+    throw new Error('Invalid token structure');
+  }
+
+  await db.setCurrentUserId(userId);
+
+  let organizationId = req.user?.organizationId || null;
+  let dbUser = null;
+  if (!organizationId || req.user?.role === 'admin') {
+    dbUser = await authQueries.findUserById(userId);
+    organizationId = organizationId || dbUser?.organization_id || null;
+  }
+
+  if (!organizationId) {
+    throw new Error('Organization not set for user');
+  }
+
+  const isAdmin = typeof (dbUser?.role || req.user?.role) === 'string' && (dbUser?.role || req.user?.role).toLowerCase() === 'admin';
+  return { userId, organizationId, isAdmin, dbUser };
+}
+
 // Get all assets (RLS: users see only their own, admins see all)
 app.get('/api/assets', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.userId ?? req.user?.id;
-    const role = req.user?.role;
-    if (!userId) {
-      return res.status(401).json({ error: 'Invalid token structure' });
-    }
-    await db.setCurrentUserId(userId);
-
-    // Defense-in-depth: do not trust JWT role alone for "admin sees all".
-    // If token claims admin, verify against DB.
-    let isAdmin = role === 'admin';
-    if (isAdmin) {
-      const dbUser = await authQueries.findUserById(userId);
-      isAdmin = typeof dbUser?.role === 'string' && dbUser.role.toLowerCase() === 'admin';
-    }
+    const { userId, organizationId, isAdmin } = await resolveUserOrgContext(req);
 
     const assets = isAdmin
-      ? await db.getAllAssets()
-      : await db.getAssetsForUser(userId);
+      ? await db.getAllAssets(organizationId)
+      : await db.getAssetsForUser(userId, organizationId);
     res.json(assets);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.message === 'Organization not set for user' ? 400 : 500).json({ error: error.message });
   }
 });
 
 // Get asset by ID (RLS: users see only their own, admins see all)
 app.get('/api/assets/:id', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.userId ?? req.user?.id;
-    const role = req.user?.role;
-    if (!userId) {
-      return res.status(401).json({ error: 'Invalid token structure' });
-    }
-    await db.setCurrentUserId(userId);
-
-    let isAdmin = role === 'admin';
-    if (isAdmin) {
-      const dbUser = await authQueries.findUserById(userId);
-      isAdmin = typeof dbUser?.role === 'string' && dbUser.role.toLowerCase() === 'admin';
-    }
+    const { userId, organizationId, isAdmin } = await resolveUserOrgContext(req);
 
     const asset = isAdmin
-      ? await db.getAssetById(req.params.id)
-      : await db.getAssetByIdForUser(req.params.id, userId);
+      ? await db.getAssetById(req.params.id, organizationId)
+      : await db.getAssetByIdForUser(req.params.id, userId, organizationId);
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }
     res.json(asset);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.message === 'Organization not set for user' ? 400 : 500).json({ error: error.message });
   }
 });
 
 // Search assets (RLS: users see only their own, admins see all)
 app.get('/api/assets/search/:query', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user?.userId ?? req.user?.id;
-    const role = req.user?.role;
-    if (!userId) {
-      return res.status(401).json({ error: 'Invalid token structure' });
-    }
-    await db.setCurrentUserId(userId);
-
-    let isAdmin = role === 'admin';
-    if (isAdmin) {
-      const dbUser = await authQueries.findUserById(userId);
-      isAdmin = typeof dbUser?.role === 'string' && dbUser.role.toLowerCase() === 'admin';
-    }
+    const { userId, organizationId, isAdmin } = await resolveUserOrgContext(req);
 
     const assets = isAdmin
-      ? await db.searchAssets(req.params.query)
-      : await db.searchAssetsForUser(req.params.query, userId);
+      ? await db.searchAssets(req.params.query, organizationId)
+      : await db.searchAssetsForUser(req.params.query, userId, organizationId);
     res.json(assets);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(error.message === 'Organization not set for user' ? 400 : 500).json({ error: error.message });
   }
 });
 
@@ -1437,13 +1438,13 @@ app.get('/api/stats', async (req, res) => {
 // Create new asset (Admin-only)
 app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { userId } = req.user;
-    await db.setCurrentUserId(userId);
+    const { userId, organizationId } = await resolveUserOrgContext(req);
     
     // If user_id not provided in body, assign to requesting user (for admins creating for users)
     const assetData = {
       ...req.body,
-      user_id: req.body.user_id || userId  // Default to current user if not specified
+      user_id: req.body.user_id || userId,  // Default to current user if not specified
+      organization_id: organizationId
     };
     
     const asset = await db.createAsset(assetData);
@@ -1476,11 +1477,20 @@ app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
 // Update asset (Admin-only)
 app.put('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { userId } = req.user;
+    const { userId, organizationId } = await resolveUserOrgContext(req);
     await db.setCurrentUserId(userId);
+
+    if (req.body.organization_id && Number(req.body.organization_id) !== Number(organizationId)) {
+      return res.status(403).json({ error: 'organization_id cannot be changed' });
+    }
+
+    const oldAsset = await db.getAssetById(req.params.id, organizationId);
+    if (!oldAsset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+
+    const asset = await db.updateAsset(req.params.id, { ...req.body, organization_id: organizationId }, organizationId);
     
-    const oldAsset = await db.getAssetById(req.params.id);
-    const asset = await db.updateAsset(req.params.id, req.body);
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }
@@ -1514,7 +1524,10 @@ app.put('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) => 
 // Delete asset
 app.delete('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const asset = await db.deleteAsset(req.params.id);
+    const { userId, organizationId } = await resolveUserOrgContext(req);
+    await db.setCurrentUserId(userId);
+
+    const asset = await db.deleteAsset(req.params.id, organizationId);
     if (!asset) {
       return res.status(404).json({ error: 'Asset not found' });
     }

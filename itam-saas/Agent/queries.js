@@ -384,8 +384,16 @@ export async function getConsumablesSchemaDiagnostics() {
 /**
  * Get all assets
  */
-export async function getAllAssets() {
+export async function getAllAssets(organizationId = null) {
   try {
+    if (await assetsHasOrganizationIdColumn()) {
+      const result = await pool.query(
+        'SELECT * FROM assets WHERE organization_id = $1 ORDER BY created_at DESC',
+        [organizationId]
+      );
+      return result.rows;
+    }
+
     const result = await pool.query('SELECT * FROM assets ORDER BY created_at DESC');
     return result.rows;
   } catch (error) {
@@ -412,6 +420,26 @@ async function assetsHasUserIdColumn() {
     // Fail open to legacy schema behavior if information_schema isn't accessible.
     _assetsHasUserIdColumn = false;
     return _assetsHasUserIdColumn;
+  }
+}
+
+let _assetsHasOrganizationIdColumn;
+async function assetsHasOrganizationIdColumn() {
+  if (typeof _assetsHasOrganizationIdColumn === 'boolean') return _assetsHasOrganizationIdColumn;
+  try {
+    const result = await pool.query(
+      `SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name = 'assets'
+         AND column_name = 'organization_id'
+       LIMIT 1`
+    );
+    _assetsHasOrganizationIdColumn = result.rowCount > 0;
+    return _assetsHasOrganizationIdColumn;
+  } catch (e) {
+    _assetsHasOrganizationIdColumn = false;
+    return _assetsHasOrganizationIdColumn;
   }
 }
 
@@ -462,9 +490,16 @@ function normalizeIdentityValues(identity) {
 /**
  * Get assets for a specific user (defense-in-depth alongside RLS)
  */
-export async function getAssetsForUser(userId) {
+export async function getAssetsForUser(userId, organizationId = null) {
   try {
     if (await assetsHasUserIdColumn()) {
+      if (await assetsHasOrganizationIdColumn()) {
+        const result = await pool.query(
+          'SELECT * FROM assets WHERE user_id = $1 AND organization_id = $2 ORDER BY created_at DESC',
+          [userId, organizationId]
+        );
+        return result.rows;
+      }
       const result = await pool.query(
         'SELECT * FROM assets WHERE user_id = $1 ORDER BY created_at DESC',
         [userId]
@@ -477,13 +512,16 @@ export async function getAssetsForUser(userId) {
     const values = normalizeIdentityValues(identity);
     if (values.length === 0) return [];
 
-    const result = await pool.query(
-      `SELECT *
+    const params = [values.map(v => v.toLowerCase())];
+    let sql = `SELECT *
        FROM assets
-       WHERE lower(assigned_user_name) = ANY ($1)
-       ORDER BY created_at DESC`,
-      [values.map(v => v.toLowerCase())]
-    );
+       WHERE lower(assigned_user_name) = ANY ($1)`;
+    if (await assetsHasOrganizationIdColumn()) {
+      sql += ' AND organization_id = $2';
+      params.push(organizationId);
+    }
+    sql += ' ORDER BY created_at DESC';
+    const result = await pool.query(sql, params);
     return result.rows;
   } catch (error) {
     console.error('Error fetching assets for user:', error);
@@ -494,8 +532,12 @@ export async function getAssetsForUser(userId) {
 /**
  * Get asset by ID
  */
-export async function getAssetById(id) {
+export async function getAssetById(id, organizationId = null) {
   try {
+    if (await assetsHasOrganizationIdColumn()) {
+      const result = await pool.query('SELECT * FROM assets WHERE id = $1 AND organization_id = $2', [id, organizationId]);
+      return result.rows[0];
+    }
     const result = await pool.query('SELECT * FROM assets WHERE id = $1', [id]);
     return result.rows[0];
   } catch (error) {
@@ -507,9 +549,16 @@ export async function getAssetById(id) {
 /**
  * Get asset by ID scoped to a user
  */
-export async function getAssetByIdForUser(id, userId) {
+export async function getAssetByIdForUser(id, userId, organizationId = null) {
   try {
     if (await assetsHasUserIdColumn()) {
+      if (await assetsHasOrganizationIdColumn()) {
+        const result = await pool.query(
+          'SELECT * FROM assets WHERE id = $1 AND user_id = $2 AND organization_id = $3',
+          [id, userId, organizationId]
+        );
+        return result.rows[0];
+      }
       const result = await pool.query(
         'SELECT * FROM assets WHERE id = $1 AND user_id = $2',
         [id, userId]
@@ -521,13 +570,16 @@ export async function getAssetByIdForUser(id, userId) {
     const values = normalizeIdentityValues(identity);
     if (values.length === 0) return null;
 
-    const result = await pool.query(
-      `SELECT *
+    const params = [id, values.map(v => v.toLowerCase())];
+    let sql = `SELECT *
        FROM assets
        WHERE id = $1
-         AND lower(assigned_user_name) = ANY ($2)`,
-      [id, values.map(v => v.toLowerCase())]
-    );
+         AND lower(assigned_user_name) = ANY ($2)`;
+    if (await assetsHasOrganizationIdColumn()) {
+      sql += ' AND organization_id = $3';
+      params.push(organizationId);
+    }
+    const result = await pool.query(sql, params);
     return result.rows[0];
   } catch (error) {
     console.error('Error fetching asset for user:', error);
@@ -552,27 +604,32 @@ export async function getAssetByTag(assetTag) {
  * Create new asset
  */
 export async function createAsset(assetData) {
-  const { asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category } = assetData;
+  const { asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category, organization_id } = assetData;
   
   try {
     // Check if category column exists
     const hasCategoryColumn = await assetsHasCategoryColumn();
     
     if (await assetsHasUserIdColumn()) {
+      const hasOrg = await assetsHasOrganizationIdColumn();
       if (hasCategoryColumn) {
         const result = await pool.query(
-          `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category${hasOrg ? ', organization_id' : ''})
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11${hasOrg ? ', $12' : ''})
            RETURNING *`,
-          [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, category]
+          hasOrg
+            ? [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, category, organization_id]
+            : [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, category]
         );
         return result.rows[0];
       } else {
         const result = await pool.query(
-          `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+          `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id${hasOrg ? ', organization_id' : ''})
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10${hasOrg ? ', $11' : ''})
            RETURNING *`,
-          [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id]
+          hasOrg
+            ? [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, organization_id]
+            : [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id]
         );
         return result.rows[0];
       }
@@ -587,18 +644,22 @@ export async function createAsset(assetData) {
 
     if (hasCategoryColumn) {
       const result = await pool.query(
-        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, category)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, category${await assetsHasOrganizationIdColumn() ? ', organization_id' : ''})
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10${await assetsHasOrganizationIdColumn() ? ', $11' : ''})
          RETURNING *`,
-        [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false, category]
+        await assetsHasOrganizationIdColumn()
+          ? [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false, category, organization_id]
+          : [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false, category]
       );
       return result.rows[0];
     } else {
       const result = await pool.query(
-        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered${await assetsHasOrganizationIdColumn() ? ', organization_id' : ''})
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9${await assetsHasOrganizationIdColumn() ? ', $10' : ''})
          RETURNING *`,
-        [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false]
+        await assetsHasOrganizationIdColumn()
+          ? [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false, organization_id]
+          : [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false]
       );
       return result.rows[0];
     }
@@ -612,7 +673,7 @@ export async function createAsset(assetData) {
 /**
  * Update asset
  */
-export async function updateAsset(id, assetData) {
+export async function updateAsset(id, assetData, organizationId = null) {
   // Legacy schema compatibility: translate user_id updates into assigned_user_name.
   if (!(await assetsHasUserIdColumn()) && assetData && Object.prototype.hasOwnProperty.call(assetData, 'user_id')) {
     const newUserId = assetData.user_id;
@@ -629,8 +690,12 @@ export async function updateAsset(id, assetData) {
   const fields = [];
   const values = [];
   let paramCount = 1;
+  const hasOrganizationId = await assetsHasOrganizationIdColumn();
 
   for (const [key, value] of Object.entries(assetData)) {
+    if (key === 'organization_id' && !hasOrganizationId) {
+      continue;
+    }
     if (value !== undefined && value !== null) {
       fields.push(`${key} = $${paramCount}`);
       values.push(value);
@@ -645,9 +710,14 @@ export async function updateAsset(id, assetData) {
   fields.push(`updated_at = $${paramCount}`);
   values.push(new Date());
   values.push(id);
+  let whereClause = `WHERE id = $${paramCount + 1}`;
+  if (hasOrganizationId) {
+    values.push(organizationId);
+    whereClause += ` AND organization_id = $${paramCount + 2}`;
+  }
 
   try {
-    const query = `UPDATE assets SET ${fields.join(', ')} WHERE id = $${paramCount + 1} RETURNING *`;
+    const query = `UPDATE assets SET ${fields.join(', ')} ${whereClause} RETURNING *`;
     const result = await pool.query(query, values);
     return result.rows[0];
   } catch (error) {
@@ -659,9 +729,16 @@ export async function updateAsset(id, assetData) {
 /**
  * Delete asset
  */
-export async function deleteAsset(id) {
+export async function deleteAsset(id, organizationId = null) {
   try {
-    const result = await pool.query('DELETE FROM assets WHERE id = $1 RETURNING *', [id]);
+    const params = [id];
+    let sql = 'DELETE FROM assets WHERE id = $1';
+    if (await assetsHasOrganizationIdColumn()) {
+      params.push(organizationId);
+      sql += ' AND organization_id = $2';
+    }
+    sql += ' RETURNING *';
+    const result = await pool.query(sql, params);
     return result.rows[0];
   } catch (error) {
     console.error('Error deleting asset:', error);
@@ -672,10 +749,12 @@ export async function deleteAsset(id) {
 /**
  * Search assets
  */
-export async function searchAssets(query) {
+export async function searchAssets(query, organizationId = null) {
   try {
     const searchTerm = `%${query}%`;
     const hasCategoryColumn = await assetsHasCategoryColumn();
+    const hasOrganizationId = await assetsHasOrganizationIdColumn();
+    const params = [searchTerm];
     
     let sql;
     if (hasCategoryColumn) {
@@ -686,18 +765,23 @@ export async function searchAssets(query) {
           OR assigned_user_name ILIKE $1
           OR category ILIKE $1
        ORDER BY created_at DESC`;
-    } else {
-      sql = `SELECT * FROM assets 
+          OR category ILIKE $1`;
        WHERE asset_tag ILIKE $1 
           OR manufacturer ILIKE $1 
           OR model ILIKE $1 
           OR assigned_user_name ILIKE $1
        ORDER BY created_at DESC`;
-    }
-    
+          OR assigned_user_name ILIKE $1`;
     const result = await pool.query(sql, [searchTerm]);
+
+    if (hasOrganizationId) {
+      sql += ' AND organization_id = $2';
+      params.push(organizationId);
+    }
+
+    sql += ' ORDER BY created_at DESC';
     return result.rows;
-  } catch (error) {
+    const result = await pool.query(sql, params);
     console.error('Error searching assets:', error);
     throw error;
   }
@@ -708,9 +792,13 @@ export async function searchAssets(query) {
  */
 export async function searchAssetsForUser(query, userId) {
   try {
-    const searchTerm = `%${query}%`;
+export async function searchAssetsForUser(query, userId, organizationId = null) {
     if (await assetsHasUserIdColumn()) {
       const result = await pool.query(
+    const hasOrganizationId = await assetsHasOrganizationIdColumn();
+        `SELECT * FROM assets
+      const params = [searchTerm, userId];
+      let sql =
         `SELECT * FROM assets
          WHERE user_id = $2
            AND (
@@ -718,10 +806,13 @@ export async function searchAssetsForUser(query, userId) {
              OR manufacturer ILIKE $1
              OR model ILIKE $1
              OR assigned_user_name ILIKE $1
-           )
-         ORDER BY created_at DESC`,
-        [searchTerm, userId]
-      );
+           )`;
+      if (hasOrganizationId) {
+        sql += ' AND organization_id = $3';
+        params.push(organizationId);
+      }
+      sql += ' ORDER BY created_at DESC';
+      const result = await pool.query(sql, params);
       return result.rows;
     }
 
@@ -729,8 +820,23 @@ export async function searchAssetsForUser(query, userId) {
     const values = normalizeIdentityValues(identity);
     if (values.length === 0) return [];
 
-    const result = await pool.query(
+    const params = [searchTerm, values.map(v => v.toLowerCase())];
+    let sql =
       `SELECT *
+       FROM assets
+       WHERE lower(assigned_user_name) = ANY ($2)
+         AND (
+           asset_tag ILIKE $1
+           OR manufacturer ILIKE $1
+           OR model ILIKE $1
+           OR assigned_user_name ILIKE $1
+         )`;
+    if (hasOrganizationId) {
+      sql += ' AND organization_id = $3';
+      params.push(organizationId);
+         WHERE user_id = $2
+    sql += ' ORDER BY created_at DESC';
+    const result = await pool.query(sql, params);
        FROM assets
        WHERE lower(assigned_user_name) = ANY ($2)
          AND (
