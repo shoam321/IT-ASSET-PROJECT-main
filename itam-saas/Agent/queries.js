@@ -205,34 +205,6 @@ export async function initDatabase() {
 }
 
 /**
- * Lightweight diagnostics for DB/session context to aid 42P01 debugging
- */
-export async function getDbSessionInfo() {
-  try {
-    const r = await pool.query(
-      "SELECT current_database() AS database, current_user AS \"user\", current_setting('search_path', true) AS search_path"
-    );
-    return r.rows[0] || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Check presence of consumables tables using to_regclass
- */
-export async function getConsumablesSchemaDiagnostics() {
-  try {
-    const r = await pool.query(
-      "SELECT to_regclass('public.consumables') AS consumables, to_regclass('public.consumable_transactions') AS consumable_transactions"
-    );
-    return r.rows[0] || null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Get all assets
  */
 export async function getAllAssets(organizationId = null) {
