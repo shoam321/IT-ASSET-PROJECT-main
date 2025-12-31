@@ -31,6 +31,53 @@ export async function setCurrentUserId(userId) {
   }
 }
 
+/**
+ * Execute a query with RLS context properly set using a dedicated client from the pool.
+ * This ensures the session variable and queries execute on the same connection.
+ */
+export async function withRLSContext(userId, callback) {
+  const client = await pool.connect();
+  try {
+    const shouldLogRls = String(process.env.DEBUG_RLS || '').toLowerCase() === 'true';
+    if (shouldLogRls) {
+      console.log(`🔐 Setting app.current_user_id = ${userId}`);
+    }
+
+    await client.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
+
+    if (shouldLogRls) {
+      const verify = await client.query("SELECT current_setting('app.current_user_id', true) as value");
+      console.log(`✅ Verified app.current_user_id = ${verify.rows[0].value}`);
+    }
+
+    return await callback(client);
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Execute a query with system context (owner/unrestricted).
+ * Uses DATABASE_OWNER_URL if available, otherwise DATABASE_URL.
+ */
+export async function withSystemContext(callback) {
+  const { Pool } = await import('pg');
+  const ownerDsn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
+  if (!ownerDsn) throw new Error('DATABASE_URL not configured');
+
+  const systemPool = new Pool({
+    connectionString: ownerDsn,
+    ssl: ownerDsn.includes('railway') ? { rejectUnauthorized: false } : false
+  });
+  const client = await systemPool.connect();
+  try {
+    return await callback(client);
+  } finally {
+    client.release();
+    await systemPool.end();
+  }
+}
+
 /** Lightweight DB/session diagnostics */
 export async function getDbSessionInfo() {
   try {
@@ -2216,6 +2263,110 @@ export async function markWebhookProcessed(eventId, status = 'processed') {
     );
   } catch (error) {
     console.error('Error updating webhook event status:', error);
+    throw error;
+  }
+}
+
+// ============ BILLING/ORGANIZATION QUERIES ============
+
+/**
+ * Get current organization's billing status
+ */
+export async function getOrganizationBilling(organizationId, client = null) {
+  const queryClient = client || pool;
+  try {
+    const result = await queryClient.query(
+      `SELECT
+        id, name, domain, plan,
+        billing_tier, subscription_status, paypal_subscription_id,
+        subscription_started_at, subscription_current_period_end,
+        subscription_updated_at, created_at, updated_at
+       FROM organizations
+       WHERE id = $1`,
+      [organizationId]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error fetching organization billing:', error);
+    throw error;
+  }
+}
+
+/**
+ * Set/update organization subscription status and billing tier
+ */
+export async function setOrganizationSubscription(organizationId, updates = {}, client = null) {
+  const queryClient = client || pool;
+  const fields = [];
+  const values = [];
+  let paramCount = 1;
+
+  if (updates.paypalSubscriptionId !== undefined) {
+    fields.push(`paypal_subscription_id = $${paramCount++}`);
+    values.push(updates.paypalSubscriptionId || null);
+  }
+  if (updates.subscriptionStatus !== undefined) {
+    fields.push(`subscription_status = $${paramCount++}`);
+    values.push(updates.subscriptionStatus || null);
+  }
+  if (updates.subscriptionStartedAt !== undefined) {
+    fields.push(`subscription_started_at = $${paramCount++}`);
+    values.push(updates.subscriptionStartedAt || null);
+  }
+  if (updates.subscriptionCurrentPeriodEnd !== undefined) {
+    fields.push(`subscription_current_period_end = $${paramCount++}`);
+    values.push(updates.subscriptionCurrentPeriodEnd || null);
+  }
+  if (updates.billingTier !== undefined) {
+    fields.push(`billing_tier = $${paramCount++}`);
+    values.push(updates.billingTier || 'regular');
+  }
+
+  if (fields.length === 0) return null;
+
+  fields.push(`subscription_updated_at = NOW()`);
+  fields.push(`updated_at = NOW()`);
+  values.push(organizationId);
+
+  try {
+    const sql = `UPDATE organizations SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING id, name, domain, plan, billing_tier, subscription_status, paypal_subscription_id, subscription_started_at, subscription_current_period_end, created_at, updated_at`;
+    const result = await queryClient.query(sql, values);
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error updating organization subscription:', error);
+    throw error;
+  }
+}
+
+/**
+ * Set billing tier for an organization (admin/system context)
+ */
+export async function setOrganizationBillingTier(organizationId, updates = {}, client = null) {
+  const queryClient = client || pool;
+  const fields = [];
+  const values = [];
+  let paramCount = 1;
+
+  if (updates.billingTier !== undefined) {
+    fields.push(`billing_tier = $${paramCount++}`);
+    values.push(updates.billingTier);
+  }
+  if (updates.subscriptionStatus !== undefined) {
+    fields.push(`subscription_status = $${paramCount++}`);
+    values.push(updates.subscriptionStatus);
+  }
+
+  if (fields.length === 0) return null;
+
+  fields.push(`updated_at = NOW()`);
+  values.push(organizationId);
+
+  try {
+    const sql = `UPDATE organizations SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING id, name, domain, plan, billing_tier, subscription_status, created_at, updated_at`;
+    const result = await queryClient.query(sql, values);
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error updating organization billing tier:', error);
     throw error;
   }
 }
