@@ -32,6 +32,9 @@ Set:
 - `PAYPAL_WEBHOOK_ID` = your PayPal **Webhook ID**
 - `PAYPAL_REGULAR_PLAN_ID` = your PayPal **Plan ID** (e.g. `P-...`) (recommended for validation)
 
+Optional (debug only):
+- `DEBUG_RLS=true` to enable verbose `app.current_user_id` logs. Leave unset/false in production to reduce log noise.
+
 ## 3) Database Migration
 Run the org billing migration on the production DB:
 - Script: `npm run migrate:org-billing` (in the Agent service)

@@ -40,13 +40,17 @@ const __dirname = path.dirname(__filename);
  */
 export async function setCurrentUserId(userId) {
   try {
+    const shouldLogRls = String(process.env.DEBUG_RLS || '').toLowerCase() === 'true';
+
     // Handle undefined or null userId gracefully
     if (userId === undefined || userId === null) {
       console.warn('⚠️ setCurrentUserId called with undefined/null userId, using 0');
       userId = 0;
     }
-    
-    console.log(`🔐 Setting app.current_user_id = ${userId}`); // DEBUG
+
+    if (shouldLogRls) {
+      console.log(`🔐 Setting app.current_user_id = ${userId}`);
+    }
     
     // Use set_config() function instead of SET command
     // set_config(setting_name, new_value, is_local)
@@ -55,7 +59,9 @@ export async function setCurrentUserId(userId) {
     
     // Verify it was set
     const verify = await pool.query("SELECT current_setting('app.current_user_id', true) as value");
-    console.log(`✅ Verified app.current_user_id = ${verify.rows[0].value}`); // DEBUG
+    if (shouldLogRls) {
+      console.log(`✅ Verified app.current_user_id = ${verify.rows[0].value}`);
+    }
     
   } catch (error) {
     console.error('Error setting current user ID:', error);
@@ -80,20 +86,26 @@ export async function setCurrentUserId(userId) {
 export async function withRLSContext(userId, callback) {
   const client = await pool.connect();
   try {
+    const shouldLogRls = String(process.env.DEBUG_RLS || '').toLowerCase() === 'true';
+
     // Handle undefined or null userId gracefully
     if (userId === undefined || userId === null) {
       console.warn('⚠️ withRLSContext called with undefined/null userId, using 0');
       userId = 0;
     }
-    
-    console.log(`🔐 Setting app.current_user_id = ${userId}`);
+
+    if (shouldLogRls) {
+      console.log(`🔐 Setting app.current_user_id = ${userId}`);
+    }
     
     // Set the session variable on THIS specific client connection
     await client.query("SELECT set_config('app.current_user_id', $1, false)", [userId.toString()]);
     
     // Verify it was set (on the same connection)
     const verify = await client.query("SELECT current_setting('app.current_user_id', true) as value");
-    console.log(`✅ Verified app.current_user_id = ${verify.rows[0].value}`);
+    if (shouldLogRls) {
+      console.log(`✅ Verified app.current_user_id = ${verify.rows[0].value}`);
+    }
     
     // Execute the callback with the same client
     return await callback(client);
