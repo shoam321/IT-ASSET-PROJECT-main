@@ -463,6 +463,68 @@ async function ensureOrgSchema() {
     await client.query(
       'CREATE INDEX IF NOT EXISTS idx_auth_users_organization_id ON auth_users(organization_id)'
     );
+
+    // ===== Enable RLS and create policies =====
+    
+    // Enable RLS on organizations table
+    await client.query('ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;');
+
+    // SELECT policy - users can see orgs they belong to
+    await client.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_policies 
+          WHERE tablename = 'organizations' AND policyname = 'organizations_select_policy'
+        ) THEN
+          CREATE POLICY organizations_select_policy ON organizations
+            FOR SELECT
+            USING (
+              id IN (
+                SELECT organization_id FROM auth_users 
+                WHERE id = current_setting('app.current_user_id', TRUE)::INTEGER
+              )
+            );
+        END IF;
+      END $$;
+    `);
+
+    // UPDATE policy - only admins/owners can update
+    await client.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_policies 
+          WHERE tablename = 'organizations' AND policyname = 'organizations_update_policy'
+        ) THEN
+          CREATE POLICY organizations_update_policy ON organizations
+            FOR UPDATE
+            USING (
+              id IN (
+                SELECT organization_id FROM auth_users 
+                WHERE id = current_setting('app.current_user_id', TRUE)::INTEGER
+                AND org_role IN ('owner', 'admin')
+              )
+            );
+        END IF;
+      END $$;
+    `);
+
+    // INSERT policy - allows system context (app.system='1') to create organizations
+    await client.query(`
+      DO $$ 
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_policies 
+          WHERE tablename = 'organizations' AND policyname = 'organizations_insert_policy'
+        ) THEN
+          CREATE POLICY organizations_insert_policy ON organizations
+            FOR INSERT
+            WITH CHECK (current_setting('app.system', TRUE) = '1');
+        END IF;
+      END $$;
+    `);
+
   } finally {
     client.release();
     await ownerPool.end();

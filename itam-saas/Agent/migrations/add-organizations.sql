@@ -94,6 +94,19 @@ BEGIN
   END IF;
 END $$;
 
+-- INSERT policy for organizations (allows system context to create orgs)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'organizations' AND policyname = 'organizations_insert_policy'
+  ) THEN
+    CREATE POLICY organizations_insert_policy ON organizations
+      FOR INSERT
+      WITH CHECK (current_setting('app.system', TRUE) = '1');
+  END IF;
+END $$;
+
 -- RLS Policies for organization_invitations
 DO $$ 
 BEGIN
