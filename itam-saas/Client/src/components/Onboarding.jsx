@@ -38,6 +38,12 @@ export default function Onboarding({ onComplete }) {
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        // Treat 409 (already assigned) as success so user can proceed.
+        if (response.status === 409) {
+          setSuccess('You are already assigned to an organization. Continuing...');
+          onComplete?.();
+          return;
+        }
         throw new Error(data?.error || 'Failed to create organization');
       }
 
