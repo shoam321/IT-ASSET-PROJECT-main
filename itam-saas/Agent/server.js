@@ -377,6 +377,37 @@ app.use((req, res, next) => {
 const FRONTEND_BASE_URL = process.env.FRONTEND_URL || 'https://it-asset-project.vercel.app';
 const paypalCurrencySet = new Set((paypalCurrencies || []).map(c => c.toUpperCase()));
 
+// Ensure multi-tenant org schema exists (idempotent, safe for reruns)
+async function ensureOrgSchema() {
+  await db.withSystemContext(async (client) => {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS organizations (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        domain VARCHAR(255),
+        plan VARCHAR(50) DEFAULT 'free',
+        settings JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(
+      `ALTER TABLE auth_users
+       ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)`
+    );
+
+    await client.query(
+      `ALTER TABLE auth_users
+       ADD COLUMN IF NOT EXISTS org_role VARCHAR(50) DEFAULT 'member'`
+    );
+
+    await client.query(
+      'CREATE INDEX IF NOT EXISTS idx_auth_users_organization_id ON auth_users(organization_id)'
+    );
+  });
+}
+
 function toCents(amount) {
   const num = Number(amount);
   if (!Number.isFinite(num) || num <= 0) {
@@ -397,6 +428,13 @@ async function startServer() {
       console.log(`🔄 Attempting to initialize database (${6 - retries}/5)...`);
       await db.initDatabase();
       console.log('✅ Database initialized successfully');
+
+      try {
+        await ensureOrgSchema();
+      } catch (schemaError) {
+        console.error('❌ Failed to ensure org schema:', schemaError.message);
+        throw schemaError;
+      }
       
       // Initialize alert service after database is ready
       try {
