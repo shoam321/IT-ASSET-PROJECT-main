@@ -648,6 +648,44 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
   res.json({ message: 'Logged out successfully' });
 });
 
+// ===== ORGANIZATIONS (minimal bootstrap) =====
+// Create an organization for an existing user who is not assigned to any org yet.
+app.post('/api/organizations/bootstrap', authenticateToken, [
+  body('name').trim().isLength({ min: 2, max: 255 }).withMessage('Organization name is required'),
+  body('domain').optional().trim().isLength({ max: 255 })
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const userId = req.user?.userId ?? req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+
+    // IMPORTANT: use system context so we can create/assign even when user has no org yet.
+    // This endpoint is still protected by JWT and only affects the current user.
+    const org = await db.withSystemContext(async () => {
+      return await authQueries.createOrganizationForExistingUser(userId, req.body.name, req.body.domain || null);
+    });
+
+    const updatedUser = await authQueries.findUserById(userId);
+    const token = generateToken(updatedUser);
+
+    return res.status(201).json({ organization: org, token });
+  } catch (error) {
+    const msg = String(error?.message || 'Failed to create organization');
+    if (msg.includes('already assigned')) {
+      return res.status(409).json({ error: msg });
+    }
+    if (msg.includes('not found')) {
+      return res.status(404).json({ error: msg });
+    }
+    console.error('Organization bootstrap error:', error);
+    return res.status(500).json({ error: 'Failed to create organization' });
+  }
+});
+
 // --- AUDIT TRAIL ENDPOINTS ---
 
 function csvEscape(value) {

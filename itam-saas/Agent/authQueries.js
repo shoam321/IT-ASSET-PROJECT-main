@@ -248,3 +248,52 @@ export async function ensureDefaultAdmin() {
     console.error('Error ensuring default admin:', error);
   }
 }
+
+/**
+ * Create an organization and assign the existing user as its owner.
+ *
+ * Constraints:
+ * - Only allowed when the user currently has organization_id IS NULL.
+ * - Does NOT change the user's global role (admin/user).
+ */
+export async function createOrganizationForExistingUser(userId, orgName, orgDomain = null) {
+  if (!userId) throw new Error('userId is required');
+  if (!orgName || !String(orgName).trim()) throw new Error('orgName is required');
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const userRes = await client.query(
+      'SELECT id, organization_id FROM auth_users WHERE id = $1 FOR UPDATE',
+      [userId]
+    );
+    const user = userRes.rows[0];
+    if (!user) throw new Error('User not found');
+    if (user.organization_id) throw new Error('User is already assigned to an organization');
+
+    const orgRes = await client.query(
+      `INSERT INTO organizations (name, domain)
+       VALUES ($1, $2)
+       RETURNING id, name, domain, plan, created_at`,
+      [String(orgName).trim(), orgDomain || null]
+    );
+
+    const organizationId = orgRes.rows[0].id;
+
+    await client.query(
+      `UPDATE auth_users
+       SET organization_id = $2, org_role = 'owner'
+       WHERE id = $1 AND organization_id IS NULL`,
+      [userId, organizationId]
+    );
+
+    await client.query('COMMIT');
+    return orgRes.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
