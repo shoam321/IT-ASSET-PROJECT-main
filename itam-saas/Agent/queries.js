@@ -59,6 +59,7 @@ export async function withRLSContext(userId, callback) {
 /**
  * Execute a query with system context (owner/unrestricted).
  * Uses DATABASE_OWNER_URL if available, otherwise DATABASE_URL.
+ * Sets app.system = '1' to allow system-level RLS policies.
  */
 export async function withSystemContext(callback) {
   const { Pool } = await import('pg');
@@ -71,6 +72,8 @@ export async function withSystemContext(callback) {
   });
   const client = await systemPool.connect();
   try {
+    // Set system context flag for RLS policies
+    await client.query("SELECT set_config('app.system', '1', false)");
     return await callback(client);
   } finally {
     client.release();
