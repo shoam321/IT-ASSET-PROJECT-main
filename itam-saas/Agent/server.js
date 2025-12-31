@@ -1407,19 +1407,27 @@ app.get('/api/analytics/dashboard', authenticateToken, authorize('analytics:view
     
     await db.setCurrentUserId(userId);
     
-    // Get user from database to verify role
+    // Get user from database to verify role and organization
     const user = await authQueries.findUserById(userId);
     const role = typeof user?.role === 'string' ? user.role.toLowerCase() : 'user';
+    const organizationId = user?.organization_id || null;
+    
+    // SECURITY: Require organization for multi-tenant isolation
+    if (!organizationId) {
+      return res.status(403).json({ error: 'User must belong to an organization to view analytics' });
+    }
+    
     // Structured diagnostics to aid troubleshooting 403s
     console.log('[analytics:view] access', {
       userId,
       role,
+      organizationId,
       tokenRole: req.user?.role,
       permissions: req.user?.permissions
     });
     
-    // Admins see all data, regular users see only their own
-    const analytics = await db.getDashboardAnalytics(role, userId);
+    // Filter analytics by organization for multi-tenant isolation
+    const analytics = await db.getDashboardAnalytics(role, userId, organizationId);
     res.json(analytics);
   } catch (error) {
     console.error('Error fetching dashboard analytics:', error);

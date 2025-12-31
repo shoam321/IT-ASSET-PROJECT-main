@@ -256,9 +256,16 @@ export async function initDatabase() {
 
 /**
  * Get all assets
+ * @param {number} organizationId - Organization ID for multi-tenant filtering (REQUIRED for security)
  */
 export async function getAllAssets(organizationId = null) {
   try {
+    // SECURITY: Require organizationId for multi-tenant isolation
+    if (!organizationId) {
+      console.warn('[SECURITY] getAllAssets called without organizationId - returning empty array');
+      return [];
+    }
+    
     if (await assetsHasOrganizationIdColumn()) {
       const result = await pool.query(
         'SELECT * FROM assets WHERE organization_id = $1 ORDER BY created_at DESC',
@@ -267,8 +274,10 @@ export async function getAllAssets(organizationId = null) {
       return result.rows;
     }
 
-    const result = await pool.query('SELECT * FROM assets ORDER BY created_at DESC');
-    return result.rows;
+    // Legacy schema fallback - still requires org check but column doesn't exist
+    // Return empty to prevent cross-tenant data leakage
+    console.warn('[SECURITY] Assets table missing organization_id column - returning empty for safety');
+    return [];
   } catch (error) {
     console.error('Error fetching assets:', error);
     throw error;
@@ -1965,56 +1974,67 @@ export async function findOrCreateGoogleUser(profile) {
 
 /**
  * Get comprehensive dashboard analytics
+ * @param {string} role - 'admin' or 'user'
+ * @param {number} userId - User ID for filtering
+ * @param {number} organizationId - Organization ID for multi-tenant filtering (REQUIRED)
  */
-export async function getDashboardAnalytics(role = 'user', userId = null) {
+export async function getDashboardAnalytics(role = 'user', userId = null, organizationId = null) {
   try {
-    // For regular users, add user_id filter where applicable
-    // Admins see everything, users see only their own data
-    const userFilter = (role === 'admin') ? '' : `WHERE user_id = ${userId}`;
+    // SECURITY: Always filter by organization_id for multi-tenant isolation
+    if (!organizationId) {
+      console.warn('[SECURITY] getDashboardAnalytics called without organizationId');
+      return {
+        overview: { total_assets: 0, total_users: 0, total_licenses: 0, total_contracts: 0, total_consumables: 0, low_stock_items: 0, active_contracts: 0, unresolved_alerts: 0 },
+        assetsByCategory: [],
+        assetsByStatus: [],
+        recentActivity: [],
+        upcomingExpirations: []
+      };
+    }
+
+    // Check if tables have organization_id column
+    const hasOrgCol = await assetsHasOrganizationIdColumn();
+    const orgFilter = hasOrgCol ? 'WHERE organization_id = $1' : '';
+    const orgParams = hasOrgCol ? [organizationId] : [];
     
-    // Overview counts
-    // Note: Some tables like assets, licenses don't have user_id yet,
-    // so for now regular users see aggregated counts
-    // TODO: Add user_id to all relevant tables for proper multi-tenancy
+    // Overview counts - filtered by organization
     const overviewQuery = await pool.query(`
       SELECT
-        (SELECT COUNT(*) FROM assets) as total_assets,
-        (SELECT COUNT(*) FROM auth_users WHERE is_active = true) as total_users,
+        (SELECT COUNT(*) FROM assets ${orgFilter}) as total_assets,
+        (SELECT COUNT(*) FROM auth_users WHERE is_active = true AND organization_id = $1) as total_users,
         (SELECT COUNT(*) FROM licenses) as total_licenses,
         (SELECT COUNT(*) FROM contracts) as total_contracts,
         (SELECT COUNT(*) FROM consumables) as total_consumables,
         (SELECT COUNT(*) FROM consumables WHERE quantity <= min_quantity) as low_stock_items
-    `);
+    `, [organizationId]);
 
-    // Assets by category
+    // Assets by category - filtered by organization
     const assetsByCategoryQuery = await pool.query(`
       SELECT category, COUNT(*) as count
       FROM assets
-      WHERE category IS NOT NULL AND category != ''
+      WHERE category IS NOT NULL AND category != '' ${hasOrgCol ? 'AND organization_id = $1' : ''}
       GROUP BY category
       ORDER BY count DESC
       LIMIT 10
-    `);
+    `, orgParams);
 
-    // Assets by status
+    // Assets by status - filtered by organization
     const assetsByStatusQuery = await pool.query(`
       SELECT status, COUNT(*) as count
       FROM assets
-      WHERE status IS NOT NULL AND status != ''
+      WHERE status IS NOT NULL AND status != '' ${hasOrgCol ? 'AND organization_id = $1' : ''}
       GROUP BY status
       ORDER BY count DESC
-    `);
+    `, orgParams);
 
-    // Recent activity from audit logs (filtered by user for non-admins)
-    const recentActivityFilter = (role === 'admin') ? '' : `WHERE user_id = $1`;
-    const recentActivityParams = (role === 'admin') ? [] : [userId];
+    // Recent activity from audit logs - filtered by organization
     const recentActivityQuery = await pool.query(`
       SELECT action, entity_type, entity_id, user_id, username, details, created_at
       FROM audit_logs
-      ${recentActivityFilter}
+      WHERE user_id IN (SELECT id FROM auth_users WHERE organization_id = $1)
       ORDER BY created_at DESC
       LIMIT 20
-    `, recentActivityParams);
+    `, [organizationId]);
 
     // Upcoming license expirations
     const upcomingExpirationsQuery = await pool.query(`
