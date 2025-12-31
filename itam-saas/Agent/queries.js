@@ -201,6 +201,53 @@ export async function getOrganizationByPayPalSubscriptionId(paypalSubscriptionId
   return result.rows[0] || null;
 }
 
+// ===== Grafana dashboard embeds (per-organization) =====
+
+export async function listGrafanaDashboards(organizationId, client = pool) {
+  const result = await client.query(
+    `SELECT id, name, description, embed_url, created_by, created_at, updated_at
+       FROM grafana_dashboards
+      WHERE organization_id = $1
+      ORDER BY created_at ASC` ,
+    [organizationId]
+  );
+  return result.rows;
+}
+
+export async function createGrafanaDashboard(organizationId, { name, description, embedUrl, createdBy }, client = pool) {
+  const result = await client.query(
+    `INSERT INTO grafana_dashboards (organization_id, name, description, embed_url, created_by)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (organization_id, name)
+       DO UPDATE SET description = EXCLUDED.description, embed_url = EXCLUDED.embed_url, updated_at = CURRENT_TIMESTAMP
+     RETURNING id, name, description, embed_url, created_by, created_at, updated_at`,
+    [organizationId, name, description || null, embedUrl, createdBy || null]
+  );
+  return result.rows[0];
+}
+
+export async function updateGrafanaDashboard(organizationId, dashboardId, { name, description, embedUrl }, client = pool) {
+  const result = await client.query(
+    `UPDATE grafana_dashboards
+        SET name = COALESCE($3, name),
+            description = COALESCE($4, description),
+            embed_url = COALESCE($5, embed_url),
+            updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1 AND organization_id = $2
+      RETURNING id, name, description, embed_url, created_by, created_at, updated_at`,
+    [dashboardId, organizationId, name || null, description || null, embedUrl || null]
+  );
+  return result.rows[0] || null;
+}
+
+export async function deleteGrafanaDashboard(organizationId, dashboardId, client = pool) {
+  const result = await client.query(
+    'DELETE FROM grafana_dashboards WHERE id = $1 AND organization_id = $2 RETURNING id',
+    [dashboardId, organizationId]
+  );
+  return result.rowCount > 0;
+}
+
 /**
  * Verify database tables exist (no automatic creation)
  */

@@ -377,6 +377,33 @@ app.use((req, res, next) => {
 const FRONTEND_BASE_URL = process.env.FRONTEND_URL || 'https://it-asset-project.vercel.app';
 const paypalCurrencySet = new Set((paypalCurrencies || []).map(c => c.toUpperCase()));
 
+const parseAllowedGrafanaHosts = () => {
+  const raw = process.env.GRAFANA_ALLOWED_HOSTS || '';
+  return raw
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .map((v) => {
+      try {
+        return new URL(v).hostname.toLowerCase();
+      } catch {
+        return v.toLowerCase();
+      }
+    });
+};
+
+const isAllowedGrafanaUrl = (value) => {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    const allowed = parseAllowedGrafanaHosts();
+    if (!allowed.length) return true;
+    return allowed.some((h) => host === h || host.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+};
+
 // Ensure multi-tenant org schema exists (idempotent). Uses DATABASE_OWNER_URL when available.
 async function ensureOrgSchema() {
   // Lazy-load pg here to avoid import cycles.
@@ -544,6 +571,39 @@ async function ensureOnboardingFoundationSchema() {
     await client.query('ROLLBACK');
     console.error('Failed to ensure onboarding foundation schema:', e.message);
     throw e;
+  } finally {
+    client.release();
+    await ownerPool.end();
+  }
+}
+
+// Ensure Grafana dashboards table exists (idempotent, owner DSN preferred)
+let _ensureGrafanaDashboardsRan = false;
+async function ensureGrafanaDashboardsSchema() {
+  if (_ensureGrafanaDashboardsRan) return;
+
+  const { Pool } = await import('pg');
+  const ownerDsn = process.env.DATABASE_OWNER_URL || process.env.DATABASE_URL;
+  if (!ownerDsn) throw new Error('DATABASE_URL not configured');
+
+  const ownerPool = new Pool({ connectionString: ownerDsn, ssl: ownerDsn.includes('railway') ? { rejectUnauthorized: false } : false });
+  const client = await ownerPool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS grafana_dashboards (
+        id SERIAL PRIMARY KEY,
+        organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        embed_url TEXT NOT NULL,
+        created_by INTEGER REFERENCES auth_users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_grafana_dashboards_org ON grafana_dashboards(organization_id);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_grafana_dashboards_org_name ON grafana_dashboards(organization_id, name);
+    `);
+    _ensureGrafanaDashboardsRan = true;
   } finally {
     client.release();
     await ownerPool.end();
@@ -2782,6 +2842,143 @@ app.post('/api/billing/paypal/webhook', async (req, res) => {
   } catch (error) {
     console.error('PayPal billing webhook error:', error);
     res.status(500).json({ error: 'Failed to process webhook' });
+  }
+});
+
+// ============ GRAFANA DASHBOARDS (Embeds per organization) ============
+
+app.get('/api/grafana/dashboards', authenticateToken, async (req, res) => {
+  try {
+    await ensureGrafanaDashboardsSchema();
+    const userId = req.user?.userId ?? req.user?.id;
+    let organizationId = req.user?.organizationId || null;
+    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+
+    if (!organizationId) {
+      const dbUser = await authQueries.findUserById(userId);
+      organizationId = dbUser?.organization_id || null;
+    }
+
+    if (!organizationId) {
+      return res.json({ dashboards: [], needsOrganization: true });
+    }
+
+    const dashboards = await db.listGrafanaDashboards(organizationId);
+    return res.json({ dashboards });
+  } catch (error) {
+    console.error('Error fetching grafana dashboards:', error);
+    res.status(500).json({ error: 'Failed to fetch dashboards' });
+  }
+});
+
+app.post('/api/grafana/dashboards', authenticateToken, requireAdmin, [
+  body('name').trim().isLength({ min: 1, max: 255 }).withMessage('Name is required'),
+  body('embedUrl').trim().isLength({ min: 1 }).withMessage('embedUrl is required')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    await ensureGrafanaDashboardsSchema();
+    const userId = req.user?.userId ?? req.user?.id;
+    let organizationId = req.user?.organizationId || null;
+    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+
+    if (!organizationId) {
+      const dbUser = await authQueries.findUserById(userId);
+      organizationId = dbUser?.organization_id || null;
+    }
+
+    if (!organizationId) {
+      return res.status(409).json({ error: 'Create or join an organization first' });
+    }
+
+    const { name, description, embedUrl } = req.body;
+    if (!isAllowedGrafanaUrl(embedUrl)) {
+      return res.status(400).json({ error: 'Embed URL host not allowed. Set GRAFANA_ALLOWED_HOSTS.' });
+    }
+
+    const dashboard = await db.createGrafanaDashboard(organizationId, {
+      name: name.trim(),
+      description: description?.trim() || null,
+      embedUrl: embedUrl.trim(),
+      createdBy: userId
+    });
+
+    return res.status(201).json({ dashboard });
+  } catch (error) {
+    console.error('Error creating grafana dashboard:', error);
+    res.status(500).json({ error: 'Failed to create dashboard' });
+  }
+});
+
+app.put('/api/grafana/dashboards/:id', authenticateToken, requireAdmin, [
+  body('name').optional().trim().isLength({ min: 1, max: 255 }).withMessage('Name must be 1-255 chars'),
+  body('embedUrl').optional().trim().isLength({ min: 1 }).withMessage('embedUrl is required when provided')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    await ensureGrafanaDashboardsSchema();
+    const userId = req.user?.userId ?? req.user?.id;
+    let organizationId = req.user?.organizationId || null;
+    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+
+    if (!organizationId) {
+      const dbUser = await authQueries.findUserById(userId);
+      organizationId = dbUser?.organization_id || null;
+    }
+
+    if (!organizationId) {
+      return res.status(409).json({ error: 'Create or join an organization first' });
+    }
+
+    const { name, description, embedUrl } = req.body;
+    if (embedUrl && !isAllowedGrafanaUrl(embedUrl)) {
+      return res.status(400).json({ error: 'Embed URL host not allowed. Set GRAFANA_ALLOWED_HOSTS.' });
+    }
+
+    const updated = await db.updateGrafanaDashboard(organizationId, Number(req.params.id), {
+      name: name?.trim() || null,
+      description: description?.trim() || null,
+      embedUrl: embedUrl?.trim() || null
+    });
+
+    if (!updated) return res.status(404).json({ error: 'Dashboard not found' });
+    return res.json({ dashboard: updated });
+  } catch (error) {
+    console.error('Error updating grafana dashboard:', error);
+    res.status(500).json({ error: 'Failed to update dashboard' });
+  }
+});
+
+app.delete('/api/grafana/dashboards/:id', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    await ensureGrafanaDashboardsSchema();
+    const userId = req.user?.userId ?? req.user?.id;
+    let organizationId = req.user?.organizationId || null;
+    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+
+    if (!organizationId) {
+      const dbUser = await authQueries.findUserById(userId);
+      organizationId = dbUser?.organization_id || null;
+    }
+
+    if (!organizationId) {
+      return res.status(409).json({ error: 'Create or join an organization first' });
+    }
+
+    const deleted = await db.deleteGrafanaDashboard(organizationId, Number(req.params.id));
+    if (!deleted) return res.status(404).json({ error: 'Dashboard not found' });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting grafana dashboard:', error);
+    res.status(500).json({ error: 'Failed to delete dashboard' });
   }
 });
 

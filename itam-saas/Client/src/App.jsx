@@ -10,6 +10,7 @@ import NetworkTopology from './components/NetworkTopology';
 import AuditTrail from './components/AuditTrail';
 import DigitalReceipts from './components/DigitalReceipts';
 import ReceiptsView from './components/ReceiptsView';
+import GrafanaDashboards from './components/GrafanaDashboards';
 import AssetScanner from './components/AssetScanner';
 import QRCodeGenerator from './components/QRCodeGenerator';
 import StockOverview from './components/StockOverview';
@@ -2179,6 +2180,8 @@ export default function App() {
         return <UsageMonitor />;
       case 'forbidden-apps':
         return <ForbiddenApps />;
+      case 'dashboards':
+        return <GrafanaDashboards />;
       case 'alerts':
         return <AlertHistory />;
       case 'topology':
@@ -2293,6 +2296,18 @@ export default function App() {
               <span>Dashboard</span>
             </button>
           )}
+
+          <button
+            onClick={() => { setCurrentScreen('dashboards'); setShowForm(false); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+              currentScreen === 'dashboards'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-400 hover:bg-slate-700'
+            }`}
+          >
+            <BarChart3 className="w-5 h-5" />
+            <span>Dashboards</span>
+          </button>
 
           {isAdmin && (
             <button
