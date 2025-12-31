@@ -681,8 +681,14 @@ app.post('/api/organizations/bootstrap', authenticateToken, [
     if (msg.includes('not found')) {
       return res.status(404).json({ error: msg });
     }
+    if (error?.code === '23505') {
+      // Unique constraint violations
+      if (error?.constraint === 'organizations_domain_key') {
+        return res.status(409).json({ error: 'An organization with this domain already exists' });
+      }
+    }
     console.error('Organization bootstrap error:', error);
-    return res.status(500).json({ error: 'Failed to create organization' });
+    return res.status(500).json({ error: msg });
   }
 });
 
