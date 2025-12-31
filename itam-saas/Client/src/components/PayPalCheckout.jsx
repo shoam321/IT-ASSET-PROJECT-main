@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 const PayPalCheckout = () => {
   const { user, token } = useAuth();
+  const effectiveToken = token || localStorage.getItem('authToken');
   const [amount, setAmount] = useState('10.00');
   const [currency, setCurrency] = useState('USD');
   const [status, setStatus] = useState(null);
@@ -15,7 +16,7 @@ const PayPalCheckout = () => {
   const clientId = process.env.REACT_APP_PAYPAL_CLIENT_ID || '';
 
   useEffect(() => {
-    if (!user || !token) return;
+    if (!effectiveToken) return;
 
     if (!clientId) {
       setStatus('error');
@@ -50,10 +51,10 @@ const PayPalCheckout = () => {
     return () => {
       script.remove();
     };
-  }, [user, token, currency, clientId]);
+  }, [effectiveToken, currency, clientId]);
 
   useEffect(() => {
-    if (!sdkReady || !window.paypal || !paypalRef.current || !user || !token) return;
+    if (!sdkReady || !window.paypal || !paypalRef.current || !effectiveToken) return;
 
     paypalRef.current.innerHTML = '';
     window.paypal.Buttons({
@@ -75,7 +76,7 @@ const PayPalCheckout = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${effectiveToken}`
           },
           body: JSON.stringify({
             amount: amountNum,
@@ -100,7 +101,7 @@ const PayPalCheckout = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
+            Authorization: `Bearer ${effectiveToken}`
           },
           body: JSON.stringify({ orderId: data.orderID })
         });
@@ -124,7 +125,7 @@ const PayPalCheckout = () => {
         setMessage('Payment cancelled.');
       }
     }).render(paypalRef.current);
-  }, [sdkReady, amount, currency, user, token, apiUrl]);
+  }, [sdkReady, amount, currency, effectiveToken, apiUrl]);
 
   return (
     <div className="max-w-md mx-auto p-6 bg-slate-700 border border-slate-600 rounded-lg shadow-lg">
@@ -133,7 +134,7 @@ const PayPalCheckout = () => {
         <h2 className="text-2xl font-bold text-white">PayPal Checkout</h2>
       </div>
 
-      {!user && (
+      {!effectiveToken && (
         <div className="mb-4 p-4 rounded-lg bg-yellow-900 bg-opacity-30 border border-yellow-700">
           <p className="text-yellow-200 text-sm">⚠️ You must be logged in to make payments.</p>
         </div>
@@ -160,14 +161,14 @@ const PayPalCheckout = () => {
               min="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              disabled={!user}
+              disabled={!effectiveToken}
               className="flex-1 px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
               placeholder="10.00"
             />
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              disabled={!user}
+              disabled={!effectiveToken}
               className="px-3 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
             >
               <option value="USD">USD</option>
@@ -180,6 +181,10 @@ const PayPalCheckout = () => {
 
         <div ref={paypalRef} className="min-h-[150px]"></div>
       </div>
+
+      <p className="text-xs text-slate-400 text-center mt-3">
+        Auth: {effectiveToken ? 'token✓' : 'token✗'} / {user ? 'user✓' : 'user✗'}
+      </p>
 
       <p className="text-xs text-slate-400 text-center mt-4">
         💳 PayPal Live. Real charges will be processed.
