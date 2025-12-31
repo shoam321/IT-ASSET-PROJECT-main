@@ -400,6 +400,10 @@ async function ensureOrgSchema() {
     `);
 
     await client.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_domain ON organizations(domain) WHERE domain IS NOT NULL`
+    );
+
+    await client.query(
       `ALTER TABLE auth_users
        ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)`
     );

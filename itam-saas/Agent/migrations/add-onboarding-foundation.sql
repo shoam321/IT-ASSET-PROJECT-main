@@ -2,6 +2,9 @@
 
 ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS onboarding_completed BOOLEAN DEFAULT FALSE;
 
+-- Ensure org domains are unique to support ON CONFLICT (domain)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_organizations_domain ON organizations(domain) WHERE domain IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS locations (
   id SERIAL PRIMARY KEY,
   organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
