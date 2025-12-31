@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, User, FileEdit, Trash2, PlusCircle, Filter } from 'lucide-react';
 import InfoButton from './InfoButton';
 
@@ -23,9 +23,45 @@ export default function AuditTrail() {
     limit: 100
   });
 
+  const fetchAuditLogs = useCallback(async (activeFilters) => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('authToken');
+      
+      const queryParams = new URLSearchParams();
+      if (activeFilters.table) queryParams.append('table', activeFilters.table);
+      if (activeFilters.action) queryParams.append('action', activeFilters.action);
+      if (activeFilters.startDate) queryParams.append('startDate', activeFilters.startDate);
+      if (activeFilters.endDate) queryParams.append('endDate', activeFilters.endDate);
+      queryParams.append('limit', activeFilters.limit);
+
+      const response = await fetch(`${API_URL}/audit-logs?${queryParams}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error('Failed to fetch audit logs');
+      }
+
+      const data = await response.json();
+      setAuditLogs(Array.isArray(data) ? data : []);
+      setLoading(false);
+    } catch (err) {
+      console.error('Audit log fetch error:', err);
+      setError(err.message);
+      setAuditLogs([]);
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    fetchAuditLogs();
-  }, [appliedFilters]);
+    fetchAuditLogs(appliedFilters);
+  }, [appliedFilters, fetchAuditLogs]);
 
   const getFilenameFromDisposition = (contentDisposition, fallback) => {
     if (!contentDisposition) return fallback;
@@ -78,41 +114,7 @@ export default function AuditTrail() {
     }
   };
 
-  const fetchAuditLogs = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('authToken');
-      
-      const queryParams = new URLSearchParams();
-      if (appliedFilters.table) queryParams.append('table', appliedFilters.table);
-      if (appliedFilters.action) queryParams.append('action', appliedFilters.action);
-      if (appliedFilters.startDate) queryParams.append('startDate', appliedFilters.startDate);
-      if (appliedFilters.endDate) queryParams.append('endDate', appliedFilters.endDate);
-      queryParams.append('limit', appliedFilters.limit);
-
-      const response = await fetch(`${API_URL}/audit-logs?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Session expired. Please login again.');
-        }
-        throw new Error('Failed to fetch audit logs');
-      }
-
-      const data = await response.json();
-      setAuditLogs(Array.isArray(data) ? data : []);
-      setLoading(false);
-    } catch (err) {
-      console.error('Audit log fetch error:', err);
-      setError(err.message);
-      setAuditLogs([]);
-      setLoading(false);
-    }
-  };
+  // fetchAuditLogs is declared above via useCallback
 
   const handleFilter = (e) => {
     e.preventDefault();

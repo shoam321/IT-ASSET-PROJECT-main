@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './UsageMonitor.css';
 import InfoButton from './InfoButton';
 import { downloadCsv } from '../utils/csvExport';
@@ -10,12 +10,12 @@ const UsageMonitor = () => {
   const [appUsageSummary, setAppUsageSummary] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds
+  const refreshInterval = 30000; // 30 seconds
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
   // Fetch all devices
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       if (!token) {
@@ -45,18 +45,18 @@ const UsageMonitor = () => {
       setError(null); // Clear any previous errors
       
       // Auto-select first device if none selected
-      if (!selectedDevice && data.length > 0) {
-        setSelectedDevice(data[0].device_id);
+      if (!selectedDevice && devicesArray.length > 0) {
+        setSelectedDevice(devicesArray[0].device_id);
       }
     } catch (err) {
       console.error('Error fetching devices:', err);
       setError(err.message);
       setDevices([]); // Set empty array on error
     }
-  };
+  }, [API_BASE_URL, selectedDevice]);
 
   // Fetch device usage stats
-  const fetchDeviceUsageStats = async (deviceId) => {
+  const fetchDeviceUsageStats = useCallback(async (deviceId) => {
     if (!deviceId) return;
     
     try {
@@ -82,10 +82,10 @@ const UsageMonitor = () => {
       console.error('Error fetching usage stats:', err);
       setUsageStats([]);
     }
-  };
+  }, [API_BASE_URL]);
 
   // Fetch app usage summary
-  const fetchAppUsageSummary = async () => {
+  const fetchAppUsageSummary = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       if (!token) return;
@@ -109,7 +109,7 @@ const UsageMonitor = () => {
       console.error('Error fetching app usage summary:', err);
       setAppUsageSummary([]);
     }
-  };
+  }, [API_BASE_URL]);
 
   // Initial load
   useEffect(() => {
@@ -123,14 +123,14 @@ const UsageMonitor = () => {
     };
     
     loadData();
-  }, []);
+  }, [fetchDevices, fetchAppUsageSummary]);
 
   // Fetch usage stats when device selected
   useEffect(() => {
     if (selectedDevice) {
       fetchDeviceUsageStats(selectedDevice);
     }
-  }, [selectedDevice]);
+  }, [selectedDevice, fetchDeviceUsageStats]);
 
   // Auto-refresh
   useEffect(() => {
@@ -143,7 +143,7 @@ const UsageMonitor = () => {
     }, refreshInterval);
 
     return () => clearInterval(interval);
-  }, [selectedDevice, refreshInterval]);
+  }, [selectedDevice, refreshInterval, fetchDevices, fetchDeviceUsageStats, fetchAppUsageSummary]);
 
   // Format duration (seconds to readable format)
   const formatDuration = (seconds) => {

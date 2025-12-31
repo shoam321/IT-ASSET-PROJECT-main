@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Package, Plus, Search, Edit2, Trash2, TrendingDown, TrendingUp, AlertTriangle, X, History } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Package, Plus, Search, Edit2, Trash2, TrendingDown, TrendingUp, X, History } from 'lucide-react';
 
 const Consumables = () => {
   const [consumables, setConsumables] = useState([]);
@@ -34,11 +34,7 @@ const Consumables = () => {
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
-  useEffect(() => {
-    fetchConsumables();
-  }, []);
-
-  const fetchConsumables = async () => {
+  const fetchConsumables = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
@@ -71,7 +67,11 @@ const Consumables = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
+
+  useEffect(() => {
+    fetchConsumables();
+  }, [fetchConsumables]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

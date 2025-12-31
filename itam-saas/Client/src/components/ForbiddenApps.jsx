@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, X, Trash2, Search, Edit2, Check, XCircle, Download } from 'lucide-react';
 import InfoButton from './InfoButton';
 import { downloadCsv } from '../utils/csvExport';
@@ -20,16 +20,7 @@ const ForbiddenApps = () => {
   // API base should include `/api` (backend routes are mounted under /api/*)
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
-  useEffect(() => {
-    fetchForbiddenApps();
-  }, []);
-
-  const showSuccessMessage = (message) => {
-    setSuccessMessage(message);
-    setTimeout(() => setSuccessMessage(''), 3000);
-  };
-
-  const fetchForbiddenApps = async () => {
+  const fetchForbiddenApps = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/forbidden-apps`, {
@@ -47,7 +38,18 @@ const ForbiddenApps = () => {
       setError(err.message);
       setLoading(false);
     }
+  }, [API_URL]);
+
+  useEffect(() => {
+    fetchForbiddenApps();
+  }, [fetchForbiddenApps]);
+
+  const showSuccessMessage = (message) => {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(''), 3000);
   };
+
+  // fetchForbiddenApps is declared above via useCallback
 
   const handleAddApp = async (e) => {
     e.preventDefault();

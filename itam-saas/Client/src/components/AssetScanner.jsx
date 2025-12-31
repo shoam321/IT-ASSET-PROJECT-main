@@ -9,7 +9,6 @@ const AssetScanner = ({ onClose }) => {
   const [error, setError] = useState(null);
   const [scannerMode, setScannerMode] = useState('camera'); // 'camera' or 'hardware'
   const [scannerActive, setScannerActive] = useState(true);
-  const [lastScan, setLastScan] = useState('');
   
   // Use ref to persist buffer across renders
   const bufferRef = useRef('');
@@ -32,7 +31,6 @@ const AssetScanner = ({ onClose }) => {
 
       if (asset) {
         setAssetData(asset);
-        setLastScan(assetId);
         setScannerActive(false); // Pause scanner after successful scan
       } else {
         setError(`Asset not found: ${assetId}`);
@@ -164,7 +162,6 @@ const AssetScanner = ({ onClose }) => {
   const handleScanAnother = () => {
     setAssetData(null);
     setError(null);
-    setLastScan('');
     setScannerActive(true);
     bufferRef.current = '';
   };

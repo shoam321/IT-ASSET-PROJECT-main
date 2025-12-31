@@ -118,12 +118,31 @@ export default function NetworkTopology() {
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
+  const fetchDevices = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_URL}/agent/devices`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setDevices(Array.isArray(data) ? data : (data.value || []));
+      }
+    } catch (err) {
+      console.error('Error fetching devices:', err);
+    }
+  }, [API_URL]);
+
   // Fetch monitored devices and load saved topologies
   useEffect(() => {
     fetchDevices();
     const saved = JSON.parse(localStorage.getItem('networkTopologies') || '[]');
     setSavedTopologies(saved);
-  }, []);
+  }, [fetchDevices]);
 
   // Custom node change handler with collision prevention
   const handleNodesChange = useCallback((changes) => {
@@ -174,26 +193,7 @@ export default function NetworkTopology() {
         return adjustedNodes;
       });
     }
-  }, [onNodesChange]);
-
-  const fetchDevices = async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/agent/devices`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setDevices(Array.isArray(data) ? data : (data.value || []));
-      }
-    } catch (err) {
-      console.error('Error fetching devices:', err);
-    }
-  };
+  }, [onNodesChange, setNodes]);
 
   const onConnect = useCallback(
     (params) => {
@@ -212,7 +212,7 @@ export default function NetworkTopology() {
       };
       setEdges((eds) => addEdge(newEdge, eds));
     },
-    [connectionType]
+    [connectionType, setEdges]
   );
 
   const onEdgeClick = useCallback((event, edge) => {

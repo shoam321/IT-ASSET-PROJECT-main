@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Package, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from '../config/assetCategories';
 import CategoryIcon from './CategoryIcon';
@@ -11,11 +11,7 @@ const StockOverview = () => {
   
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
-  useEffect(() => {
-    fetchAssets();
-  }, []);
-
-  const fetchAssets = async () => {
+  const fetchAssets = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
@@ -30,7 +26,11 @@ const StockOverview = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
+
+  useEffect(() => {
+    fetchAssets();
+  }, [fetchAssets]);
 
   // Group assets by category
   const getStockByType = () => {

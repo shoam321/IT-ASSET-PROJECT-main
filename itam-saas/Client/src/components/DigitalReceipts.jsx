@@ -1,25 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, File, Trash2, Download, X, FileText, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { File, Trash2, Download, FileText, Image as ImageIcon, FileSpreadsheet } from 'lucide-react';
 import InfoButton from './InfoButton';
 
 const DigitalReceipts = ({ assetId }) => {
   const [receipts, setReceipts] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [description, setDescription] = useState('');
-  const [showUploadForm, setShowUploadForm] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
-  useEffect(() => {
-    if (assetId) {
-      fetchReceipts();
-    }
-  }, [assetId]);
-
-  const fetchReceipts = async () => {
+  const fetchReceipts = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
@@ -37,69 +27,13 @@ const DigitalReceipts = ({ assetId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL, assetId]);
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // Validate file size (10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        setError('File size must be less than 10MB');
-        return;
-      }
-
-      // Validate file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf', 
-                           'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                           'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-      
-      if (!allowedTypes.includes(file.type)) {
-        setError('Invalid file type. Allowed: Images, PDF, Word, Excel');
-        return;
-      }
-
-      setSelectedFile(file);
-      setError(null);
+  useEffect(() => {
+    if (assetId) {
+      fetchReceipts();
     }
-  };
-
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      setError('Please select a file');
-      return;
-    }
-
-    try {
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('receipt', selectedFile);
-      formData.append('description', description);
-
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/assets/${assetId}/receipts`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
-
-      // Reset form and refresh list
-      setSelectedFile(null);
-      setDescription('');
-      setShowUploadForm(false);
-      await fetchReceipts();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUploading(false);
-    }
-  };
+  }, [assetId, fetchReceipts]);
 
   const handleDelete = async (receiptId) => {
     if (!window.confirm('Are you sure you want to delete this receipt?')) {

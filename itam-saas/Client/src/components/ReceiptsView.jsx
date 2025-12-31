@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Search, Download, Trash2, Calendar, DollarSign, Building, Filter, X, Upload, Plus } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { FileText, Search, Download, Trash2, Calendar, DollarSign, Building, X, Upload } from 'lucide-react';
 
 const ReceiptsView = () => {
   const [receipts, setReceipts] = useState([]);
@@ -17,12 +17,7 @@ const ReceiptsView = () => {
   
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
-  useEffect(() => {
-    fetchAllReceipts();
-    fetchAssets();
-  }, []);
-
-  const fetchAssets = async () => {
+  const fetchAssets = useCallback(async () => {
     try {
       const token = localStorage.getItem('authToken');
       const response = await fetch(`${API_URL}/assets`, {
@@ -42,9 +37,9 @@ const ReceiptsView = () => {
     } catch (err) {
       console.error('Failed to load assets:', err);
     }
-  };
+  }, [API_URL]);
 
-  const fetchAllReceipts = async () => {
+  const fetchAllReceipts = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('authToken');
@@ -62,7 +57,12 @@ const ReceiptsView = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_URL]);
+
+  useEffect(() => {
+    fetchAllReceipts();
+    fetchAssets();
+  }, [fetchAllReceipts, fetchAssets]);
 
   const handleDelete = async (receiptId) => {
     if (!window.confirm('Are you sure you want to delete this receipt?')) {

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import QRCode from 'qrcode';
 import { Download, Printer, X } from 'lucide-react';
 
@@ -6,13 +6,7 @@ const QRCodeGenerator = ({ asset, onClose }) => {
   const canvasRef = useRef(null);
   const [qrGenerated, setQrGenerated] = useState(false);
 
-  useEffect(() => {
-    if (asset && canvasRef.current) {
-      generateQRCode();
-    }
-  }, [asset]);
-
-  const generateQRCode = async () => {
+  const generateQRCode = useCallback(async () => {
     try {
       // Generate URL with asset details as query params for hybrid offline/online access
       const baseUrl = window.location.origin;
@@ -41,7 +35,13 @@ const QRCodeGenerator = ({ asset, onClose }) => {
     } catch (error) {
       console.error('Error generating QR code:', error);
     }
-  };
+  }, [asset]);
+
+  useEffect(() => {
+    if (asset && canvasRef.current) {
+      generateQRCode();
+    }
+  }, [asset, generateQRCode]);
 
   const handleDownload = () => {
     if (canvasRef.current) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Package, Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, Monitor, Laptop, Server, Router, Cable, Printer, Smartphone, Tablet, MonitorSpeaker, Keyboard, Mouse, Zap, Headphones, Usb, Container, Wifi, Cloud, Box, BarChart3, CreditCard } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, BarChart3, CreditCard } from 'lucide-react';
 import * as dbService from './services/db';
 import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from './config/assetCategories';
 import { useAuth } from './context/AuthContext';
@@ -8,7 +8,6 @@ import ForbiddenApps from './components/ForbiddenApps';
 import AlertHistory from './components/AlertHistory';
 import NetworkTopology from './components/NetworkTopology';
 import AuditTrail from './components/AuditTrail';
-import InfoButton from './components/InfoButton';
 import DigitalReceipts from './components/DigitalReceipts';
 import ReceiptsView from './components/ReceiptsView';
 import AssetScanner from './components/AssetScanner';
@@ -339,21 +338,6 @@ export default function App() {
       cost: asset.cost || 0
     });
     setShowForm(true);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setShowForm(false);
-    setFormData({
-      asset_tag: '',
-      asset_type: '',
-      category: '',
-      manufacturer: '',
-      model: '',
-      serial_number: '',
-      assigned_user_name: '',
-      status: 'In Use'
-    });
   };
 
   const handleDeleteAsset = async (id) => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { RefreshCw, Filter, Download } from 'lucide-react';
 import InfoButton from './InfoButton';
@@ -17,6 +17,44 @@ const AlertHistory = () => {
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app';
   const WS_URL = API_URL.replace('/api', ''); // Remove /api for WebSocket connection
 
+  const fetchAlerts = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_URL}/alerts?limit=100`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch alerts');
+
+      const data = await response.json();
+      setAlerts(data);
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  }, [API_URL]);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_URL}/alerts/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch stats');
+
+      const data = await response.json();
+      setStats(data);
+    } catch (err) {
+      console.error('Stats fetch error:', err);
+    }
+  }, [API_URL]);
+
   // Fetch alerts on mount and set up auto-refresh
   useEffect(() => {
     fetchAlerts();
@@ -34,7 +72,7 @@ const AlertHistory = () => {
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [autoRefresh]);
+  }, [autoRefresh, fetchAlerts, fetchStats]);
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -74,45 +112,7 @@ const AlertHistory = () => {
     return () => {
       newSocket.close();
     };
-  }, []);
-
-  const fetchAlerts = async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/alerts?limit=100`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch alerts');
-
-      const data = await response.json();
-      setAlerts(data);
-      setLoading(false);
-    } catch (err) {
-      setError(err.message);
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/alerts/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch stats');
-
-      const data = await response.json();
-      setStats(data);
-    } catch (err) {
-      console.error('Stats fetch error:', err);
-    }
-  };
+  }, [WS_URL, fetchAlerts, fetchStats]);
 
   const handleStatusChange = async (id, newStatus) => {
     try {
