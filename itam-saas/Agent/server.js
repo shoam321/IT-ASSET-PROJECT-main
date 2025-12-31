@@ -390,7 +390,9 @@ const paypalCurrencySet = new Set((paypalCurrencies || []).map(c => c.toUpperCas
 
 const parseAllowedGrafanaHosts = () => {
   const raw = process.env.GRAFANA_ALLOWED_HOSTS || '';
-  return raw
+  // Default allowed hosts for Railway Grafana deployments
+  const defaultHosts = ['railway.app', 'grafana.com', 'grafana.net'];
+  const parsed = raw
     .split(',')
     .map((v) => v.trim())
     .filter(Boolean)
@@ -401,6 +403,8 @@ const parseAllowedGrafanaHosts = () => {
         return v.toLowerCase();
       }
     });
+  // Combine user-configured hosts with defaults
+  return [...new Set([...parsed, ...defaultHosts])];
 };
 
 const isAllowedGrafanaUrl = (value) => {
