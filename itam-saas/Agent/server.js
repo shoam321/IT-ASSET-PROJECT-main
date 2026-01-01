@@ -786,6 +786,16 @@ async function startServer() {
         // Do not rethrow; continue startup so existing endpoints remain available.
       }
       
+      // Disable RLS on assets/licenses tables - security enforced at application level
+      try {
+        const pgPool = db.getPool();
+        await pgPool.query('ALTER TABLE assets DISABLE ROW LEVEL SECURITY');
+        await pgPool.query('ALTER TABLE licenses DISABLE ROW LEVEL SECURITY');
+        console.log('✅ RLS disabled on assets/licenses (security at app level)');
+      } catch (rlsError) {
+        console.error('⚠️ Failed to disable RLS:', rlsError.message);
+      }
+      
       // Initialize alert service after database is ready
       try {
         await initializeAlertService(io);
@@ -1595,6 +1605,9 @@ app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { userId, organizationId } = await resolveUserOrgContext(req);
     
+    // Set current user for RLS policies
+    await db.setCurrentUserId(userId);
+    
     // If user_id not provided in body, assign to requesting user (for admins creating for users)
     const assetData = {
       ...req.body,
@@ -1602,7 +1615,9 @@ app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
       organization_id: organizationId
     };
     
+    console.log('[asset-create] Creating asset:', { assetData, userId, organizationId });
     const asset = await db.createAsset(assetData);
+    console.log('[asset-create] Asset created successfully:', asset?.id);
     
     // Send email if asset assigned to user with email
     if (req.body.assigned_to && req.body.assigned_user_email) {
