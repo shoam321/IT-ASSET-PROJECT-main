@@ -27,6 +27,7 @@ import * as emailService from './emailService.js';
 import { startLicenseExpirationChecker, stopLicenseExpirationChecker } from './licenseExpirationChecker.js';
 import { createOrder as createPayPalOrder, captureOrder as capturePayPalOrder, verifyWebhookSignature, allowedCurrencies as paypalCurrencies } from './paypalClient.js';
 import { getSubscription as getPayPalSubscription } from './paypalSubscriptions.js';
+import { startHealthCheckScheduler, stopHealthCheckScheduler, runHealthCheckAndNotify } from './healthCheckService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -847,6 +848,14 @@ async function startServer() {
         console.error('⚠️ Failed to start license expiration checker:', error.message);
       }
       
+      // Start 24-hour health check scheduler
+      try {
+        startHealthCheckScheduler();
+        console.log('✅ Health check scheduler started (24-hour interval)');
+      } catch (error) {
+        console.error('⚠️ Failed to start health check scheduler:', error.message);
+      }
+      
       return;
     } catch (error) {
       retries--;
@@ -870,6 +879,33 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     version: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_COMMIT || 'unknown'
   });
+});
+
+// Comprehensive health check with email notification (Admin-only)
+app.post('/api/health/check', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    console.log('🏥 Manual health check triggered by admin');
+    const report = await runHealthCheckAndNotify();
+    res.json({
+      message: 'Health check completed and email sent',
+      report
+    });
+  } catch (error) {
+    console.error('❌ Manual health check failed:', error);
+    res.status(500).json({ error: 'Health check failed', details: error.message });
+  }
+});
+
+// Get health check status without sending email (Admin-only)
+app.get('/api/health/status', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { runHealthChecks } = await import('./healthCheckService.js');
+    const report = await runHealthChecks();
+    res.json(report);
+  } catch (error) {
+    console.error('❌ Health status check failed:', error);
+    res.status(500).json({ error: 'Health check failed', details: error.message });
+  }
 });
 
 // ===== AUTHENTICATION ROUTES =====
