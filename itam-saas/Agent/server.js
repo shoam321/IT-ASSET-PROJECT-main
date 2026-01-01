@@ -1426,8 +1426,12 @@ app.get('/api/analytics/dashboard', authenticateToken, authorize('analytics:view
       permissions: req.user?.permissions
     });
     
-    // Filter analytics by organization for multi-tenant isolation
-    const analytics = await db.getDashboardAnalytics(role, userId, organizationId);
+    // Cache analytics per organization (expensive query)
+    const cacheKey = `analytics:org:${organizationId}`;
+    const analytics = await getCached(cacheKey, async () => {
+      return await db.getDashboardAnalytics(role, userId, organizationId);
+    }, 30); // Cache for 30 seconds (analytics should be fairly fresh)
+    
     res.json(analytics);
   } catch (error) {
     console.error('Error fetching dashboard analytics:', error);
@@ -1528,9 +1532,17 @@ app.get('/api/assets', authenticateToken, async (req, res) => {
   try {
     const { userId, organizationId, isAdmin } = await resolveUserOrgContext(req);
 
-    const assets = isAdmin
-      ? await db.getAllAssets(organizationId)
-      : await db.getAssetsForUser(userId, organizationId);
+    // Cache key includes org and user context for proper isolation
+    const cacheKey = isAdmin 
+      ? `assets:org:${organizationId}:all`
+      : `assets:org:${organizationId}:user:${userId}`;
+    
+    const assets = await getCached(cacheKey, async () => {
+      return isAdmin
+        ? await db.getAllAssets(organizationId)
+        : await db.getAssetsForUser(userId, organizationId);
+    }, 60); // Cache for 60 seconds
+    
     res.json(assets);
   } catch (error) {
     res.status(error.message === 'Organization not set for user' ? 400 : 500).json({ error: error.message });
@@ -1611,6 +1623,9 @@ app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
       userAgent: req.headers['user-agent']
     });
     
+    // Invalidate assets cache for this organization
+    await invalidateCache(`assets:org:${organizationId}:*`);
+    
     res.status(201).json(asset);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -1658,6 +1673,9 @@ app.put('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) => 
       userAgent: req.headers['user-agent']
     });
     
+    // Invalidate assets cache for this organization
+    await invalidateCache(`assets:org:${organizationId}:*`);
+    
     res.json(asset);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -1683,6 +1701,9 @@ app.delete('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) 
       userAgent: req.headers['user-agent']
     });
     
+    // Invalidate assets cache for this organization
+    await invalidateCache(`assets:org:${organizationId}:*`);
+    
     res.json({ message: 'Asset deleted', asset });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1694,7 +1715,9 @@ app.delete('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) 
 // Get all licenses
 app.get('/api/licenses', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const licenses = await db.getAllLicenses();
+    const licenses = await getCached('licenses:all', async () => {
+      return await db.getAllLicenses();
+    }, 120); // Cache for 2 minutes
     res.json(licenses);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1726,6 +1749,10 @@ app.post('/api/licenses', authenticateToken, requireAdmin, async (req, res) => {
       userAgent: req.headers['user-agent']
     });
     
+    // Invalidate cache
+    await invalidateCache('licenses:*');
+    await invalidateCache('analytics:*');
+    
     res.status(201).json(license);
   } catch (error) {
     console.error('❌ License creation error:', error.message);
@@ -1754,6 +1781,10 @@ app.put('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res) =
       userAgent: req.headers['user-agent']
     });
     
+    // Invalidate cache
+    await invalidateCache('licenses:*');
+    await invalidateCache('analytics:*');
+    
     res.json(license);
   } catch (error) {
     console.error('❌ License update error:', error.message);
@@ -1777,6 +1808,10 @@ app.delete('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res
       userAgent: req.headers['user-agent']
     });
     
+    // Invalidate cache
+    await invalidateCache('licenses:*');
+    await invalidateCache('analytics:*');
+    
     res.json({ message: 'License deleted', license });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1788,7 +1823,9 @@ app.delete('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res
 // Get all users
 app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const users = await db.getAllUsers();
+    const users = await getCached('users:all', async () => {
+      return await db.getAllUsers();
+    }, 60); // Cache for 60 seconds
     res.json(users);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1884,7 +1921,9 @@ app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) =
 // Get all contracts
 app.get('/api/contracts', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const contracts = await db.getAllContracts();
+    const contracts = await getCached('contracts:all', async () => {
+      return await db.getAllContracts();
+    }, 120); // Cache for 2 minutes
     res.json(contracts);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1914,6 +1953,10 @@ app.post('/api/contracts', authenticateToken, requireAdmin, async (req, res) => 
       userAgent: req.headers['user-agent']
     });
     
+    // Invalidate cache
+    await invalidateCache('contracts:*');
+    await invalidateCache('analytics:*');
+    
     res.status(201).json(contract);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -1938,6 +1981,10 @@ app.put('/api/contracts/:id', authenticateToken, requireAdmin, async (req, res) 
       userAgent: req.headers['user-agent']
     });
     
+    // Invalidate cache
+    await invalidateCache('contracts:*');
+    await invalidateCache('analytics:*');
+    
     res.json(contract);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -1959,6 +2006,10 @@ app.delete('/api/contracts/:id', authenticateToken, requireAdmin, async (req, re
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
+    
+    // Invalidate cache
+    await invalidateCache('contracts:*');
+    await invalidateCache('analytics:*');
     
     res.json({ message: 'Contract deleted', contract });
   } catch (error) {
