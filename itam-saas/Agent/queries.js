@@ -6,6 +6,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Export pool getter for health checks
+export function getPool() {
+  return pool;
+}
+
 // ============ RLS HELPERS ============
 
 /**
