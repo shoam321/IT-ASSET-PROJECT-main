@@ -22,7 +22,7 @@ import * as authQueries from './authQueries.js';
 import * as consumablesDb from './consumablesQueries.js';
 import { authenticateToken, generateToken, requireAdmin, authorize } from './middleware/auth.js';
 import { initializeAlertService, shutdownAlertService } from './alertService.js';
-import { getCached, invalidateCache } from './redis.js';
+import { getCached, invalidateCache, getRedisClient } from './redis.js';
 import * as emailService from './emailService.js';
 import { startLicenseExpirationChecker, stopLicenseExpirationChecker } from './licenseExpirationChecker.js';
 import { createOrder as createPayPalOrder, captureOrder as capturePayPalOrder, verifyWebhookSignature, allowedCurrencies as paypalCurrencies } from './paypalClient.js';

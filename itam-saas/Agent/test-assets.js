@@ -12,8 +12,16 @@ async function test() {
   const { token } = await loginRes.json();
   console.log('✅ Logged in\n');
   
+  // Clear cache first
+  console.log('🗑️ Clearing cache...');
+  const clearRes = await fetch(`${API_URL}/api/admin/clear-cache`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  console.log('Cache clear:', await clearRes.json());
+  
   // Get assets
-  console.log('📦 Fetching assets...');
+  console.log('\n📦 Fetching assets...');
   const assetsRes = await fetch(`${API_URL}/api/assets`, {
     headers: { 'Authorization': `Bearer ${token}` }
   });
