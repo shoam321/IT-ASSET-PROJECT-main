@@ -908,6 +908,24 @@ app.get('/api/health/status', authenticateToken, requireAdmin, async (req, res) 
   }
 });
 
+// Clear column cache (Admin-only) - useful after schema changes
+app.post('/api/admin/clear-cache', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    db.clearColumnCache && db.clearColumnCache();
+    // Also clear Redis cache
+    const redis = await getRedisClient();
+    if (redis) {
+      await redis.flushDb();
+      console.log('🗑️ Redis cache flushed');
+    }
+    console.log('🔄 Column cache cleared by admin');
+    res.json({ message: 'Cache cleared successfully' });
+  } catch (error) {
+    console.error('❌ Cache clear failed:', error);
+    res.status(500).json({ error: 'Failed to clear cache', details: error.message });
+  }
+});
+
 // ===== AUTHENTICATION ROUTES =====
 
 // Register new user
