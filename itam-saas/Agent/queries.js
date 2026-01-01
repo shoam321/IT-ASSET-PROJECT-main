@@ -305,6 +305,14 @@ async function assetsHasUserIdColumn() {
   }
 }
 
+// Clear cached column checks (call after schema changes)
+export function clearColumnCache() {
+  _assetsHasOrganizationIdColumn = undefined;
+  _assetsHasUserIdColumn = undefined;
+  _assetsHasCategoryColumn = undefined;
+  console.log('🔄 Column cache cleared - will re-check on next query');
+}
+
 let _assetsHasOrganizationIdColumn;
 async function assetsHasOrganizationIdColumn() {
   if (typeof _assetsHasOrganizationIdColumn === 'boolean') return _assetsHasOrganizationIdColumn;
@@ -318,8 +326,10 @@ async function assetsHasOrganizationIdColumn() {
        LIMIT 1`
     );
     _assetsHasOrganizationIdColumn = result.rowCount > 0;
+    console.log(`📊 assetsHasOrganizationIdColumn check: ${_assetsHasOrganizationIdColumn}`);
     return _assetsHasOrganizationIdColumn;
   } catch (e) {
+    console.error('❌ Error checking organization_id column:', e.message);
     _assetsHasOrganizationIdColumn = false;
     return _assetsHasOrganizationIdColumn;
   }

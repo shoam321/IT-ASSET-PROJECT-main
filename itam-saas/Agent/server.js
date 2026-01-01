@@ -786,6 +786,17 @@ async function startServer() {
         // Do not rethrow; continue startup so existing endpoints remain available.
       }
       
+      // Ensure organization_id column exists on assets table
+      try {
+        const pgPool = db.getPool();
+        await pgPool.query('ALTER TABLE assets ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)');
+        console.log('✅ Assets table has organization_id column');
+        // Clear any cached column checks so they re-detect
+        db.clearColumnCache && db.clearColumnCache();
+      } catch (colError) {
+        console.error('⚠️ Failed to add organization_id to assets:', colError.message);
+      }
+      
       // Disable RLS on assets/licenses tables - security enforced at application level
       try {
         const pgPool = db.getPool();
