@@ -2915,9 +2915,10 @@ app.get('/api/payments', authenticateToken, async (req, res) => {
 });
 
 app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
-  body('amount').isFloat({ gt: 0 }).withMessage('amount must be a positive number'),
+  body('amount').optional().isFloat({ gt: 0 }).withMessage('amount must be a positive number'),
   body('currency').optional().isString().isLength({ min: 3, max: 3 }).withMessage('currency must be a 3-letter code'),
-  body('description').optional().isString().isLength({ max: 255 })
+  body('description').optional().isString().isLength({ max: 255 }),
+  body('plan').optional().isIn(['regular', 'enterprise']).withMessage('plan must be regular or enterprise')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -2938,9 +2939,12 @@ app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
       organizationId = dbUser?.organization_id || null;
     }
 
-    const cents = toCents(req.body.amount);
-    if (!cents) {
-      return res.status(400).json({ error: 'amount must be greater than zero' });
+    const plan = String(req.body.plan || 'regular').toLowerCase();
+    const proPriceCents = Number.parseInt(process.env.PAYPAL_PRO_PRICE_CENTS || '2900', 10);
+    const enterprisePriceCents = Number.parseInt(process.env.PAYPAL_ENTERPRISE_PRICE_CENTS || '9900', 10);
+    const cents = plan === 'enterprise' ? enterprisePriceCents : proPriceCents;
+    if (!Number.isFinite(cents) || cents <= 0) {
+      return res.status(500).json({ error: 'Server billing configuration is invalid' });
     }
 
     const currency = (req.body.currency || 'USD').toUpperCase();
@@ -2948,7 +2952,12 @@ app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
       return res.status(400).json({ error: 'Unsupported currency' });
     }
 
-    const description = req.body.description || 'IT Asset payment';
+    // Pricing is configured in USD cents. Reject other currencies until explicit pricing is added.
+    if (currency !== 'USD') {
+      return res.status(400).json({ error: 'Only USD is supported for subscriptions right now' });
+    }
+
+    const description = req.body.description || `IT Asset subscription - ${plan === 'enterprise' ? 'Enterprise' : 'Pro'}`;
     const returnUrl = `${FRONTEND_BASE_URL}/paypal/return`;
     const cancelUrl = `${FRONTEND_BASE_URL}/paypal/cancel`;
 
@@ -2976,7 +2985,7 @@ app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
         status: order.status || 'CREATED',
         intent: 'CAPTURE',
         description,
-        metadata: { source: 'api', requested_amount: req.body.amount, custom_id: customId }
+        metadata: { source: 'api', plan, custom_id: customId }
       });
     } catch (dbError) {
       // Don't fail order creation due to payments table schema drift.
@@ -3021,19 +3030,35 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
     }
 
     // Validate that the order was created for this org/user without relying on DB persistence.
+    // Fail closed if verification is not possible (except admin).
     try {
       const orderDetails = await getPayPalOrder(orderId);
       const customId = orderDetails?.purchaseUnits?.[0]?.custom_id;
-      if (customId && organizationId) {
-        const expected = `org:${organizationId};user:${userId}`;
-        // Allow admin override
-        if (customId !== expected && role !== 'admin') {
+      if (customId) {
+        const parts = String(customId)
+          .split(';')
+          .map((p) => p.trim())
+          .filter(Boolean);
+        const map = new Map(parts.map((p) => {
+          const [k, ...rest] = p.split(':');
+          return [String(k || '').trim(), rest.join(':').trim()];
+        }));
+        const cidUser = map.get('user');
+        const cidOrg = map.get('org');
+
+        if (cidUser && String(cidUser) !== String(userId) && role !== 'admin') {
+          return res.status(403).json({ error: 'Forbidden' });
+        }
+        if (organizationId && cidOrg && String(cidOrg) !== String(organizationId) && role !== 'admin') {
           return res.status(403).json({ error: 'Forbidden' });
         }
       }
     } catch (verifyError) {
-      // If PayPal order lookup fails, we still attempt capture; PayPal will reject invalid orders.
-      console.warn('[paypal] Failed to fetch order details for verification (continuing):', verifyError?.message || verifyError);
+      if (role !== 'admin') {
+        console.warn('[paypal] Failed to fetch order details for verification (blocked):', verifyError?.message || verifyError);
+        return res.status(503).json({ error: 'Unable to verify PayPal order at this time. Please retry.' });
+      }
+      console.warn('[paypal] Failed to fetch order details for verification (admin override):', verifyError?.message || verifyError);
     }
 
     const result = await capturePayPalOrder(orderId);
@@ -3041,6 +3066,13 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
     if (!result?.captureId) {
       return res.status(500).json({ error: 'Failed to capture order' });
     }
+
+    const normalizedPlan = String(plan || 'regular').toLowerCase();
+    const proPriceCents = Number.parseInt(process.env.PAYPAL_PRO_PRICE_CENTS || '2900', 10);
+    const enterprisePriceCents = Number.parseInt(process.env.PAYPAL_ENTERPRISE_PRICE_CENTS || '9900', 10);
+    const expectedCents = normalizedPlan === 'enterprise' ? enterprisePriceCents : proPriceCents;
+    const capturedCurrency = (result?.amount?.currency_code || 'USD').toUpperCase();
+    const capturedCents = result?.amount?.value ? toCents(result.amount.value) : null;
 
     // Persist capture details if the payments table exists with the expected schema.
     try {
@@ -3050,7 +3082,7 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
         captureId: result.captureId,
         userId,
         amountCents: amountCents || 0,
-        currency: (result?.amount?.currency_code || 'USD').toUpperCase(),
+        currency: capturedCurrency,
         status: result.status || 'CAPTURED',
         intent: 'CAPTURE',
         payerEmail: result.payerEmail,
@@ -3062,8 +3094,10 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
     }
 
     // ✅ UPGRADE ORGANIZATION TO PRO after successful payment!
-    if (organizationId && result.status === 'COMPLETED') {
-      const billingTier = plan === 'enterprise' ? 'enterprise' : 'pro';
+    const amountMatches = capturedCents !== null && Number.isFinite(expectedCents) && capturedCents === expectedCents;
+    const currencyMatches = capturedCurrency === 'USD';
+    if (organizationId && result.status === 'COMPLETED' && amountMatches && currencyMatches) {
+      const billingTier = normalizedPlan === 'enterprise' ? 'enterprise' : 'pro';
       await db.withSystemContext(async (client) => {
         await db.setOrganizationSubscription(organizationId, {
           billingTier,
@@ -3073,6 +3107,15 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
         }, client);
       });
       console.log(`[billing] ✅ Upgraded org ${organizationId} to ${billingTier} after PayPal payment ${orderId}`);
+    } else if (organizationId && result.status === 'COMPLETED' && (!amountMatches || !currencyMatches)) {
+      console.warn('[billing] Payment completed but amount/currency mismatch - not upgrading.', {
+        organizationId,
+        orderId,
+        normalizedPlan,
+        expectedCents,
+        capturedCents,
+        capturedCurrency
+      });
     }
 
     res.json({
@@ -3080,7 +3123,7 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
       captureId: result.captureId,
       payerEmail: result.payerEmail,
       payerName: result.payerName,
-      upgraded: result.status === 'COMPLETED'
+      upgraded: organizationId ? (result.status === 'COMPLETED' && amountMatches && currencyMatches) : false
     });
   } catch (error) {
     console.error('Error capturing PayPal order:', error);
