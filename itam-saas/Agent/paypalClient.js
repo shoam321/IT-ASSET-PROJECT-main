@@ -4,25 +4,15 @@ const PAYPAL_MODE = (process.env.PAYPAL_MODE || 'sandbox').toLowerCase();
 
 let cachedClient = null;
 
-// Log PayPal configuration on module load
-console.log('🔧 PayPal Config:', {
-  mode: PAYPAL_MODE,
-  hasClientId: !!process.env.PAYPAL_CLIENT_ID,
-  clientIdPrefix: process.env.PAYPAL_CLIENT_ID?.substring(0, 10) + '...',
-  hasClientSecret: !!process.env.PAYPAL_CLIENT_SECRET,
-  secretLength: process.env.PAYPAL_CLIENT_SECRET?.length || 0
-});
-
 function getClient() {
   if (cachedClient) return cachedClient;
   const clientId = process.env.PAYPAL_CLIENT_ID;
   const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    console.error('❌ PayPal credentials missing:', { hasClientId: !!clientId, hasClientSecret: !!clientSecret });
+    console.error('❌ PayPal credentials missing');
     throw new Error('PayPal client credentials are not configured');
   }
 
-  console.log('✅ Creating PayPal client in', PAYPAL_MODE, 'mode');
   const environment = PAYPAL_MODE === 'live'
     ? new paypal.core.LiveEnvironment(clientId, clientSecret)
     : new paypal.core.SandboxEnvironment(clientId, clientSecret);
