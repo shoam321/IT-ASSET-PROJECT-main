@@ -2970,21 +2970,30 @@ app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
 });
 
 app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
-  body('orderId').isString().notEmpty().withMessage('orderId is required')
+  body('orderId').isString().notEmpty().withMessage('orderId is required'),
+  body('plan').optional().isString()
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
   }
 
-  const { orderId } = req.body;
+  const { orderId, plan = 'regular' } = req.body;
   try {
     const userId = req.user?.userId ?? req.user?.id;
     const role = req.user?.role;
+    let organizationId = req.user?.organizationId || null;
+    
     if (!userId) {
       return res.status(401).json({ error: 'Invalid token structure' });
     }
     await db.setCurrentUserId(userId);
+
+    // Get organization ID if not in token
+    if (!organizationId) {
+      const dbUser = await authQueries.findUserById(userId);
+      organizationId = dbUser?.organization_id || null;
+    }
 
     const payment = await db.getPaymentByOrderId(orderId);
     if (payment && payment.user_id && payment.user_id !== userId && role !== 'admin') {
@@ -3021,11 +3030,26 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
       });
     }
 
+    // ✅ UPGRADE ORGANIZATION TO PRO after successful payment!
+    if (organizationId && result.status === 'COMPLETED') {
+      const billingTier = plan === 'enterprise' ? 'enterprise' : 'pro';
+      await db.withSystemContext(async (client) => {
+        await db.setOrganizationSubscription(organizationId, {
+          billingTier,
+          subscriptionStatus: 'active',
+          subscriptionStartedAt: new Date(),
+          subscriptionCurrentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+        }, client);
+      });
+      console.log(`[billing] ✅ Upgraded org ${organizationId} to ${billingTier} after PayPal payment ${orderId}`);
+    }
+
     res.json({
       status: result.status || 'CAPTURED',
       captureId: result.captureId,
       payerEmail: result.payerEmail,
-      payerName: result.payerName
+      payerName: result.payerName,
+      upgraded: result.status === 'COMPLETED'
     });
   } catch (error) {
     console.error('Error capturing PayPal order:', error);
