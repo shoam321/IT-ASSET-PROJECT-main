@@ -1029,7 +1029,7 @@ app.post('/api/auth/register', authLimiter, [
 // Complete Onboarding
 app.post('/api/auth/complete-onboarding', authenticateToken, async (req, res) => {
   try {
-    await db.query(
+    await pool.query(
       'UPDATE auth_users SET onboarding_completed = true WHERE id = $1',
       [req.user.id]
     );

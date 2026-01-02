@@ -2213,8 +2213,10 @@ export async function getPaymentsForUser(userId, { limit = 50, offset = 0 } = {}
 
   return withRLSContext(userId, async (client) => {
     const result = await client.query(
-      `SELECT order_id, capture_id, user_id, amount_cents, currency, status, intent,
-              payer_email, payer_name, description, created_at, updated_at
+      `SELECT id, paypal_order_id as order_id, paypal_subscription_id as capture_id, 
+              user_id, amount as amount_cents, currency, status, payment_type as intent,
+              paypal_payer_email as payer_email, metadata->>'payer_name' as payer_name, 
+              description, created_at, updated_at
          FROM payments
         WHERE user_id = $1
         ORDER BY created_at DESC
@@ -2230,8 +2232,10 @@ export async function getAllPayments({ limit = 50, offset = 0 } = {}) {
   const safeOffset = Math.max(Number(offset) || 0, 0);
 
   const result = await pool.query(
-    `SELECT order_id, capture_id, user_id, amount_cents, currency, status, intent,
-            payer_email, payer_name, description, created_at, updated_at
+    `SELECT id, paypal_order_id as order_id, paypal_subscription_id as capture_id, 
+            user_id, amount as amount_cents, currency, status, payment_type as intent,
+            paypal_payer_email as payer_email, metadata->>'payer_name' as payer_name, 
+            description, created_at, updated_at
        FROM payments
       ORDER BY created_at DESC
       LIMIT $1 OFFSET $2`,
@@ -2267,7 +2271,7 @@ export async function updatePaymentStatus(orderId, updates = {}) {
   if (fields.length === 0) return null;
 
   values.push(orderId);
-  const sql = `UPDATE payments SET ${fields.join(', ')}, updated_at = NOW() WHERE order_id = $${fields.length + 1} RETURNING *`;
+  const sql = `UPDATE payments SET ${fields.join(', ')}, updated_at = NOW() WHERE paypal_order_id = $${fields.length + 1} RETURNING *`;
   try {
     const result = await pool.query(sql, values);
     return result.rows[0] || null;
