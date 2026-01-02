@@ -3,12 +3,21 @@ import { useAuth } from '../context/AuthContext';
 import Login from './Login';
 import Register from './Register';
 import OnboardingWizard from './OnboardingWizard';
+import WelcomePage from './WelcomePage';
+import SignUpModal from './SignUpModal';
+import WelcomeAnimation from './WelcomeAnimation';
+import SetupWizard from './SetupWizard';
 import App from '../App';
 import { Loader, AlertCircle } from 'lucide-react';
 
 export default function AuthWrapper() {
-  const { isAuthenticated, loading, login } = useAuth();
+  const { isAuthenticated, loading, login, user, token } = useAuth();
   const [showRegister, setShowRegister] = useState(false);
+  const [showSignUpModal, setShowSignUpModal] = useState(false);
+  const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false);
+  const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [newUserName, setNewUserName] = useState('');
+  const [usePremiumOnboarding, setUsePremiumOnboarding] = useState(true); // Toggle for new UX
 
   // Handle OAuth callback
   useEffect(() => {
@@ -45,10 +54,86 @@ export default function AuthWrapper() {
 
   // If authenticated, show main app
   if (isAuthenticated) {
+    // Check if user needs to complete onboarding
+    if (showSetupWizard || (user && user.onboarding_completed === false)) {
+      return (
+        <SetupWizard
+          token={token}
+          onComplete={() => {
+            setShowSetupWizard(false);
+            window.location.reload();
+          }}
+        />
+      );
+    }
     return <OrgGate />;
   }
 
-  // If not authenticated, show login or register
+  // Premium onboarding: WelcomePage → SignUpModal → WelcomeAnimation → SetupWizard
+  if (usePremiumOnboarding) {
+    // Show welcome animation after signup
+    if (showWelcomeAnimation) {
+      return (
+        <WelcomeAnimation
+          userName={newUserName}
+          onComplete={() => {
+            setShowWelcomeAnimation(false);
+            setShowSetupWizard(true);
+          }}
+        />
+      );
+    }
+
+    // Show signup modal
+    if (showSignUpModal) {
+      return (
+        <>
+          <WelcomePage onGetStarted={() => {}} onSignIn={() => setShowRegister(false)} />
+          <SignUpModal
+            isOpen={showSignUpModal}
+            onClose={() => setShowSignUpModal(false)}
+            onSuccess={(token, userData) => {
+              setNewUserName(userData?.firstName || userData?.username || 'there');
+              login(token, userData);
+              setShowSignUpModal(false);
+              setShowWelcomeAnimation(true);
+            }}
+            onSwitchToLogin={() => {
+              setShowSignUpModal(false);
+              setShowRegister(false);
+            }}
+          />
+        </>
+      );
+    }
+
+    // Show login (traditional)
+    if (showRegister === 'login') {
+      return (
+        <Login
+          onLoginSuccess={(token, user) => {
+            login(token, user);
+          }}
+          onSwitchToRegister={() => {
+            setShowRegister(false);
+            setShowSignUpModal(true);
+          }}
+        />
+      );
+    }
+
+    // Default: Show WelcomePage
+    return (
+      <WelcomePage
+        onGetStarted={(email) => {
+          setShowSignUpModal(true);
+        }}
+        onSignIn={() => setShowRegister('login')}
+      />
+    );
+  }
+
+  // Legacy flow: If not authenticated, show login or register
   return showRegister ? (
     <Register
       onRegisterSuccess={(token, user) => {

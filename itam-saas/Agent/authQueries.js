@@ -9,16 +9,21 @@ import crypto from 'crypto';
  * - Passwords are hashed with bcrypt (`bcryptjs`).
  * - Cost factor is intentionally set to 12 for better resistance against offline cracking.
  */
-export async function createAuthUser(username, email, password, fullName = null, role = 'user', organizationId = null, orgRole = 'member') {
+export async function createAuthUser(username, email, password, fullName = null, role = 'user', organizationId = null, orgRole = 'member', firstName = null, lastName = null) {
   try {
     const salt = await bcrypt.genSalt(12); // Increased salt rounds from 10 to 12
     const passwordHash = await bcrypt.hash(password, salt);
+    
+    // Calculate trial dates (30-day trial)
+    const trialStartedAt = new Date();
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
 
     const result = await pool.query(
-      `INSERT INTO auth_users (username, email, password_hash, full_name, role, organization_id, org_role)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, username, email, full_name, role, organization_id, org_role, is_active, created_at`,
-      [username, email, passwordHash, fullName, role, organizationId, orgRole]
+      `INSERT INTO auth_users (username, email, password_hash, full_name, role, organization_id, org_role, first_name, last_name, trial_started_at, trial_ends_at, onboarding_completed)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false)
+       RETURNING id, username, email, full_name, role, organization_id, org_role, is_active, created_at, first_name, last_name, trial_started_at, trial_ends_at, onboarding_completed`,
+      [username, email, passwordHash, fullName, role, organizationId, orgRole, firstName, lastName, trialStartedAt, trialEndsAt]
     );
 
     return result.rows[0];

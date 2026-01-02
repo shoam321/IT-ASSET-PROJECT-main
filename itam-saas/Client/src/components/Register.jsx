@@ -9,7 +9,8 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
     email: '',
     password: '',
     confirmPassword: '',
-    fullName: ''
+    firstName: '',
+    lastName: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -54,7 +55,8 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
           username: formData.username,
           email: formData.email,
           password: formData.password,
-          fullName: formData.fullName || null
+          firstName: formData.firstName || null,
+          lastName: formData.lastName || null
         })
       });
 
@@ -137,20 +139,36 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
               </div>
             </div>
 
-            {/* Full Name Field (Optional) */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Full Name <span className="text-slate-500 text-xs">(Optional)</span>
-              </label>
-              <input
-                type="text"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleChange}
-                className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-                placeholder="John Doe"
-                disabled={loading}
-              />
+            {/* First Name & Last Name Fields */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  First Name
+                </label>
+                <input
+                  type="text"
+                  name="firstName"
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  placeholder="John"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Last Name
+                </label>
+                <input
+                  type="text"
+                  name="lastName"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  placeholder="Doe"
+                  disabled={loading}
+                />
+              </div>
             </div>
 
             {/* Password Field */}

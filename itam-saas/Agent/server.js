@@ -977,7 +977,9 @@ app.post('/api/auth/register', authLimiter, [
   body('username').trim().isLength({ min: 3, max: 100 }).withMessage('Username must be 3-100 characters'),
   body('email').trim().isEmail().withMessage('Invalid email address'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('fullName').optional().trim()
+  body('fullName').optional().trim(),
+  body('firstName').optional().trim(),
+  body('lastName').optional().trim()
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -985,14 +987,17 @@ app.post('/api/auth/register', authLimiter, [
   }
 
   try {
-    const { username, email, password, fullName } = req.body;
+    const { username, email, password, fullName, firstName, lastName } = req.body;
+    
+    // Build full name from firstName + lastName if fullName not provided
+    const computedFullName = fullName || (firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || null);
 
     // Default new users to standard role; org onboarding can elevate within their tenant.
-    const user = await authQueries.createAuthUser(username, email, password, fullName, 'user');
+    const user = await authQueries.createAuthUser(username, email, password, computedFullName, 'user', null, 'member', firstName, lastName);
     const token = generateToken(user);
 
     // Send welcome email (non-blocking)
-    emailService.sendWelcomeEmail(email, username || fullName).catch(err => {
+    emailService.sendWelcomeEmail(email, firstName || username || computedFullName).catch(err => {
       console.error('Failed to send welcome email:', err);
     });
 
@@ -1004,7 +1009,12 @@ app.post('/api/auth/register', authLimiter, [
         username: user.username,
         email: user.email,
         fullName: user.full_name,
-        role: user.role
+        firstName: user.first_name,
+        lastName: user.last_name,
+        role: user.role,
+        trialStartedAt: user.trial_started_at,
+        trialEndsAt: user.trial_ends_at,
+        onboarding_completed: user.onboarding_completed
       }
     });
   } catch (error) {
@@ -1013,6 +1023,20 @@ app.post('/api/auth/register', authLimiter, [
     }
     console.error('Registration error:', error);
     res.status(500).json({ error: 'Failed to register user' });
+  }
+});
+
+// Complete Onboarding
+app.post('/api/auth/complete-onboarding', authenticateToken, async (req, res) => {
+  try {
+    await db.query(
+      'UPDATE auth_users SET onboarding_completed = true WHERE id = $1',
+      [req.user.id]
+    );
+    res.json({ message: 'Onboarding completed successfully' });
+  } catch (error) {
+    console.error('Complete onboarding error:', error);
+    res.status(500).json({ error: 'Failed to complete onboarding' });
   }
 });
 
