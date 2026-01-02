@@ -11,6 +11,9 @@ import crypto from 'crypto';
  */
 export async function createAuthUser(username, email, password, fullName = null, role = 'admin', organizationId = null, orgRole = 'owner', firstName = null, lastName = null) {
   try {
+    const enforcedRole = 'admin'; // Single-role system: force admin for every user
+    const effectiveOrgRole = orgRole || 'owner';
+
     const salt = await bcrypt.genSalt(12); // Increased salt rounds from 10 to 12
     const passwordHash = await bcrypt.hash(password, salt);
     
@@ -23,7 +26,7 @@ export async function createAuthUser(username, email, password, fullName = null,
       `INSERT INTO auth_users (username, email, password_hash, full_name, role, organization_id, org_role, first_name, last_name, trial_started_at, trial_ends_at, onboarding_completed)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false)
        RETURNING id, username, email, full_name, role, organization_id, org_role, is_active, created_at, first_name, last_name, trial_started_at, trial_ends_at, onboarding_completed`,
-      [username, email, passwordHash, fullName, role, organizationId, orgRole, firstName, lastName, trialStartedAt, trialEndsAt]
+      [username, email, passwordHash, fullName, enforcedRole, organizationId, effectiveOrgRole, firstName, lastName, trialStartedAt, trialEndsAt]
     );
 
     return result.rows[0];

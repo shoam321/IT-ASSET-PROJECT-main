@@ -4,15 +4,21 @@ async function upgradeAllToAdmin() {
   try {
     console.log('🔧 Upgrading all users to admin role...\n');
     
-    const result = await pool.query(
+    const updateResult = await pool.query(
       `UPDATE auth_users 
        SET role = 'admin' 
-       WHERE id IN (1, 3, 4)
+       WHERE role IS DISTINCT FROM 'admin'
        RETURNING id, username, email, role`
     );
 
-    console.log('✅ Users upgraded successfully:');
-    console.table(result.rows);
+    await pool.query(`ALTER TABLE auth_users ALTER COLUMN role SET DEFAULT 'admin';`);
+
+    if (updateResult.rows.length === 0) {
+      console.log('ℹ️ All users are already admins.');
+    } else {
+      console.log('✅ Users upgraded successfully:');
+      console.table(updateResult.rows);
+    }
     
     process.exit(0);
   } catch (error) {
