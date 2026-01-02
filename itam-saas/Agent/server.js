@@ -29,6 +29,11 @@ import { createOrder as createPayPalOrder, captureOrder as capturePayPalOrder, v
 import { getSubscription as getPayPalSubscription } from './paypalSubscriptions.js';
 import { startHealthCheckScheduler, stopHealthCheckScheduler, runHealthCheckAndNotify } from './healthCheckService.js';
 import metrics, { metricsMiddleware, updateBusinessMetrics, updatePoolMetrics, getMetrics, getMetricsContentType, authAttempts, subscriptionEvents, websocketConnections, alertsGenerated, cacheOperations, cacheLatency } from './metrics.js';
+import { setupCrashHandlers, recordStartup, recordError, getCrashStats, getCrashLogsFromDb, getStartupLogsFromDb } from './crashDetectionService.js';
+
+// Initialize crash detection FIRST before anything else
+setupCrashHandlers();
+recordStartup();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -967,6 +972,36 @@ app.post('/api/admin/clear-cache', authenticateToken, requireAdmin, async (req, 
   } catch (error) {
     console.error('❌ Cache clear failed:', error);
     res.status(500).json({ error: 'Failed to clear cache', details: error.message });
+  }
+});
+
+// ===== CRASH DETECTION API =====
+
+// Get crash statistics (Admin-only)
+app.get('/api/admin/crash-stats', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const stats = getCrashStats();
+    const crashLogs = await getCrashLogsFromDb(20);
+    const startupLogs = await getStartupLogsFromDb(50);
+    
+    res.json({
+      current: stats,
+      crashLogs,
+      startupLogs
+    });
+  } catch (error) {
+    console.error('❌ Failed to get crash stats:', error);
+    res.status(500).json({ error: 'Failed to get crash stats', details: error.message });
+  }
+});
+
+// Manually trigger a test crash alert (Admin-only, for testing)
+app.post('/api/admin/test-crash-alert', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    recordError(new Error('Test crash alert - triggered manually'), { type: 'test' });
+    res.json({ message: 'Test error recorded. If thresholds are met, an alert will be sent.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to record test error', details: error.message });
   }
 });
 
@@ -3593,6 +3628,10 @@ startServer();
 app.use((err, req, res, next) => {
   const requestId = req?.requestId || 'unknown';
   console.error(`[${new Date().toISOString()}] [${requestId}] Unhandled error:`, err);
+  
+  // Record error for crash detection
+  recordError(err, { requestId, url: req?.url, method: req?.method });
+  
   if (res.headersSent) {
     return next(err);
   }
@@ -3610,6 +3649,7 @@ process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
   stopLicenseExpirationChecker(global.licenseCheckerInterval);
   clearInterval(global.metricsInterval);
+  clearInterval(global.memoryCheckInterval);
   await shutdownAlertService();
   process.exit(0);
 });
@@ -3618,6 +3658,7 @@ process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
   stopLicenseExpirationChecker(global.licenseCheckerInterval);
   clearInterval(global.metricsInterval);
+  clearInterval(global.memoryCheckInterval);
   await shutdownAlertService();
   process.exit(0);
 });
