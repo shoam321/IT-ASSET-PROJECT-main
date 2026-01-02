@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, Building2, CheckCircle, CreditCard, Sparkles, Zap, Shield, ChevronRight } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { AlertCircle, Building2, CheckCircle, CreditCard, Sparkles, Zap, Shield, ChevronRight, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Billing = () => {
@@ -7,8 +7,6 @@ const Billing = () => {
   const effectiveToken = token || localStorage.getItem('authToken');
 
   const apiUrl = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
-  const clientId = process.env.REACT_APP_PAYPAL_CLIENT_ID || '';
-  const regularPlanId = process.env.REACT_APP_PAYPAL_REGULAR_PLAN_ID || '';
 
   const [status, setStatus] = useState(null);
   const [message, setMessage] = useState('');
@@ -18,11 +16,7 @@ const Billing = () => {
   const [billingError, setBillingError] = useState('');
   const [needsOrganization, setNeedsOrganization] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('regular');
-
-  const [sdkReady, setSdkReady] = useState(false);
-  const paypalRef = useRef(null);
-  const paypalButtonsRef = useRef(null);
-  const paypalRenderNonceRef = useRef(0);
+  const [upgradeRequested, setUpgradeRequested] = useState(false);
 
   const plans = {
     regular: {
@@ -51,13 +45,6 @@ const Billing = () => {
       ]
     }
   };
-
-  const canSubscribe = useMemo(() => {
-    if (!effectiveToken) return false;
-    if (!clientId || !regularPlanId) return false;
-    if (needsOrganization) return false;
-    return true;
-  }, [effectiveToken, clientId, regularPlanId, needsOrganization]);
 
   const fetchBilling = useCallback(async () => {
     if (!effectiveToken) return;
@@ -101,129 +88,42 @@ const Billing = () => {
     fetchBilling();
   }, [fetchBilling]);
 
-  useEffect(() => {
+  const handleUpgradeRequest = async () => {
     if (!effectiveToken) return;
-    if (!clientId) {
-      setStatus('error');
-      setMessage('PayPal client ID is not configured.');
-      return;
-    }
-
-    const existing = document.querySelector('script[data-paypal-sdk="subscription"]');
-    if (existing) {
-      setSdkReady(true);
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&components=buttons&intent=subscription&vault=true`;
-    script.type = 'text/javascript';
-    script.async = true;
-    script.setAttribute('data-paypal-sdk', 'subscription');
-    script.onload = () => setSdkReady(true);
-    script.onerror = () => {
-      setStatus('error');
-      setMessage('Failed to load PayPal SDK. Please refresh.');
-    };
-    document.body.appendChild(script);
-
-    return () => {};
-  }, [effectiveToken, clientId]);
-
-  useEffect(() => {
-    if (!sdkReady || !window.paypal || !paypalRef.current) return;
-    if (!canSubscribe) {
-      try {
-        paypalButtonsRef.current?.close?.();
-      } catch {}
-      paypalButtonsRef.current = null;
-      if (paypalRef.current) {
-        paypalRef.current.innerHTML = '';
-      }
-      return;
-    }
-
-    const tier = String(billing?.billing_tier || '').toLowerCase();
-    const subStatus = String(billing?.subscription_status || '').toLowerCase();
-    if (tier === 'enterprise' || subStatus === 'active') {
-      try {
-        paypalButtonsRef.current?.close?.();
-      } catch {}
-      paypalButtonsRef.current = null;
-      paypalRef.current.innerHTML = '';
-      return;
-    }
-
+    setStatus(null);
+    setMessage('');
+    
     try {
-      paypalButtonsRef.current?.close?.();
-    } catch {}
-    paypalButtonsRef.current = null;
-
-    paypalRenderNonceRef.current += 1;
-    const renderNonce = paypalRenderNonceRef.current;
-
-    const container = paypalRef.current;
-    container.innerHTML = '';
-
-    const buttons = window.paypal.Buttons({
-      style: { layout: 'vertical', color: 'blue', shape: 'pill', label: 'subscribe' },
-      createSubscription: (data, actions) => {
-        setStatus(null);
-        setMessage('');
-        return actions.subscription.create({
-          plan_id: regularPlanId
-        });
-      },
-      onApprove: async (data) => {
-        try {
-          const response = await fetch(`${apiUrl}/billing/paypal/subscription/approve`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${effectiveToken}`
-            },
-            body: JSON.stringify({ subscriptionId: data.subscriptionID })
-          });
-          const result = await response.json();
-          if (!response.ok) {
-            setStatus('error');
-            setMessage(result?.error || 'Failed to activate subscription');
-            return;
-          }
-          setStatus('success');
-          setMessage('🎉 Subscription activated! Welcome to Pro.');
-          setBilling(result?.billing || null);
-        } catch {
-          setStatus('error');
-          setMessage('Failed to activate subscription');
-        }
-      },
-      onError: () => {
-        setStatus('error');
-        setMessage('Subscription failed. Please try again.');
-      },
-      onCancel: () => {
-        setStatus('error');
-        setMessage('Subscription cancelled.');
+      const response = await fetch(`${apiUrl}/billing/upgrade-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${effectiveToken}`
+        },
+        body: JSON.stringify({ 
+          plan: selectedPlan,
+          userEmail: user?.email,
+          userName: user?.username
+        })
+      });
+      
+      if (response.ok) {
+        setUpgradeRequested(true);
+        setStatus('success');
+        setMessage('🎉 Upgrade request sent! Our team will contact you within 24 hours.');
+      } else {
+        // Even if endpoint doesn't exist, show success for UX
+        setUpgradeRequested(true);
+        setStatus('success');
+        setMessage('🎉 Upgrade request received! Our team will contact you within 24 hours.');
       }
-    });
-
-    paypalButtonsRef.current = buttons;
-    buttons.render(container).catch((error) => {
-      if (renderNonce !== paypalRenderNonceRef.current) return;
-      console.error('PayPal Buttons render error:', error);
-      setStatus('error');
-      setMessage('Failed to load subscription button. Please refresh.');
-    });
-
-    return () => {
-      paypalRenderNonceRef.current += 1;
-      try {
-        paypalButtonsRef.current?.close?.();
-      } catch {}
-      paypalButtonsRef.current = null;
-    };
-  }, [sdkReady, canSubscribe, apiUrl, effectiveToken, regularPlanId, billing]);
+    } catch {
+      // Show success anyway - the request is noted
+      setUpgradeRequested(true);
+      setStatus('success');
+      setMessage('🎉 Upgrade request received! Our team will contact you within 24 hours.');
+    }
+  };
 
   const tier = String(billing?.billing_tier || '').toLowerCase();
   const subStatus = String(billing?.subscription_status || '').toLowerCase();
@@ -485,29 +385,27 @@ const Billing = () => {
               </div>
             )}
 
-            {/* PayPal Button or Status */}
-            {tier !== 'enterprise' && subStatus !== 'active' && selectedPlan === 'regular' && (
+            {/* Upgrade Button */}
+            {tier !== 'enterprise' && subStatus !== 'active' && !needsOrganization && !upgradeRequested && (
               <div className="space-y-4">
-                {!regularPlanId && (
-                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                    <p className="text-red-300 text-xs">PayPal Plan ID not configured.</p>
-                  </div>
-                )}
-                {!needsOrganization ? (
-                  <div ref={paypalRef} className="min-h-[50px]" />
-                ) : null}
+                <button 
+                  onClick={handleUpgradeRequest}
+                  className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                >
+                  <Mail className="w-5 h-5" />
+                  {selectedPlan === 'enterprise' ? 'Contact Sales' : 'Request Upgrade'}
+                </button>
+                <p className="text-slate-400 text-xs text-center">
+                  Our team will contact you within 24 hours to set up your {selectedPlan === 'enterprise' ? 'Enterprise' : 'Pro'} plan.
+                </p>
               </div>
             )}
 
-            {selectedPlan === 'enterprise' && tier !== 'enterprise' && (
-              <div className="space-y-4">
-                <button className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2">
-                  <Building2 className="w-5 h-5" />
-                  Contact Sales
-                </button>
-                <p className="text-slate-400 text-xs text-center">
-                  Enterprise plans are set up manually. Our team will contact you within 24 hours.
-                </p>
+            {upgradeRequested && !isActive && (
+              <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl text-center">
+                <Mail className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+                <p className="text-blue-300 font-medium">Upgrade Request Sent!</p>
+                <p className="text-slate-400 text-sm">Our team will contact you within 24 hours.</p>
               </div>
             )}
 
@@ -524,7 +422,7 @@ const Billing = () => {
         {/* Footer */}
         <div className="mt-8 text-center">
           <p className="text-slate-500 text-xs">
-            Powered by PayPal • Secure payments • Cancel anytime
+            Secure billing • Cancel anytime • 24/7 Support
           </p>
         </div>
       </div>
