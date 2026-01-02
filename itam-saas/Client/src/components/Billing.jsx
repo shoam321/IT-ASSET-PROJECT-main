@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, Building2, CheckCircle, CreditCard, Sparkles, Zap, Shield, ChevronRight, Mail } from 'lucide-react';
+import { AlertCircle, Building2, CheckCircle, CreditCard, Sparkles, Zap, Shield, ChevronRight, Mail, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
+
+const PAYPAL_CLIENT_ID = process.env.REACT_APP_PAYPAL_CLIENT_ID || 'sb'; // 'sb' = sandbox fallback
 
 const Billing = () => {
   const { user, token } = useAuth();
@@ -17,6 +20,8 @@ const Billing = () => {
   const [needsOrganization, setNeedsOrganization] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('regular');
   const [upgradeRequested, setUpgradeRequested] = useState(false);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [showPayPal, setShowPayPal] = useState(false);
 
   const plans = {
     regular: {
@@ -125,18 +130,98 @@ const Billing = () => {
     }
   };
 
+  // PayPal: Create order on backend
+  const createPayPalOrder = async () => {
+    setPaymentProcessing(true);
+    setStatus(null);
+    setMessage('');
+    
+    try {
+      const response = await fetch(`${apiUrl}/payments/paypal/order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${effectiveToken}`
+        },
+        body: JSON.stringify({
+          amount: String(currentPlan.price),
+          currency: 'USD',
+          description: `IT Asset Tracker - ${currentPlan.name}`,
+          plan: selectedPlan
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create order');
+      }
+      
+      return data.orderId;
+    } catch (error) {
+      console.error('PayPal create order error:', error);
+      setStatus('error');
+      setMessage(error.message || 'Failed to create PayPal order');
+      setPaymentProcessing(false);
+      throw error;
+    }
+  };
+
+  // PayPal: Capture payment on backend
+  const capturePayPalOrder = async (orderId) => {
+    try {
+      const response = await fetch(`${apiUrl}/payments/paypal/capture`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${effectiveToken}`
+        },
+        body: JSON.stringify({ orderId, plan: selectedPlan })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to capture payment');
+      }
+      
+      // Payment successful!
+      setStatus('success');
+      setMessage('🎉 Payment successful! Your subscription is now active.');
+      setShowPayPal(false);
+      
+      // Refresh billing info
+      await fetchBilling();
+      
+      return data;
+    } catch (error) {
+      console.error('PayPal capture error:', error);
+      setStatus('error');
+      setMessage(error.message || 'Payment failed. Please try again.');
+      throw error;
+    } finally {
+      setPaymentProcessing(false);
+    }
+  };
+
   const tier = String(billing?.billing_tier || '').toLowerCase();
   const subStatus = String(billing?.subscription_status || '').toLowerCase();
   const currentPlan = plans[selectedPlan];
   const isActive = subStatus === 'active' || tier === 'enterprise';
 
   return (
+    <PayPalScriptProvider options={{ 
+      clientId: PAYPAL_CLIENT_ID,
+      currency: 'USD',
+      intent: 'capture'
+    }}>
     <div className="min-h-screen bg-slate-900">
       {/* Decorative Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-500/20 to-cyan-500/10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-gradient-to-tr from-purple-500/10 to-blue-500/10 rounded-full blur-3xl transform -translate-x-1/2 translate-y-1/2" />
       </div>
+
 
       <div className="relative max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
@@ -385,27 +470,99 @@ const Billing = () => {
               </div>
             )}
 
-            {/* Upgrade Button */}
-            {tier !== 'enterprise' && subStatus !== 'active' && !needsOrganization && !upgradeRequested && (
+            {/* Payment Section */}
+            {tier !== 'enterprise' && !needsOrganization && !isActive && (
               <div className="space-y-4">
-                <button 
-                  onClick={handleUpgradeRequest}
-                  className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
-                >
-                  <Mail className="w-5 h-5" />
-                  {selectedPlan === 'enterprise' ? 'Contact Sales' : 'Request Upgrade'}
-                </button>
-                <p className="text-slate-400 text-xs text-center">
-                  Our team will contact you within 24 hours to set up your {selectedPlan === 'enterprise' ? 'Enterprise' : 'Pro'} plan.
-                </p>
-              </div>
-            )}
+                {/* Pay Now with PayPal */}
+                {!showPayPal ? (
+                  <>
+                    <button 
+                      onClick={() => setShowPayPal(true)}
+                      disabled={paymentProcessing}
+                      className="w-full py-4 bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-slate-900 font-semibold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20.067 8.478c.492.88.556 2.014.163 3.322-.492 1.64-1.64 2.828-3.34 3.346-.816.25-1.694.306-2.6.17h-.3c-.235 0-.436.168-.474.396l-.036.18-.45 2.854-.035.17c-.037.228-.238.396-.473.396H9.82c-.225 0-.403-.177-.38-.398l.79-5.022.013-.083c.014-.09.043-.17.083-.243.14-.264.4-.426.692-.433l.878-.018c.244-.004.48.008.698.04 1.714.232 3.145-.343 4.11-1.588.58-.745.96-1.604.963-2.534.02-.06.043-.11.067-.16 1.08.41 1.823 1.332 2.333 2.605M8.645 7.86c.124-.8.76-1.4 1.545-1.42l4.7-.01c.567 0 1.12.075 1.63.228 1.203.357 2.012 1.088 2.508 2.125.075.155.14.318.196.488-.06-.033-.12-.064-.18-.092-.622-.294-1.32-.433-2.04-.433l-4.59.01c-1.16 0-2.13.786-2.392 1.85l-1.03 6.55c-.044.275-.054.5-.03.676l-.55 3.48c-.05.314-.32.546-.636.546H5.56c-.35 0-.63-.28-.63-.63l2-12.75c.12-.76.67-1.4 1.35-1.55.26-.06.53-.08.79-.08l.57.01c.05 0 .09.002.13.005l-.124.006z"/>
+                      </svg>
+                      Pay Now with PayPal
+                    </button>
+                    
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-slate-700"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-2 bg-slate-900 text-slate-400">or</span>
+                      </div>
+                    </div>
 
-            {upgradeRequested && !isActive && (
-              <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl text-center">
-                <Mail className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-                <p className="text-blue-300 font-medium">Upgrade Request Sent!</p>
-                <p className="text-slate-400 text-sm">Our team will contact you within 24 hours.</p>
+                    {!upgradeRequested && (
+                      <button 
+                        onClick={handleUpgradeRequest}
+                        className="w-full py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2 border border-slate-600"
+                      >
+                        <Mail className="w-5 h-5" />
+                        {selectedPlan === 'enterprise' ? 'Contact Sales' : 'Request Manual Setup'}
+                      </button>
+                    )}
+                    
+                    {upgradeRequested && (
+                      <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl text-center">
+                        <p className="text-blue-300 text-sm">✓ Request sent! Our team will contact you.</p>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+                      <p className="text-white font-medium mb-3 text-center">Complete Payment</p>
+                      
+                      {paymentProcessing && (
+                        <div className="text-center py-4">
+                          <Loader2 className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-2" />
+                          <p className="text-slate-400 text-sm">Processing payment...</p>
+                        </div>
+                      )}
+                      
+                      <div className="paypal-buttons-container">
+                        <PayPalButtons
+                          style={{ 
+                            layout: 'vertical',
+                            color: 'gold',
+                            shape: 'rect',
+                            label: 'paypal'
+                          }}
+                          createOrder={createPayPalOrder}
+                          onApprove={async (data) => {
+                            await capturePayPalOrder(data.orderID);
+                          }}
+                          onError={(err) => {
+                            console.error('PayPal error:', err);
+                            setStatus('error');
+                            setMessage('Payment failed. Please try again.');
+                            setPaymentProcessing(false);
+                          }}
+                          onCancel={() => {
+                            setStatus(null);
+                            setMessage('');
+                            setPaymentProcessing(false);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => { setShowPayPal(false); setPaymentProcessing(false); }}
+                      className="w-full py-2 text-slate-400 hover:text-white transition text-sm"
+                    >
+                      ← Back to options
+                    </button>
+                  </div>
+                )}
+                
+                <p className="text-slate-500 text-xs text-center">
+                  Secure payment powered by PayPal
+                </p>
               </div>
             )}
 
@@ -427,6 +584,7 @@ const Billing = () => {
         </div>
       </div>
     </div>
+    </PayPalScriptProvider>
   );
 };
 

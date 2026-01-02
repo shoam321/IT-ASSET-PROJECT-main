@@ -4,6 +4,7 @@
   "description": "IT Asset Tracker SaaS Client - React Frontend",
   "private": true,
   "dependencies": {
+    "@paypal/react-paypal-js": "^8.9.2",
     "@xyflow/react": "^12.3.5",
     "autoprefixer": "^10.4.17",
     "express-rate-limit": "^8.2.1",
