@@ -36,12 +36,15 @@ const __dirname = path.dirname(__filename);
 // Load environment variables relative to this folder so `node itam-saas/Agent/server.js`
 // works no matter what the current working directory is.
 // Prefer `.env.local` for local development to avoid accidentally using production creds.
-const envLocalPath = path.join(__dirname, '.env.local');
-const envPath = path.join(__dirname, '.env');
-if (fs.existsSync(envLocalPath)) {
-  dotenv.config({ path: envLocalPath });
-} else {
-  dotenv.config({ path: envPath });
+// In production (Railway), env vars are set directly - don't load .env files
+if (process.env.NODE_ENV !== 'production') {
+  const envLocalPath = path.join(__dirname, '.env.local');
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envLocalPath)) {
+    dotenv.config({ path: envLocalPath });
+  } else if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  }
 }
 
 const app = express();
