@@ -10,15 +10,17 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
-// Load env relative to this module so it works regardless of process.cwd().
+// Only load .env file in development - Railway sets env vars directly in production
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const envLocalPath = path.join(__dirname, '.env.local');
-const envPath = path.join(__dirname, '.env');
-if (fs.existsSync(envLocalPath)) {
-  dotenv.config({ path: envLocalPath });
-} else {
-  dotenv.config({ path: envPath });
+if (process.env.NODE_ENV !== 'production') {
+  const envLocalPath = path.join(__dirname, '.env.local');
+  const envPath = path.join(__dirname, '.env');
+  if (fs.existsSync(envLocalPath)) {
+    dotenv.config({ path: envLocalPath });
+  } else if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+  }
 }
 
 const connectionString = process.env.DATABASE_URL;
