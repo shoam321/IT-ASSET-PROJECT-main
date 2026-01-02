@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { Building, Monitor, Download, ArrowRight, ArrowLeft, Check, Sparkles, Users, Laptop, Server, Smartphone, SkipForward } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Building, Monitor, Download, ArrowRight, ArrowLeft, Check, Sparkles, Users, Laptop, Server, Smartphone, SkipForward, Loader } from 'lucide-react';
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
 export default function SetupWizard({ token, onComplete }) {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState('');
+  const [hasOrg, setHasOrg] = useState(false);
   
   const [orgData, setOrgData] = useState({
     name: '',
@@ -18,6 +20,34 @@ export default function SetupWizard({ token, onComplete }) {
     type: 'Laptop',
     serialNumber: ''
   });
+
+  // Check if user already has an organization on mount
+  useEffect(() => {
+    const checkExistingOrg = async () => {
+      try {
+        const response = await fetch(`${API_URL}/billing`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        // If user already has an org, skip to step 2
+        if (response.ok && !data.needsOrganization) {
+          setHasOrg(true);
+          setStep(2);
+        }
+      } catch (err) {
+        console.error('Failed to check org status:', err);
+      } finally {
+        setInitializing(false);
+      }
+    };
+    
+    if (token) {
+      checkExistingOrg();
+    } else {
+      setInitializing(false);
+    }
+  }, [token]);
 
   const totalSteps = 3;
   const sizes = [
@@ -63,12 +93,24 @@ export default function SetupWizard({ token, onComplete }) {
 
       const data = await response.json();
       
+      // 409 = already has org, just proceed
+      if (response.status === 409) {
+        console.log('User already has organization, proceeding to next step');
+        setStep(2);
+        return;
+      }
+      
       if (!response.ok) {
         throw new Error(data.error || data.errors?.[0]?.msg || 'Failed to create organization');
       }
 
       setStep(2);
     } catch (err) {
+      // If it's a conflict error, proceed anyway
+      if (err.message?.toLowerCase().includes('already')) {
+        setStep(2);
+        return;
+      }
       setError(err.message);
     } finally {
       setLoading(false);
@@ -101,14 +143,18 @@ export default function SetupWizard({ token, onComplete }) {
         })
       });
 
+      // Even if asset creation fails, proceed to next step (non-blocking)
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to add asset');
+        console.warn('Asset creation warning:', data.error);
+        // Still proceed - asset can be added later
       }
 
       setStep(3);
     } catch (err) {
-      setError(err.message);
+      console.warn('Asset creation error:', err.message);
+      // Proceed anyway - asset creation is optional
+      setStep(3);
     } finally {
       setLoading(false);
     }
@@ -138,6 +184,18 @@ export default function SetupWizard({ token, onComplete }) {
       handleComplete();
     }
   };
+
+  // Show loading while checking organization status
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-slate-400">Setting up your workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center p-4">
