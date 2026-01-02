@@ -3403,6 +3403,67 @@ app.post('/api/billing/paypal/webhook', async (req, res) => {
   }
 });
 
+// Capture upgrade requests (UI self-serve > contact sales)
+app.post('/api/billing/upgrade-request', authenticateToken, [
+  body('plan').optional().isString().trim(),
+  body('seats').optional().isInt({ gt: 0 }).withMessage('seats must be a positive integer'),
+  body('notes').optional().isString().trim(),
+  body('contactEmail').optional().isEmail().withMessage('contactEmail must be valid'),
+  body('contactName').optional().isString().trim()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const userId = req.user?.userId ?? req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+
+    let organizationId = req.user?.organizationId || null;
+    let orgName = req.user?.organizationName || null;
+    const dbUser = await authQueries.findUserById(userId);
+    organizationId = organizationId || dbUser?.organization_id || null;
+    orgName = orgName || dbUser?.organization_name || null;
+
+    await db.setCurrentUserId(userId);
+
+    const { plan, seats, notes, contactEmail, contactName } = req.body;
+    const requesterEmail = contactEmail || dbUser?.email || req.user?.email;
+    const requesterName = contactName || dbUser?.full_name || dbUser?.username || req.user?.username;
+
+    // Send notification email to admin/sales
+    await emailService.sendUpgradeRequestEmail({
+      requesterEmail,
+      requesterName,
+      organizationName: orgName || `Org ${organizationId || 'unknown'}`,
+      plan: plan || 'unspecified',
+      seats,
+      notes
+    });
+
+    // Log audit event for traceability
+    await db.logAuditEvent('billing', organizationId || userId, 'CREATE', null, {
+      type: 'upgrade_request',
+      plan: plan || null,
+      seats: seats || null,
+      notes: notes || null,
+      requesterEmail,
+      requesterName
+    }, {
+      userId,
+      username: req.user?.username,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
+    return res.json({ message: 'Upgrade request received' });
+  } catch (error) {
+    console.error('Error handling upgrade request:', error);
+    res.status(500).json({ error: 'Failed to submit upgrade request' });
+  }
+});
+
 // ============ GRAFANA DASHBOARDS (Embeds per organization) ============
 
 app.get('/api/grafana/dashboards', authenticateToken, async (req, res) => {

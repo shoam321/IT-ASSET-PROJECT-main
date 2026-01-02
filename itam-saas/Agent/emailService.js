@@ -4,6 +4,7 @@ import { Resend } from 'resend';
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@itasset.local';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.FROM_EMAIL || 'noreply@itasset.local';
 
 /**
  * Send password reset email
@@ -193,6 +194,55 @@ export async function sendLicenseExpirationEmail(to, licenseName, expirationDate
     return data;
   } catch (error) {
     console.error('❌ Failed to send license expiration email:', error);
+    return null;
+  }
+}
+
+/**
+ * Send an upgrade request notification
+ */
+export async function sendUpgradeRequestEmail({
+  to = ADMIN_EMAIL,
+  requesterEmail,
+  requesterName,
+  organizationName,
+  plan,
+  seats,
+  notes
+}) {
+  try {
+    if (!resend) {
+      console.warn('⚠️ RESEND_API_KEY not configured, skipping upgrade request email');
+      return null;
+    }
+
+    const safeSeats = seats ? String(seats) : 'unspecified';
+    const { data, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to,
+      subject: `Upgrade Request - ${organizationName || 'Unknown Org'}`,
+      reply_to: requesterEmail,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto;">
+          <h2 style="color: #111827;">Upgrade Request</h2>
+          <p><strong>Requester:</strong> ${requesterName || 'Unknown'} (${requesterEmail || 'no email provided'})</p>
+          <p><strong>Organization:</strong> ${organizationName || 'Not provided'}</p>
+          <p><strong>Plan:</strong> ${plan || 'Not provided'}</p>
+          <p><strong>Seats:</strong> ${safeSeats}</p>
+          ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+        </div>
+      `
+    });
+
+    if (error) {
+      console.error('❌ Upgrade request email send error:', error);
+      throw error;
+    }
+
+    console.log('✅ Upgrade request email sent to:', to);
+    return data;
+  } catch (error) {
+    console.error('❌ Failed to send upgrade request email:', error);
     return null;
   }
 }
