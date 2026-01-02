@@ -2511,7 +2511,7 @@ export default function App() {
       </aside>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col relative">
+      <div className="flex-1 flex flex-col relative min-w-0">
         {/* Mobile overlay when sidebar is open */}
         {sidebarOpen && (
           <div 
@@ -2521,8 +2521,8 @@ export default function App() {
         )}
         
         {/* Header */}
-        <header className="bg-slate-800 border-b border-slate-700 shadow-lg relative z-5">
-          <div className="px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2 md:gap-4">
+        <header className="bg-slate-800 border-b border-slate-700 shadow-lg relative z-5 flex-shrink-0">
+          <div className="px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2 md:gap-4 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="lg:hidden p-2 hover:bg-slate-700 rounded-lg transition text-slate-300"
@@ -2531,8 +2531,8 @@ export default function App() {
             </button>
 
             {/* Universal Search */}
-            <div className="flex-1 max-w-2xl">
-              <div className="relative">
+            <div className="flex-1 max-w-2xl min-w-0">
+              <div className="relative min-w-0">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-slate-400" />
                 <input
                   type="text"
