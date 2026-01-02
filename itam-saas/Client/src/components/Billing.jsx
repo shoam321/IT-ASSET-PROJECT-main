@@ -204,6 +204,37 @@ const Billing = () => {
     }
   };
 
+  // Reset billing to free trial (for testing)
+  const resetToFreeTrial = async () => {
+    if (!effectiveToken) return;
+    setStatus(null);
+    setMessage('');
+    
+    try {
+      const response = await fetch(`${apiUrl}/billing/reset-to-free`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${effectiveToken}`
+        }
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to reset billing');
+      }
+      
+      setStatus('success');
+      setMessage('✅ Billing reset to Free Trial. You can now test PayPal payments!');
+      await fetchBilling();
+    } catch (error) {
+      console.error('Reset billing error:', error);
+      setStatus('error');
+      setMessage(error.message || 'Failed to reset billing');
+    }
+  };
+
   const tier = String(billing?.billing_tier || '').toLowerCase();
   const subStatus = String(billing?.subscription_status || '').toLowerCase();
   const currentPlan = plans[selectedPlan];
@@ -445,6 +476,16 @@ const Billing = () => {
                     </div>
                   )}
                 </div>
+                
+                {/* Reset to Free Trial Button (for testing) */}
+                {(tier === 'pro' || tier === 'regular' || tier === 'enterprise' || subStatus === 'active') && (
+                  <button
+                    onClick={resetToFreeTrial}
+                    className="mt-4 w-full py-2 px-4 bg-orange-500/20 border border-orange-500/50 text-orange-300 rounded-lg text-sm hover:bg-orange-500/30 transition-colors"
+                  >
+                    🧪 Reset to Free Trial (Testing)
+                  </button>
+                )}
               </div>
             )}
 
