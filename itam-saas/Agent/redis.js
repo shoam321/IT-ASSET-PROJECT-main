@@ -29,7 +29,9 @@ export async function getRedisClient() {
 }
 
 // Cache wrapper function
-export async function getCached(key, fetchFn, ttlSeconds = 300) {
+// TTL: 20 minutes - balance between freshness and performance
+// Cache is invalidated on create/update/delete, so changes appear immediately
+export async function getCached(key, fetchFn, ttlSeconds = 1200) {
   const redis = await getRedisClient();
   
   if (!redis) {
