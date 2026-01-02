@@ -1190,6 +1190,50 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
 });
 
 // ===== ORGANIZATIONS (minimal bootstrap) =====
+// Create an organization for the SetupWizard onboarding flow
+app.post('/api/organizations', authenticateToken, [
+  body('name').trim().isLength({ min: 2, max: 255 }).withMessage('Organization name is required'),
+  body('plan').optional().trim(),
+  body('settings').optional()
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  try {
+    const userId = req.user?.userId ?? req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
+
+    const { name, plan, settings } = req.body;
+
+    // Use system context so we can create/assign even when user has no org yet
+    const org = await db.withSystemContext(async (client) => {
+      return await authQueries.createOrganizationForExistingUser(userId, name, null, client);
+    });
+
+    // Update org with plan and settings if provided
+    if (plan || settings) {
+      await db.query(
+        'UPDATE organizations SET plan = COALESCE($1, plan), settings = COALESCE($2, settings) WHERE id = $3',
+        [plan, settings ? JSON.stringify(settings) : null, org.id]
+      );
+    }
+
+    const updatedUser = await authQueries.findUserById(userId);
+    const token = generateToken(updatedUser);
+
+    return res.status(201).json({ organization: org, token, user: updatedUser });
+  } catch (error) {
+    const msg = String(error?.message || 'Failed to create organization');
+    if (msg.includes('already assigned')) {
+      return res.status(409).json({ error: msg });
+    }
+    console.error('Organization creation error:', error);
+    return res.status(500).json({ error: msg });
+  }
+});
+
 // Create an organization for an existing user who is not assigned to any org yet.
 app.post('/api/organizations/bootstrap', authenticateToken, [
   body('name').trim().isLength({ min: 2, max: 255 }).withMessage('Organization name is required'),
