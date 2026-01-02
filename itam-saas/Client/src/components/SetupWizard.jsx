@@ -61,9 +61,10 @@ export default function SetupWizard({ token, onComplete }) {
         })
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to create organization');
+        throw new Error(data.error || data.errors?.[0]?.msg || 'Failed to create organization');
       }
 
       setStep(2);

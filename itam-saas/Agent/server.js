@@ -1192,13 +1192,15 @@ app.post('/api/auth/logout', authenticateToken, (req, res) => {
 // ===== ORGANIZATIONS (minimal bootstrap) =====
 // Create an organization for the SetupWizard onboarding flow
 app.post('/api/organizations', authenticateToken, [
-  body('name').trim().isLength({ min: 2, max: 255 }).withMessage('Organization name is required'),
+  body('name').trim().isLength({ min: 2, max: 255 }).withMessage('Organization name is required (2-255 characters)'),
   body('plan').optional().trim(),
   body('settings').optional()
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+    const errorMsg = errors.array().map(e => e.msg).join(', ');
+    console.error('Organization validation errors:', errors.array());
+    return res.status(400).json({ error: errorMsg, errors: errors.array() });
   }
 
   try {
