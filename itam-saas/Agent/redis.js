@@ -2,6 +2,22 @@ import { createClient } from 'redis';
 
 let redisClient = null;
 
+// Metrics imports - lazy loaded to avoid circular dependencies
+let cacheOperations = null;
+let cacheLatency = null;
+
+async function loadMetrics() {
+  if (!cacheOperations) {
+    try {
+      const metrics = await import('./metrics.js');
+      cacheOperations = metrics.cacheOperations;
+      cacheLatency = metrics.cacheLatency;
+    } catch (e) {
+      // Metrics not available, continue without
+    }
+  }
+}
+
 export async function getRedisClient() {
   if (redisClient && redisClient.isOpen) {
     return redisClient;
@@ -32,6 +48,7 @@ export async function getRedisClient() {
 // TTL: 20 minutes - balance between freshness and performance
 // Cache is invalidated on create/update/delete, so changes appear immediately
 export async function getCached(key, fetchFn, ttlSeconds = 1200) {
+  await loadMetrics();
   const redis = await getRedisClient();
   
   if (!redis) {
@@ -39,20 +56,34 @@ export async function getCached(key, fetchFn, ttlSeconds = 1200) {
     return await fetchFn();
   }
 
+  const start = process.hrtime.bigint();
+  
   try {
     // Try to get from cache
     const cached = await redis.get(key);
+    
     if (cached) {
+      const durationNs = process.hrtime.bigint() - start;
+      const durationSeconds = Number(durationNs) / 1e9;
+      
       console.log(`📦 Cache hit: ${key}`);
+      cacheOperations?.inc({ operation: 'get', result: 'hit' });
+      cacheLatency?.observe({ operation: 'get' }, durationSeconds);
+      
       return JSON.parse(cached);
     }
 
     // Cache miss - fetch data
     console.log(`🔄 Cache miss: ${key}`);
+    cacheOperations?.inc({ operation: 'get', result: 'miss' });
+    
     const data = await fetchFn();
     
     // Store in cache
+    const setStart = process.hrtime.bigint();
     await redis.setEx(key, ttlSeconds, JSON.stringify(data));
+    const setDuration = Number(process.hrtime.bigint() - setStart) / 1e9;
+    cacheLatency?.observe({ operation: 'set' }, setDuration);
     
     return data;
   } catch (error) {

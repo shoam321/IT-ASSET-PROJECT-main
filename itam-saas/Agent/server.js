@@ -28,6 +28,7 @@ import { startLicenseExpirationChecker, stopLicenseExpirationChecker } from './l
 import { createOrder as createPayPalOrder, captureOrder as capturePayPalOrder, verifyWebhookSignature, allowedCurrencies as paypalCurrencies } from './paypalClient.js';
 import { getSubscription as getPayPalSubscription } from './paypalSubscriptions.js';
 import { startHealthCheckScheduler, stopHealthCheckScheduler, runHealthCheckAndNotify } from './healthCheckService.js';
+import metrics, { metricsMiddleware, updateBusinessMetrics, updatePoolMetrics, getMetrics, getMetricsContentType, authAttempts, subscriptionEvents, websocketConnections, alertsGenerated, cacheOperations, cacheLatency } from './metrics.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -161,9 +162,11 @@ const io = new Server(httpServer, {
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('🔌 WebSocket client connected:', socket.id);
+  websocketConnections.inc();
   
   socket.on('disconnect', () => {
     console.log('🔌 WebSocket client disconnected:', socket.id);
+    websocketConnections.dec();
   });
 });
 
@@ -255,6 +258,23 @@ app.use(bodyParser.json({
   }
 }));
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Prometheus metrics middleware - track all requests
+app.use(metricsMiddleware);
+
+// Prometheus metrics endpoint - must be BEFORE authentication
+app.get('/metrics', async (req, res) => {
+  try {
+    // Update pool metrics on each scrape
+    updatePoolMetrics(pool);
+    
+    res.set('Content-Type', getMetricsContentType());
+    res.end(await getMetrics());
+  } catch (error) {
+    console.error('Error generating metrics:', error);
+    res.status(500).end('Error generating metrics');
+  }
+});
 
 // Bind a single DB connection to each /api request.
 // Needed for PostgreSQL RLS that relies on session variables (set_config).
@@ -856,6 +876,25 @@ async function startServer() {
         console.error('⚠️ Failed to start health check scheduler:', error.message);
       }
       
+      // Start Prometheus business metrics collector (every 5 minutes)
+      try {
+        const METRICS_INTERVAL = 5 * 60 * 1000; // 5 minutes
+        // Initial update
+        await updateBusinessMetrics(pool);
+        // Schedule periodic updates
+        global.metricsInterval = setInterval(async () => {
+          try {
+            await updateBusinessMetrics(pool);
+          } catch (err) {
+            console.error('⚠️ Metrics update failed:', err.message);
+          }
+        }, METRICS_INTERVAL);
+        console.log('✅ Prometheus metrics collector started (5-min interval)');
+        console.log('📊 Metrics endpoint: /metrics');
+      } catch (error) {
+        console.error('⚠️ Failed to start metrics collector:', error.message);
+      }
+      
       return;
     } catch (error) {
       retries--;
@@ -988,6 +1027,9 @@ app.post('/api/auth/login', authLimiter, [
     
     const token = generateToken(user);
     
+    // Track successful login
+    authAttempts.inc({ method: 'password', result: 'success' });
+    
     // Log audit event
     await db.logAuditEvent('users', user.id, 'LOGIN', null, { logged_in: true }, {
       userId: user.id,
@@ -1008,6 +1050,9 @@ app.post('/api/auth/login', authLimiter, [
       }
     });
   } catch (error) {
+    // Track failed login
+    authAttempts.inc({ method: 'password', result: 'failure' });
+    
     console.error('Login error:', error.message);
     if (error.message === 'Invalid username or password' || error.message === 'Account is disabled') {
       return res.status(401).json({ error: error.message });
@@ -3035,6 +3080,9 @@ app.post('/api/billing/paypal/subscription/approve', paymentLimiter, authenticat
       }
     );
 
+    // Track subscription activation
+    subscriptionEvents.inc({ event_type: 'activated', plan: 'regular' });
+
     return res.json({ billing: updated, paypalStatus: subscription?.status || null });
   } catch (error) {
     console.error('Error approving subscription:', error);
@@ -3486,6 +3534,7 @@ export default app;
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully...');
   stopLicenseExpirationChecker(global.licenseCheckerInterval);
+  clearInterval(global.metricsInterval);
   await shutdownAlertService();
   process.exit(0);
 });
@@ -3493,6 +3542,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   console.log('SIGINT received, shutting down gracefully...');
   stopLicenseExpirationChecker(global.licenseCheckerInterval);
+  clearInterval(global.metricsInterval);
   await shutdownAlertService();
   process.exit(0);
 });
@@ -3502,5 +3552,6 @@ httpServer.listen(PORT, () => {
   console.log(`\n🚀 IT Asset Tracker Server running on http://localhost:${PORT}`);
   console.log(`📊 API available at http://localhost:${PORT}/api`);
   console.log(`🏥 Health check: http://localhost:${PORT}/health`);
+  console.log(`📈 Prometheus metrics: http://localhost:${PORT}/metrics`);
   console.log(`🔌 WebSocket ready for real-time alerts\n`);
 });
