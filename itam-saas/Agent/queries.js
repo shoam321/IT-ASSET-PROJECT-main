@@ -1785,18 +1785,18 @@ export async function getAuditLogs(filters = {}) {
     }
 
     if (filters.startDate) {
-      query += ` AND al.timestamp >= $${paramCount}`;
+      query += ` AND al.created_at >= $${paramCount}`;
       params.push(filters.startDate);
       paramCount++;
     }
 
     if (filters.endDate) {
-      query += ` AND al.timestamp <= $${paramCount}`;
+      query += ` AND al.created_at <= $${paramCount}`;
       params.push(filters.endDate);
       paramCount++;
     }
 
-    query += ` ORDER BY al.timestamp DESC`;
+    query += ` ORDER BY al.created_at DESC`;
 
     if (filters.limit) {
       query += ` LIMIT $${paramCount}`;
