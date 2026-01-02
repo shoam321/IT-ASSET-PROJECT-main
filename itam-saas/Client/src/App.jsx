@@ -1365,9 +1365,9 @@ export default function App() {
                       </div>
                       <button
                         onClick={() => setShowForm(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg flex items-center gap-2 transition mt-2"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base mt-2"
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-4 h-4 md:w-5 md:h-5" />
                         Add Your First Asset
                       </button>
                     </div>
