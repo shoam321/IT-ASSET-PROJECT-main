@@ -2169,17 +2169,18 @@ export async function createPaymentRecord({
   try {
     const result = await pool.query(
       `INSERT INTO payments (
-         paypal_order_id, paypal_subscription_id, user_id, amount, currency,
-         status, payment_type, paypal_payer_email, description, metadata
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (paypal_order_id) DO UPDATE SET
-         paypal_subscription_id = COALESCE(EXCLUDED.paypal_subscription_id, payments.paypal_subscription_id),
+         order_id, capture_id, user_id, amount_cents, currency,
+         status, intent, payer_email, payer_name, description, metadata
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ON CONFLICT (order_id) DO UPDATE SET
+         capture_id = COALESCE(EXCLUDED.capture_id, payments.capture_id),
          status = EXCLUDED.status,
-         paypal_payer_email = COALESCE(EXCLUDED.paypal_payer_email, payments.paypal_payer_email),
+         payer_email = COALESCE(EXCLUDED.payer_email, payments.payer_email),
+         payer_name = COALESCE(EXCLUDED.payer_name, payments.payer_name),
          metadata = COALESCE(EXCLUDED.metadata, payments.metadata),
          updated_at = NOW()
        RETURNING *` ,
-      [orderId, captureId, userId, amountCents, currency, status, intent, payerEmail, description, metadata]
+      [orderId, captureId, userId, amountCents, currency, status, intent, payerEmail, payerName, description, metadata]
     );
     return result.rows[0];
   } catch (error) {
@@ -2190,7 +2191,7 @@ export async function createPaymentRecord({
 
 export async function getPaymentByOrderId(orderId) {
   try {
-    const result = await pool.query('SELECT * FROM payments WHERE paypal_order_id = $1', [orderId]);
+    const result = await pool.query('SELECT * FROM payments WHERE order_id = $1', [orderId]);
     return result.rows[0] || null;
   } catch (error) {
     console.error('Error fetching payment by order id:', error);
@@ -2200,7 +2201,7 @@ export async function getPaymentByOrderId(orderId) {
 
 export async function getPaymentByCaptureId(captureId) {
   try {
-    const result = await pool.query('SELECT * FROM payments WHERE paypal_subscription_id = $1', [captureId]);
+    const result = await pool.query('SELECT * FROM payments WHERE capture_id = $1', [captureId]);
     return result.rows[0] || null;
   } catch (error) {
     console.error('Error fetching payment by capture id:', error);
@@ -2214,9 +2215,9 @@ export async function getPaymentsForUser(userId, { limit = 50, offset = 0 } = {}
 
   return withRLSContext(userId, async (client) => {
     const result = await client.query(
-      `SELECT id, paypal_order_id as order_id, paypal_subscription_id as capture_id, 
-              user_id, amount as amount_cents, currency, status, payment_type as intent,
-              paypal_payer_email as payer_email, metadata->>'payer_name' as payer_name, 
+      `SELECT id, order_id, capture_id, 
+              user_id, amount_cents, currency, status, intent,
+              payer_email, payer_name, 
               description, created_at, updated_at
          FROM payments
         WHERE user_id = $1
@@ -2233,9 +2234,9 @@ export async function getAllPayments({ limit = 50, offset = 0 } = {}) {
   const safeOffset = Math.max(Number(offset) || 0, 0);
 
   const result = await pool.query(
-    `SELECT id, paypal_order_id as order_id, paypal_subscription_id as capture_id, 
-            user_id, amount as amount_cents, currency, status, payment_type as intent,
-            paypal_payer_email as payer_email, metadata->>'payer_name' as payer_name, 
+    `SELECT id, order_id, capture_id, 
+            user_id, amount_cents, currency, status, intent,
+            payer_email, payer_name, 
             description, created_at, updated_at
        FROM payments
       ORDER BY created_at DESC
@@ -2253,11 +2254,11 @@ export async function updatePaymentStatus(orderId, updates = {}) {
     values.push(updates.status);
   }
   if (updates.captureId) {
-    fields.push(`paypal_subscription_id = $${fields.length + 1}`);
+    fields.push(`capture_id = $${fields.length + 1}`);
     values.push(updates.captureId);
   }
   if (updates.payerEmail) {
-    fields.push(`paypal_payer_email = $${fields.length + 1}`);
+    fields.push(`payer_email = $${fields.length + 1}`);
     values.push(updates.payerEmail);
   }
   if (updates.metadata) {
@@ -2268,7 +2269,7 @@ export async function updatePaymentStatus(orderId, updates = {}) {
   if (fields.length === 0) return null;
 
   values.push(orderId);
-  const sql = `UPDATE payments SET ${fields.join(', ')}, updated_at = NOW() WHERE paypal_order_id = $${fields.length + 1} RETURNING *`;
+  const sql = `UPDATE payments SET ${fields.join(', ')}, updated_at = NOW() WHERE order_id = $${fields.length + 1} RETURNING *`;
   try {
     const result = await pool.query(sql, values);
     return result.rows[0] || null;
