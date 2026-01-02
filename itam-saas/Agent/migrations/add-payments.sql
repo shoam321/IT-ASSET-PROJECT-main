@@ -17,6 +17,25 @@ CREATE TABLE IF NOT EXISTS payments (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- If a legacy payments table exists, patch it to the expected schema.
+-- We intentionally avoid NOT NULL migrations here to prevent failures on existing rows.
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS order_id TEXT;
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS capture_id TEXT;
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS user_id INTEGER;
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS amount_cents BIGINT;
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS currency VARCHAR(10);
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS status VARCHAR(32);
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS intent VARCHAR(16) DEFAULT 'CAPTURE';
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS payer_email TEXT;
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS payer_name TEXT;
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE IF EXISTS payments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+-- Ensure uniqueness needed for ON CONFLICT(order_id)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_order_id_unique ON payments(order_id);
+
 CREATE TABLE IF NOT EXISTS webhook_events (
   id SERIAL PRIMARY KEY,
   event_id TEXT UNIQUE NOT NULL,

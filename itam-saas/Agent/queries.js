@@ -186,10 +186,31 @@ export async function initDatabase() {
       ) as consumables_exists,
       EXISTS (
         SELECT 1 FROM information_schema.tables WHERE table_name = 'consumable_transactions'
-      ) as consumable_transactions_exists;
+      ) as consumable_transactions_exists,
+      EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'payments'
+      ) as payments_exists,
+      EXISTS (
+        SELECT 1 FROM information_schema.columns WHERE table_name = 'payments' AND column_name = 'order_id'
+      ) as payments_has_order_id,
+      EXISTS (
+        SELECT 1 FROM information_schema.tables WHERE table_name = 'webhook_events'
+      ) as webhook_events_exists;
     `);
     
-    const { assets_exists, licenses_exists, users_exists, contracts_exists, forbidden_apps_exists, security_alerts_exists, consumables_exists, consumable_transactions_exists } = tablesCheck.rows[0];
+    const {
+      assets_exists,
+      licenses_exists,
+      users_exists,
+      contracts_exists,
+      forbidden_apps_exists,
+      security_alerts_exists,
+      consumables_exists,
+      consumable_transactions_exists,
+      payments_exists,
+      payments_has_order_id,
+      webhook_events_exists
+    } = tablesCheck.rows[0];
     
     if (assets_exists) {
       console.log('✅ Assets table exists');
@@ -245,6 +266,25 @@ export async function initDatabase() {
         }
       } else {
         console.warn('ℹ️ AUTO_MIGRATE_CONSUMABLES is disabled. To create tables, run: node itam-saas/Agent/migrations/run-consumables-migration.js');
+      }
+    }
+
+    // Payments/webhook persistence (PayPal) - auto-patch if schema drift is detected.
+    if (payments_exists && payments_has_order_id && webhook_events_exists) {
+      // ok
+    } else {
+      const needsPayments = !payments_exists || !payments_has_order_id || !webhook_events_exists;
+      if (needsPayments) {
+        try {
+          const migrationPath = path.join(__dirname, 'migrations', 'add-payments.sql');
+          const sql = fs.readFileSync(migrationPath, 'utf8');
+          console.log('🔄 Applying payments migration automatically...');
+          await pool.query(sql);
+          console.log('✅ Payments migration applied successfully');
+        } catch (mErr) {
+          console.error('❌ Failed to apply payments migration automatically:', mErr.message);
+          console.warn('ℹ️ You can run it manually: node itam-saas/Agent/migrations/run-payments-migration.js (use DATABASE_OWNER_URL if needed)');
+        }
       }
     }
     
