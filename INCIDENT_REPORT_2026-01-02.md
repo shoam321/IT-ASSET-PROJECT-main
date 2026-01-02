@@ -269,5 +269,42 @@ curl https://it-asset-project-production.up.railway.app/health
 
 ---
 
+## Post-Recovery Issues Fixed (17:10 UTC)
+
+After the initial database restore, two additional issues were discovered:
+
+### Issue 1: Foreign Key Constraint Violation
+```
+ERROR: insert or update on table "devices" violates foreign key constraint "devices_user_id_fkey"
+DETAIL: Key (user_id)=(4) is not present in table "auth_users".
+```
+
+**Cause**: The agent was configured with `user_id=4`, but all user data was lost in the incident.
+
+**Fix**: Created placeholder user with ID 4:
+```sql
+INSERT INTO auth_users (id, username, email, password_hash, full_name, role, is_active)
+OVERRIDING SYSTEM VALUE
+VALUES (4, 'shoam', 'shoam@example.com', '$2b$10$placeholder...', 'Shoam (Agent User)', 'admin', true)
+```
+
+### Issue 2: Missing `category` Column
+```
+ERROR: column "category" of relation "assets" does not exist at character 169
+```
+
+**Cause**: The `EMERGENCY_DB_RESTORE.sql` created `category_id` but not the legacy `category` text column that the onboarding endpoint uses.
+
+**Fix**: Added missing column:
+```sql
+ALTER TABLE assets ADD COLUMN IF NOT EXISTS category VARCHAR(255)
+```
+
+### Recovery Script Used
+Created `fix-agent-user.js` to apply both fixes.
+
+---
+
 **Report Generated**: 2026-01-02T17:10:00Z  
+**Last Updated**: 2026-01-02T17:10:30Z  
 **Next Review**: Implement prevention measures within 7 days
