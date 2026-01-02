@@ -479,23 +479,25 @@ export function setupCrashHandlers() {
     });
   });
   
-  // Memory warnings
+  // Memory warnings - use RSS (actual memory usage) instead of heap percentage
+  // Railway containers typically have 512MB-1GB, warn at 400MB
+  const MEMORY_WARNING_THRESHOLD_MB = 400;
   const memoryCheckInterval = setInterval(() => {
     const usage = process.memoryUsage();
+    const rssMB = usage.rss / 1024 / 1024;
     const heapUsedMB = usage.heapUsed / 1024 / 1024;
-    const heapTotalMB = usage.heapTotal / 1024 / 1024;
-    const heapPercent = (heapUsedMB / heapTotalMB) * 100;
     
-    if (heapPercent > 90) {
-      console.warn(`⚠️ HIGH MEMORY USAGE: ${heapUsedMB.toFixed(0)}MB / ${heapTotalMB.toFixed(0)}MB (${heapPercent.toFixed(1)}%)`);
-      recordError(new Error(`High memory usage: ${heapPercent.toFixed(1)}%`), {
+    // Only warn if RSS exceeds threshold (actual memory pressure)
+    if (rssMB > MEMORY_WARNING_THRESHOLD_MB) {
+      console.warn(`⚠️ HIGH MEMORY USAGE: RSS ${rssMB.toFixed(0)}MB (Heap: ${heapUsedMB.toFixed(0)}MB)`);
+      recordError(new Error(`High memory usage: RSS ${rssMB.toFixed(0)}MB`), {
         type: 'memoryWarning',
+        rssMB,
         heapUsedMB,
-        heapTotalMB,
-        heapPercent
+        threshold: MEMORY_WARNING_THRESHOLD_MB
       });
     }
-  }, 60000); // Check every minute
+  }, 300000); // Check every 5 minutes (less noisy)
   
   // Store interval for cleanup
   global.memoryCheckInterval = memoryCheckInterval;
