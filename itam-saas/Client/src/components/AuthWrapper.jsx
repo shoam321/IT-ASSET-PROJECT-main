@@ -16,6 +16,7 @@ export default function AuthWrapper() {
   const [showSignUpModal, setShowSignUpModal] = useState(false);
   const [showWelcomeAnimation, setShowWelcomeAnimation] = useState(false);
   const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [onboardingJustCompleted, setOnboardingJustCompleted] = useState(false);
   const [newUserName, setNewUserName] = useState('');
   const [usePremiumOnboarding, setUsePremiumOnboarding] = useState(true); // Toggle for new UX
 
@@ -54,14 +55,15 @@ export default function AuthWrapper() {
 
   // If authenticated, show main app
   if (isAuthenticated) {
-    // Check if user needs to complete onboarding
-    if (showSetupWizard || (user && user.onboarding_completed === false)) {
+    // Check if user needs to complete onboarding (but not if just completed)
+    if (!onboardingJustCompleted && (showSetupWizard || (user && user.onboarding_completed === false))) {
       return (
         <SetupWizard
           token={token}
           onComplete={() => {
             setShowSetupWizard(false);
-            window.location.reload();
+            setOnboardingJustCompleted(true);
+            // Don't reload - just proceed to OrgGate
           }}
         />
       );

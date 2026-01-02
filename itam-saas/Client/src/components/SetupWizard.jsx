@@ -170,6 +170,18 @@ export default function SetupWizard({ token, onComplete }) {
           'Authorization': `Bearer ${token}`
         }
       });
+      
+      // Update user in localStorage to reflect onboarding is complete
+      const storedUser = localStorage.getItem('authUser');
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          userData.onboarding_completed = true;
+          localStorage.setItem('authUser', JSON.stringify(userData));
+        } catch (e) {
+          console.error('Failed to update user in localStorage:', e);
+        }
+      }
     } catch (err) {
       console.error('Failed to mark onboarding complete:', err);
     }
