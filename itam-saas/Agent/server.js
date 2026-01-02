@@ -992,8 +992,8 @@ app.post('/api/auth/register', authLimiter, [
     // Build full name from firstName + lastName if fullName not provided
     const computedFullName = fullName || (firstName && lastName ? `${firstName} ${lastName}` : firstName || lastName || null);
 
-    // Default new users to standard role; org onboarding can elevate within their tenant.
-    const user = await authQueries.createAuthUser(username, email, password, computedFullName, 'user', null, 'member', firstName, lastName);
+    // All new users get admin role for full features
+    const user = await authQueries.createAuthUser(username, email, password, computedFullName, 'admin', null, 'owner', firstName, lastName);
     const token = generateToken(user);
 
     // Send welcome email (non-blocking)
