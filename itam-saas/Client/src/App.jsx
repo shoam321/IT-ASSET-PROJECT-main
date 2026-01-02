@@ -2552,18 +2552,6 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-2 flex-shrink-0">
-              {/* Upgrade Now Button - Always visible */}
-              {currentScreen !== 'billing' && (
-                <button
-                  onClick={() => setCurrentScreen('billing')}
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base flex-shrink-0 shadow-lg shadow-blue-500/25"
-                  title="Upgrade Now"
-                >
-                  <Zap className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                  <span className="hidden md:inline">Upgrade Now</span>
-                </button>
-              )}
-
               {['assets', 'licenses', 'users', 'contracts'].includes(currentScreen) && !universalSearch && (
                 <>
                   <button
