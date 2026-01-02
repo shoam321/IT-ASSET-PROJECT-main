@@ -9,7 +9,7 @@ import crypto from 'crypto';
  * - Passwords are hashed with bcrypt (`bcryptjs`).
  * - Cost factor is intentionally set to 12 for better resistance against offline cracking.
  */
-export async function createAuthUser(username, email, password, fullName = null, role = 'user', organizationId = null, orgRole = 'member', firstName = null, lastName = null) {
+export async function createAuthUser(username, email, password, fullName = null, role = 'admin', organizationId = null, orgRole = 'owner', firstName = null, lastName = null) {
   try {
     const salt = await bcrypt.genSalt(12); // Increased salt rounds from 10 to 12
     const passwordHash = await bcrypt.hash(password, salt);
@@ -128,7 +128,7 @@ export async function findUserById(id) {
   try {
     const result = await pool.query(
       `SELECT id, username, email, full_name, role, is_active, created_at, last_login,
-              organization_id, org_role, onboarding_completed
+              organization_id, org_role, onboarding_completed, trial_started_at, trial_ends_at
        FROM auth_users
        WHERE id = $1`,
       [id]
@@ -166,13 +166,9 @@ export async function authenticateUser(username, password) {
       throw new Error('Account is disabled');
     }
 
-    await updateLastLogin(user.id);
-    
-    // Return user without password hash
-    const { password_hash, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    return user;
   } catch (error) {
-    console.error('Authentication error:', error.message);
+    console.error('Error authenticating user:', error);
     throw error;
   }
 }
@@ -220,17 +216,15 @@ export async function getAllAuthUsers() {
  */
 export async function ensureDefaultAdmin() {
   try {
-    // In production SaaS, never create a default admin unless explicitly enabled.
     if (process.env.AUTO_CREATE_ADMIN !== 'true') {
       return;
     }
 
-    // Check if any admin exists
     const result = await pool.query("SELECT count(*) FROM auth_users WHERE role = 'admin'");
     const count = parseInt(result.rows[0].count);
     
     if (count === 0) {
-      console.warn('⚠️ No admin users found. AUTO_CREATE_ADMIN=true so creating an admin user...');
+      console.warn('No admin users found. AUTO_CREATE_ADMIN=true so creating an admin user...');
 
       const providedPassword = process.env.ADMIN_INITIAL_PASSWORD;
       const generatedPassword = crypto.randomBytes(18).toString('base64url');
@@ -245,11 +239,11 @@ export async function ensureDefaultAdmin() {
       );
 
       if (!providedPassword) {
-        console.warn('✅ Admin user created: admin');
-        console.warn(`🔐 Generated password (store it now): ${generatedPassword}`);
+        console.warn('Admin user created: admin');
+        console.warn(`Generated password (store it now): ${generatedPassword}`);
         console.warn('Set ADMIN_INITIAL_PASSWORD to control this, and disable AUTO_CREATE_ADMIN after bootstrap.');
       } else {
-        console.warn('✅ Admin user created: admin (password from ADMIN_INITIAL_PASSWORD)');
+        console.warn('Admin user created: admin (password from ADMIN_INITIAL_PASSWORD)');
       }
     }
   } catch (error) {
@@ -272,6 +266,10 @@ export async function createOrganizationForExistingUser(userId, orgName, orgDoma
   const localClient = externalClient ? null : await pool.connect();
   const c = externalClient || localClient;
 
+  const trialStartedAt = new Date();
+  const trialEndsAt = new Date(trialStartedAt.getTime());
+  trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
   try {
     if (!externalClient) {
       await c.query('BEGIN');
@@ -286,17 +284,17 @@ export async function createOrganizationForExistingUser(userId, orgName, orgDoma
     if (user.organization_id) throw new Error('User is already assigned to an organization');
 
     const orgRes = await c.query(
-      `INSERT INTO organizations (name, domain, billing_tier, subscription_status)
-       VALUES ($1, $2, 'pro', 'active')
-       RETURNING id, name, domain, plan, billing_tier, subscription_status, created_at`,
-      [String(orgName).trim(), orgDomain || null]
+      `INSERT INTO organizations (name, domain, plan, billing_tier, subscription_status, subscription_started_at, subscription_current_period_end)
+       VALUES ($1, $2, 'trial', 'pro', 'trial', $3, $4)
+       RETURNING id, name, domain, plan, billing_tier, subscription_status, subscription_started_at, subscription_current_period_end, created_at`,
+      [String(orgName).trim(), orgDomain || null, trialStartedAt, trialEndsAt]
     );
 
     const organizationId = orgRes.rows[0].id;
 
     await c.query(
       `UPDATE auth_users
-       SET organization_id = $2, org_role = 'owner'
+       SET organization_id = $2, org_role = 'owner', role = 'admin'
        WHERE id = $1 AND organization_id IS NULL`,
       [userId, organizationId]
     );

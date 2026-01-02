@@ -633,6 +633,10 @@ async function ensureOnboardingFoundationSchema() {
   try {
     await client.query('BEGIN');
 
+    const trialStartedAt = new Date();
+    const trialEndsAt = new Date(trialStartedAt.getTime());
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
     // auth_users.onboarding_completed
     await client.query(`
       DO $$
@@ -1110,7 +1114,14 @@ app.post('/api/auth/login', authLimiter, [
         username: user.username,
         email: user.email,
         fullName: user.full_name,
-        role: user.role
+        role: user.role,
+        organization_id: user.organization_id,
+        org_role: user.org_role,
+        onboarding_completed: user.onboarding_completed,
+        trialStartedAt: user.trial_started_at,
+        trialEndsAt: user.trial_ends_at,
+        trial_started_at: user.trial_started_at,
+        trial_ends_at: user.trial_ends_at
       }
     });
   } catch (error) {
@@ -1211,7 +1222,11 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
       lastLogin: user.last_login,
       organization_id: user.organization_id,
       org_role: user.org_role,
-      onboarding_completed: user.onboarding_completed
+      onboarding_completed: user.onboarding_completed,
+      trialStartedAt: user.trial_started_at,
+      trialEndsAt: user.trial_ends_at,
+      trial_started_at: user.trial_started_at,
+      trial_ends_at: user.trial_ends_at
     });
   } catch (error) {
     console.error('Get user error:', error);
@@ -1353,11 +1368,11 @@ app.post('/api/onboarding/complete', authenticateToken, async (req, res) => {
 
     // Create org and attach user as owner (idempotent per user)
     const orgResult = await client.query(
-      `INSERT INTO organizations (name, domain, billing_tier, subscription_status)
-       VALUES ($1, $2, 'pro', 'active')
+      `INSERT INTO organizations (name, domain, plan, billing_tier, subscription_status, subscription_started_at, subscription_current_period_end)
+       VALUES ($1, $2, 'trial', 'pro', 'trial', $3, $4)
        ON CONFLICT (domain) WHERE domain IS NOT NULL DO UPDATE SET name = EXCLUDED.name
-       RETURNING id, name, domain, billing_tier, subscription_status`,
-      [String(orgName).trim(), orgDomain]
+       RETURNING id, name, domain, plan, billing_tier, subscription_status, subscription_started_at, subscription_current_period_end`,
+      [String(orgName).trim(), orgDomain, trialStartedAt, trialEndsAt]
     );
     const organizationId = orgResult.rows[0].id;
 

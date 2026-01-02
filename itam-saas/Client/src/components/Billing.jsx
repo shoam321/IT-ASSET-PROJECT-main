@@ -205,9 +205,11 @@ const Billing = () => {
   };
 
   const tier = String(billing?.billing_tier || '').toLowerCase();
+  const planName = String(billing?.plan || '').toLowerCase();
   const subStatus = String(billing?.subscription_status || '').toLowerCase();
+  const isTrial = planName === 'trial' || subStatus === 'trial';
   const currentPlan = plans[selectedPlan];
-  const isActive = subStatus === 'active' || tier === 'enterprise' || tier === 'pro';
+  const isActive = !isTrial && (subStatus === 'active' || tier === 'enterprise');
 
   return (
     <PayPalScriptProvider options={{ 

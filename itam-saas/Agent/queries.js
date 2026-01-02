@@ -2006,17 +2006,25 @@ export async function findOrCreateGoogleUser(profile) {
         username = `${username}_${Math.floor(Math.random() * 10000)}`;
     }
 
+    // Grant full access during the 30-day trial for new Google signups
+    const trialStartedAt = new Date();
+    const trialEndsAt = new Date(trialStartedAt.getTime());
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30);
+
     result = await pool.query(
-      `INSERT INTO auth_users (username, email, password_hash, full_name, role, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO auth_users (username, email, password_hash, full_name, role, is_active, org_role, trial_started_at, trial_ends_at, onboarding_completed)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
        RETURNING *`,
       [
         username,
         email,
         'GOOGLE_SSO_NO_PASSWORD', // Dummy hash, password login disabled for this user
         profile.displayName,
-        'user',
-        true
+        'admin',
+        true,
+        'owner',
+        trialStartedAt,
+        trialEndsAt
       ]
     );
     
