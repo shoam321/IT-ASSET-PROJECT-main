@@ -1,128 +1,188 @@
-# PayPal Integration Complete ✅
+# PayPal Payments (Orders) + Billing Upgrade
 
-## Status Summary
-The PayPal payment integration has been **fully completed and deployed** to production. Users can now access PayPal checkout functionality directly from the IT Asset Management dashboard.
+This project supports **instant PayPal payments** (PayPal Orders API) from the **Billing** page.
 
-## What's Been Completed
+After a successful capture, the backend upgrades the user’s **organization billing tier** (Pro/Enterprise) only when the captured amount and currency match server-enforced pricing.
 
-### ✅ Backend Integration
-- **Server Endpoints**: All 3 PayPal endpoints are live and deployed to Railway
-  - `POST /api/payments/paypal/order` - Creates PayPal orders
-  - `POST /api/payments/paypal/capture` - Captures approved payments
-  - `POST /api/payments/paypal/webhook` - Handles PayPal webhook notifications
+> Note: There is also a separate PayPal **subscription** webhook flow documented in `PAYPAL_SUBSCRIPTIONS_LIVE_SETUP.md`.
 
-- **PayPal Configuration**: Live mode enabled with credentials
-  - Mode: **LIVE** (real charges will be processed)
-  - Client ID: Configured in Railway environment variables
-  - Webhook ID: Configured in Railway environment variables
+---
 
-- **Database Tables**: Created and verified
-  - `payments` table with RLS policies (tracks all payment transactions)
-  - `webhook_events` table for webhook audit logging
+## What Users See
 
-- **Environment Variables**: Configured in Railway
-  - PAYPAL_MODE=live
-  - PAYPAL_CLIENT_ID
-  - PAYPAL_CLIENT_SECRET
-  - PAYPAL_WEBHOOK_ID
+In the app, users go to **Billing**, pick a plan, click **Pay Now with PayPal**, approve, and the UI calls capture.
 
-### ✅ Frontend Integration
-- **React Component**: `PayPalCheckout.jsx` fully implemented
-  - Amount and currency selection (USD, EUR, GBP, ILS)
-  - Order creation with PayPal redirect
-  - Payment capture on return from PayPal
-  - Status messages and error handling
-  - Dark theme styling matching the application
+Implementation:
+- Frontend UI: `itam-saas/Client/src/components/Billing.jsx`
+- Screen routing: `itam-saas/Client/src/App.jsx` (screen `billing`)
 
-- **App Navigation**: Integrated into main dashboard
-  - New "Payments" menu button in sidebar (💳 Payments)
-  - Screen case added to render PayPalCheckout component
-  - Button styling with active state indicator
+The old admin-only “Reset to Free Trial” testing button has been removed.
 
-- **Styling**: Updated to match dark theme
-  - Dark slate background (bg-slate-700)
-  - Light text colors for contrast
-  - Blue accent colors matching the design system
-  - Status messages with appropriate colors (green/red/blue)
+---
 
-## How to Use
+## Backend Architecture
 
-### For Users:
-1. Click the **💳 Payments** button in the sidebar menu
-2. Enter the amount you want to pay
-3. Select the currency (USD, EUR, GBP, ILS)
-4. Click **"Pay with PayPal"**
-5. Complete payment on the PayPal website
-6. You'll be redirected back to confirm the payment
-7. Click **"Confirm Payment"** to finalize
-8. Success message will appear with capture ID
+Files:
+- PayPal client wrapper: `itam-saas/Agent/paypalClient.js`
+- PayPal endpoints + billing upgrade: `itam-saas/Agent/server.js`
+- Persistence + migrations bootstrap: `itam-saas/Agent/queries.js`
+- Migration SQL: `itam-saas/Agent/migrations/add-payments.sql`
 
-### For Admins:
-- View payment records in the `payments` database table
-- Monitor webhook events in `webhook_events` table
-- Check payment status and capture IDs
+Key design choices:
+- **Server-side pricing enforcement**: client cannot choose price.
+- **Ownership validation**: order is tagged with PayPal `custom_id` and verified at capture time.
+- **Non-blocking persistence**: payment still works even if `payments` table is missing/drifted.
+- **Auto-patching migrations on startup** for payments tables/columns.
 
-## Technical Details
+---
 
-### File Modifications:
-1. **[itam-saas/Client/src/App.jsx](itam-saas/Client/src/App.jsx#L2014-L2015)**
-   - Added PayPalCheckout import (line 19)
-   - Added CreditCard icon import (already present)
-   - Added Payments menu button in sidebar (lines 2294-2302)
-   - Added screen case for payments rendering (lines 2014-2015)
+## Environment Variables
 
-2. **[itam-saas/Client/src/components/PayPalCheckout.jsx](itam-saas/Client/src/components/PayPalCheckout.jsx)**
-   - Complete React component implementation
-   - Fully themed for dark UI
-   - Proper error handling and loading states
-   - API integration with backend endpoints
+### Frontend (Vercel / CRA build)
+- `REACT_APP_API_URL`
+  - Example: `https://<your-railway-host>/api`
+- `REACT_APP_PAYPAL_CLIENT_ID`
+  - Required for `@paypal/react-paypal-js`.
 
-### Backend Files (Already Deployed):
-- [itam-saas/Agent/paypalClient.js](itam-saas/Agent/paypalClient.js) - PayPal SDK wrapper
-- [itam-saas/Agent/server.js](itam-saas/Agent/server.js) - API endpoints
-- [itam-saas/Agent/queries.js](itam-saas/Agent/queries.js) - Database helpers
-- [itam-saas/Agent/.env](itam-saas/Agent/.env) - PayPal credentials
+Notes:
+- CRA `REACT_APP_*` are **build-time**; redeploy after changing.
+
+### Backend (Railway)
+Required:
+- `PAYPAL_MODE` = `live` or `sandbox`
+- `PAYPAL_CLIENT_ID`
+- `PAYPAL_CLIENT_SECRET`
+- `PAYPAL_WEBHOOK_ID` (required if using the webhook endpoint)
+
+Pricing (enforced server-side):
+- `PAYPAL_PRO_PRICE_CENTS` (default `2900`)
+- `PAYPAL_ENTERPRISE_PRICE_CENTS` (default `9900`)
+
+Recommended:
+- `FRONTEND_URL` and/or `REACT_APP_URL` for CORS allowlist and return/cancel URLs.
+
+---
+
+## API Endpoints
+
+### Create an order
+`POST /api/payments/paypal/order`
+
+Auth: required (JWT)
+
+Body (client can send these, but server enforces price):
+```json
+{
+  "plan": "regular" | "enterprise",
+  "currency": "USD",
+  "description": "..."
+}
+```
+
+Behavior:
+- Computes amount from `PAYPAL_*_PRICE_CENTS`.
+- Currently **USD-only** (rejects other currencies).
+- Sets PayPal `custom_id` to `org:<orgId>;user:<userId>` when possible.
+- Attempts to insert into `payments` (non-blocking if DB schema is missing).
+
+Response:
+```json
+{ "orderId": "...", "approveUrl": "...", "status": "CREATED" }
+```
+
+### Capture an order
+`POST /api/payments/paypal/capture`
+
+Auth: required (JWT)
+
+Body:
+```json
+{ "orderId": "...", "plan": "regular" | "enterprise" }
+```
+
+Behavior:
+- Calls PayPal `OrdersGet` to verify `custom_id` matches the current user/org.
+  - If PayPal verification fails, non-admin receives `503` and should retry.
+- Captures via PayPal `OrdersCapture`.
+- Attempts to persist capture into `payments` (non-blocking on schema issues).
+- Upgrades the organization only if:
+  - capture `status === "COMPLETED"`
+  - captured currency is `USD`
+  - captured amount equals expected plan price (in cents)
+- Sets `subscription_status = active` and `subscription_current_period_end = now + 30 days`.
+
+Response:
+```json
+{ "status": "COMPLETED", "captureId": "...", "upgraded": true }
+```
+
+### Webhook (Orders events)
+`POST /api/payments/paypal/webhook`
+
+Purpose:
+- Verifies PayPal signature.
+- Writes an audit record into `webhook_events`.
+- Upserts into `payments` when possible.
+
+### Webhook (Subscription events)
+`POST /api/billing/paypal/webhook`
+
+See `PAYPAL_SUBSCRIPTIONS_LIVE_SETUP.md`.
+
+---
+
+## Database Persistence & Migrations
+
+Tables created/patched by `itam-saas/Agent/migrations/add-payments.sql`:
+- `payments`
+  - Important columns: `order_id` (unique), `capture_id`, `user_id`, `amount_cents`, `currency`, `status`, `metadata`, timestamps.
+- `webhook_events`
+  - `event_id` unique, `event_type`, `payload`, `status`, `processed_at`.
+
+Schema drift handling:
+- On backend startup, `initDatabase()` checks for `payments` and specifically `payments.order_id`.
+- If missing, it automatically applies `add-payments.sql`.
+
+Manual migration runner:
+- `node itam-saas/Agent/migrations/run-payments-migration.js`
+  - Uses `DATABASE_OWNER_URL` first (recommended if permissions are limited), otherwise `DATABASE_URL`.
+
+---
+
+## Security Notes (Important)
+
+- **Do not trust client price**: the server ignores client price and computes price from env.
+- **No upgrade on underpayment**: upgrade only happens when amount/currency match expected.
+- **Order ownership validation**: verified against PayPal `custom_id` during capture.
+- **Persistence is best-effort**: DB failures won’t block capturing/upgrading, but will reduce audit/history until migrations are fixed.
+
+---
 
 ## Verification Checklist
 
-- ✅ Backend health check: Status 200 OK
-- ✅ Payment tables exist in database
-- ✅ PayPal endpoints compiled and deployed
-- ✅ Frontend component builds without errors
-- ✅ Menu button displays correctly
-- ✅ Screen rendering configured
-- ✅ Dark theme styling applied
-- ✅ Environment variables set in Railway
-- ✅ Live PayPal credentials active
+1. Billing page loads and shows PayPal buttons.
+2. `POST /api/payments/paypal/order` returns `200` with `orderId`.
+3. `POST /api/payments/paypal/capture` returns `COMPLETED` and `upgraded: true`.
+4. `GET /api/billing` shows `billing_tier` updated and `subscription_status: active`.
+5. (Optional) `GET /api/payments` returns history; if it returns empty with a warning, run/confirm payments migration.
 
-## Next Steps (Optional)
+---
 
-1. **Test Live Transaction**: Send a real payment through PayPal to verify the complete flow
-2. **Create Payments History Page**: Display all user payments and transaction details
-3. **Add Payment Analytics**: Track revenue, transaction counts, currency breakdown
-4. **Create Admin Dashboard**: View all payments across all users
+## Troubleshooting
 
-## Important Notes
+### `invalid_client` / auth errors
+- Check `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` in Railway.
+- Confirm `PAYPAL_MODE` matches the credential type (live vs sandbox).
 
-⚠️ **LIVE ENVIRONMENT**: This integration is using PayPal's **LIVE** environment. Any test payments will result in real charges to the PayPal account. For testing without charges, PayPal credentials would need to be switched to Sandbox mode.
+### 500s mentioning `order_id` missing
+- Payments table schema drift.
+- Confirm startup auto-migration ran, or run:
+  - `node itam-saas/Agent/migrations/run-payments-migration.js`
 
-🔒 **Security**: 
-- All payments require user authentication
-- Webhook signatures are verified
-- Payment data is stored with user context
-- Row-level security (RLS) policies protect user data
-- API endpoints require JWT tokens
+### Capture returns `503 Unable to verify`
+- PayPal `OrdersGet` failed temporarily.
+- Retry capture (non-admin is fail-closed by design).
 
-📱 **Supported Currencies**:
-- USD (US Dollars)
-- EUR (Euros)  
-- GBP (British Pounds)
-- ILS (Israeli Shekels)
-
-## Support
-
-For issues or questions:
-1. Check browser console for API errors
-2. Review backend logs at Railway dashboard
-3. Verify PayPal webhook status in PayPal Developer Dashboard
-4. Check database records for payment history
+### PayPal button not showing
+- Frontend missing `REACT_APP_PAYPAL_CLIENT_ID` at build time.
+- Redeploy Vercel after setting env var.

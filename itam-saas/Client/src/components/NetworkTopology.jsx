@@ -3,7 +3,6 @@ import {
   ReactFlow,
   MiniMap,
   Controls,
-  Background,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -14,6 +13,7 @@ import {
 } from '@xyflow/react';
 import { Save, Download, Plus, Server, Monitor, Wifi, Shield, AlignLeft, Grid3x3, FolderOpen } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
+import RippleGrid from './RippleGrid';
 
 const SNAP_GRID = [20, 20]; // Snap to 20px grid
 const MIN_DISTANCE = 150; // Minimum distance between nodes (increased padding)
@@ -453,22 +453,36 @@ export default function NetworkTopology() {
       </div>
 
       {/* Main Canvas */}
-      <div className="flex-1 relative">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onEdgeClick={onEdgeClick}
-          nodeTypes={nodeTypes}
-          snapToGrid={true}
-          snapGrid={SNAP_GRID}
-          fitView
-          connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
-          connectionMode="loose"
-          className="bg-slate-900"
-        >
+      <div className="flex-1 relative overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <RippleGrid
+            enableRainbow={false}
+            gridColor="#ffffff"
+            rippleIntensity={0.05}
+            gridSize={10}
+            gridThickness={15}
+            mouseInteraction={true}
+            mouseInteractionRadius={1.2}
+            opacity={0.8}
+          />
+        </div>
+
+        <div className="relative z-10 h-full">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onEdgeClick={onEdgeClick}
+            nodeTypes={nodeTypes}
+            snapToGrid={true}
+            snapGrid={SNAP_GRID}
+            fitView
+            connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
+            connectionMode="loose"
+            className="bg-transparent"
+          >
           <Controls className="bg-slate-700 border-slate-600" />
           <MiniMap 
             className="bg-slate-800 border-slate-600" 
@@ -478,7 +492,6 @@ export default function NetworkTopology() {
               return '#ef4444';
             }}
           />
-          <Background variant="dots" gap={16} size={1} color="#475569" />
           
           <Panel position="top-left" className="flex flex-col gap-2">
             <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 shadow-lg">
@@ -532,7 +545,8 @@ export default function NetworkTopology() {
               Export
             </button>
           </Panel>
-        </ReactFlow>
+          </ReactFlow>
+        </div>
 
         {/* Edge Edit Panel */}
         {showEdgePanel && selectedEdge && (

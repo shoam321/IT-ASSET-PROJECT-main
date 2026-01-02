@@ -3326,39 +3326,6 @@ app.post('/api/billing/enterprise/activate', authenticateToken, requireAdmin, [
   }
 });
 
-// Reset billing to free trial (for testing payments) - ADMIN ONLY
-app.post('/api/billing/reset-to-free', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const userId = req.user?.userId ?? req.user?.id;
-    let organizationId = req.user?.organizationId || null;
-    if (!userId) return res.status(401).json({ error: 'Invalid token structure' });
-
-    if (!organizationId) {
-      const dbUser = await authQueries.findUserById(userId);
-      organizationId = dbUser?.organization_id || null;
-    }
-
-    if (!organizationId) {
-      return res.status(409).json({ error: 'No organization found' });
-    }
-
-    const updated = await db.withSystemContext(async (client) => {
-      return await db.setOrganizationBillingTier(
-        organizationId,
-        { billingTier: 'free', subscriptionStatus: 'trial' },
-        client
-      );
-    });
-
-    if (!updated) return res.status(404).json({ error: 'Organization not found' });
-    console.log(`[billing] Reset org ${organizationId} to free trial for testing`);
-    return res.json({ billing: updated, message: 'Billing reset to free trial for testing' });
-  } catch (error) {
-    console.error('Error resetting billing to free:', error);
-    res.status(500).json({ error: 'Failed to reset billing' });
-  }
-});
-
 // PayPal subscription webhooks (server-to-server)
 app.post('/api/billing/paypal/webhook', async (req, res) => {
   const body = req.body;
