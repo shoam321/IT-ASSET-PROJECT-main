@@ -23,7 +23,7 @@ function getClient() {
 
 export const allowedCurrencies = ['USD', 'EUR', 'GBP', 'ILS'];
 
-export async function createOrder({ amount, currency, description, returnUrl, cancelUrl, intent = 'CAPTURE' }) {
+export async function createOrder({ amount, currency, description, returnUrl, cancelUrl, intent = 'CAPTURE', customId = null }) {
   const client = getClient();
   const request = new paypal.orders.OrdersCreateRequest();
   request.prefer('return=representation');
@@ -31,6 +31,7 @@ export async function createOrder({ amount, currency, description, returnUrl, ca
     intent,
     purchase_units: [
       {
+        ...(customId ? { custom_id: String(customId).slice(0, 127) } : {}),
         amount: {
           currency_code: currency,
           value: amount
@@ -49,6 +50,19 @@ export async function createOrder({ amount, currency, description, returnUrl, ca
   const orderId = response?.result?.id;
   const approveUrl = response?.result?.links?.find(l => l.rel === 'approve')?.href;
   return { orderId, approveUrl, status: response?.result?.status, raw: response?.result };
+}
+
+export async function getOrder(orderId) {
+  const client = getClient();
+  const request = new paypal.orders.OrdersGetRequest(orderId);
+  const response = await client.execute(request);
+  const result = response?.result;
+  return {
+    orderId: result?.id,
+    status: result?.status,
+    purchaseUnits: result?.purchase_units || [],
+    raw: result
+  };
 }
 
 export async function captureOrder(orderId) {

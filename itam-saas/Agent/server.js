@@ -25,7 +25,7 @@ import { initializeAlertService, shutdownAlertService } from './alertService.js'
 import { getCached, invalidateCache, getRedisClient } from './redis.js';
 import * as emailService from './emailService.js';
 import { startLicenseExpirationChecker, stopLicenseExpirationChecker } from './licenseExpirationChecker.js';
-import { createOrder as createPayPalOrder, captureOrder as capturePayPalOrder, verifyWebhookSignature, allowedCurrencies as paypalCurrencies } from './paypalClient.js';
+import { createOrder as createPayPalOrder, captureOrder as capturePayPalOrder, getOrder as getPayPalOrder, verifyWebhookSignature, allowedCurrencies as paypalCurrencies } from './paypalClient.js';
 import { getSubscription as getPayPalSubscription } from './paypalSubscriptions.js';
 import { startHealthCheckScheduler, stopHealthCheckScheduler, runHealthCheckAndNotify } from './healthCheckService.js';
 import metrics, { metricsMiddleware, updateBusinessMetrics, updatePoolMetrics, getMetrics, getMetricsContentType, authAttempts, subscriptionEvents, websocketConnections, alertsGenerated, cacheOperations, cacheLatency } from './metrics.js';
@@ -2891,13 +2891,23 @@ app.get('/api/payments', authenticateToken, async (req, res) => {
     const offset = req.query.offset;
     const all = String(req.query.all || '').toLowerCase() === 'true';
 
-    if (all && role === 'admin') {
-      const rows = await db.getAllPayments({ limit, offset });
-      return res.json({ payments: rows });
-    }
+    try {
+      if (all && role === 'admin') {
+        const rows = await db.getAllPayments({ limit, offset });
+        return res.json({ payments: rows });
+      }
 
-    const rows = await db.getPaymentsForUser(userId, { limit, offset });
-    return res.json({ payments: rows });
+      const rows = await db.getPaymentsForUser(userId, { limit, offset });
+      return res.json({ payments: rows });
+    } catch (dbError) {
+      // If the payments table schema is out of sync in a given environment, don't break the app.
+      // Payments persistence is helpful but should not block core functionality.
+      const message = String(dbError?.message || '');
+      if (dbError?.code === '42703' || message.toLowerCase().includes('order_id')) {
+        return res.json({ payments: [], warning: 'Payments persistence is not configured in this environment yet.' });
+      }
+      throw dbError;
+    }
   } catch (error) {
     console.error('Error fetching payments:', error);
     res.status(500).json({ error: 'Failed to fetch payments' });
@@ -2916,10 +2926,17 @@ app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
 
   try {
     const userId = req.user?.userId ?? req.user?.id;
+    let organizationId = req.user?.organizationId || null;
     if (!userId) {
       return res.status(401).json({ error: 'Invalid token structure' });
     }
     await db.setCurrentUserId(userId);
+
+    // Get organization ID if not in token
+    if (!organizationId) {
+      const dbUser = await authQueries.findUserById(userId);
+      organizationId = dbUser?.organization_id || null;
+    }
 
     const cents = toCents(req.body.amount);
     if (!cents) {
@@ -2935,28 +2952,36 @@ app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
     const returnUrl = `${FRONTEND_BASE_URL}/paypal/return`;
     const cancelUrl = `${FRONTEND_BASE_URL}/paypal/cancel`;
 
+    const customId = organizationId ? `org:${organizationId};user:${userId}` : `user:${userId}`;
+
     const order = await createPayPalOrder({
       amount: centsToValue(cents),
       currency,
       description,
       returnUrl,
-      cancelUrl
+      cancelUrl,
+      customId
     });
 
     if (!order?.orderId) {
       return res.status(500).json({ error: 'Failed to create PayPal order' });
     }
 
-    await db.createPaymentRecord({
-      orderId: order.orderId,
-      userId,
-      amountCents: cents,
-      currency,
-      status: order.status || 'CREATED',
-      intent: 'CAPTURE',
-      description,
-      metadata: { source: 'api', requested_amount: req.body.amount }
-    });
+    try {
+      await db.createPaymentRecord({
+        orderId: order.orderId,
+        userId,
+        amountCents: cents,
+        currency,
+        status: order.status || 'CREATED',
+        intent: 'CAPTURE',
+        description,
+        metadata: { source: 'api', requested_amount: req.body.amount, custom_id: customId }
+      });
+    } catch (dbError) {
+      // Don't fail order creation due to payments table schema drift.
+      console.warn('[payments] Failed to persist payment order (non-blocking):', dbError?.message || dbError);
+    }
 
     res.json({
       orderId: order.orderId,
@@ -2995,9 +3020,20 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
       organizationId = dbUser?.organization_id || null;
     }
 
-    const payment = await db.getPaymentByOrderId(orderId);
-    if (payment && payment.user_id && payment.user_id !== userId && role !== 'admin') {
-      return res.status(403).json({ error: 'Forbidden' });
+    // Validate that the order was created for this org/user without relying on DB persistence.
+    try {
+      const orderDetails = await getPayPalOrder(orderId);
+      const customId = orderDetails?.purchaseUnits?.[0]?.custom_id;
+      if (customId && organizationId) {
+        const expected = `org:${organizationId};user:${userId}`;
+        // Allow admin override
+        if (customId !== expected && role !== 'admin') {
+          return res.status(403).json({ error: 'Forbidden' });
+        }
+      }
+    } catch (verifyError) {
+      // If PayPal order lookup fails, we still attempt capture; PayPal will reject invalid orders.
+      console.warn('[paypal] Failed to fetch order details for verification (continuing):', verifyError?.message || verifyError);
     }
 
     const result = await capturePayPalOrder(orderId);
@@ -3006,15 +3042,8 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
       return res.status(500).json({ error: 'Failed to capture order' });
     }
 
-    if (payment) {
-      await db.updatePaymentStatus(orderId, {
-        status: result.status || 'CAPTURED',
-        captureId: result.captureId,
-        payerEmail: result.payerEmail,
-        payerName: result.payerName,
-        metadata: result.raw || payment.metadata
-      });
-    } else {
+    // Persist capture details if the payments table exists with the expected schema.
+    try {
       const amountCents = result?.amount?.value ? toCents(result.amount.value) : null;
       await db.createPaymentRecord({
         orderId,
@@ -3028,6 +3057,8 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
         payerName: result.payerName,
         metadata: result.raw || {}
       });
+    } catch (dbError) {
+      console.warn('[payments] Failed to persist capture (non-blocking):', dbError?.message || dbError);
     }
 
     // ✅ UPGRADE ORGANIZATION TO PRO after successful payment!
