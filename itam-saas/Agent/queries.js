@@ -1444,10 +1444,10 @@ export async function getInstalledApps(device_id) {
 export async function getAllForbiddenApps() {
   try {
     const result = await pool.query(
-      `SELECT fa.id, fa.process_name, fa.description, fa.severity, fa.created_at, fa.updated_at, 
+      `SELECT fa.id, fa.name as process_name, fa.description, fa.severity, fa.created_at, fa.updated_at, 
               au.full_name AS created_by_name
        FROM forbidden_apps fa
-       LEFT JOIN auth_users au ON fa.created_by = au.id
+       LEFT JOIN auth_users au ON fa.user_id = au.id
        ORDER BY fa.created_at DESC`
     );
     return result.rows;
@@ -1463,7 +1463,7 @@ export async function getAllForbiddenApps() {
 export async function getForbiddenAppsList() {
   try {
     const result = await pool.query(
-      `SELECT process_name, severity FROM forbidden_apps`
+      `SELECT name as process_name, severity FROM forbidden_apps`
     );
     return result.rows;
   } catch (error) {
@@ -1500,9 +1500,9 @@ export async function createForbiddenApp(appData) {
   
   try {
     const result = await pool.query(
-      `INSERT INTO forbidden_apps (process_name, description, severity, created_by)
+      `INSERT INTO forbidden_apps (name, description, severity, user_id)
        VALUES ($1, $2, $3, $4)
-       RETURNING *`,
+       RETURNING *, name as process_name`,
       [process_name.trim().toLowerCase(), description || null, severity || 'Medium', created_by || null]
     );
     return result.rows[0];
@@ -1523,7 +1523,8 @@ export async function updateForbiddenApp(id, appData) {
   const values = [];
   let paramCount = 1;
   
-  const excludeFields = ['id', 'created_at', 'updated_at', 'created_by'];
+  const excludeFields = ['id', 'created_at', 'updated_at', 'created_by', 'user_id'];
+  const columnMapping = { process_name: 'name' };
 
   for (const [key, value] of Object.entries(appData)) {
     if (excludeFields.includes(key) || value === undefined) {
@@ -1537,7 +1538,8 @@ export async function updateForbiddenApp(id, appData) {
       processedValue = processedValue.trim();
     }
     
-    fields.push(`${key} = $${paramCount}`);
+    const columnName = columnMapping[key] || key;
+    fields.push(`${columnName} = $${paramCount}`);
     values.push(processedValue);
     paramCount++;
   }
@@ -1549,7 +1551,7 @@ export async function updateForbiddenApp(id, appData) {
   values.push(id);
 
   try {
-    const query = `UPDATE forbidden_apps SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount} RETURNING *`;
+    const query = `UPDATE forbidden_apps SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${paramCount} RETURNING *, name as process_name`;
     const result = await pool.query(query, values);
     return result.rows[0];
   } catch (error) {
@@ -1578,7 +1580,7 @@ export async function deleteForbiddenApp(id) {
  * Create security alert
  */
 export async function createSecurityAlert(alertData) {
-  const { device_id, app_detected, severity, process_id, user_id } = alertData;
+  const { device_id, app_detected, severity, user_id, organization_id, details } = alertData;
   
   if (!device_id || !app_detected) {
     throw new Error('device_id and app_detected are required');
@@ -1586,10 +1588,10 @@ export async function createSecurityAlert(alertData) {
   
   try {
     const result = await pool.query(
-      `INSERT INTO security_alerts (device_id, app_detected, severity, process_id, user_id, status)
-       VALUES ($1, $2, $3, $4, $5, 'New')
-       RETURNING *`,
-      [device_id, app_detected, severity || 'Medium', process_id || null, user_id || null]
+      `INSERT INTO security_alerts (device_id, app_name, severity, user_id, organization_id, details, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'New')
+       RETURNING *, app_name as app_detected`,
+      [device_id, app_detected, severity || 'Medium', user_id || null, organization_id || null, details || null]
     );
     return result.rows[0];
   } catch (error) {
