@@ -1163,7 +1163,18 @@ export default function App() {
 
       {showForm && (
         <div className="bg-slate-700 border border-slate-600 rounded-lg p-6 mb-8 shadow-xl">
-          <h2 className="text-xl font-semibold text-white mb-4">{editingId ? 'Edit Asset' : 'Add New Asset'}</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">{editingId ? 'Edit Asset' : 'Add New Asset'}</h2>
+            {!editingId && (
+              <button
+                onClick={() => setShowScanner(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition text-sm"
+              >
+                <Camera className="w-4 h-4" />
+                <span>Scan QR Code</span>
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               id="asset_tag"
@@ -2399,16 +2410,6 @@ export default function App() {
             >
               <Shield className="w-5 h-5" />
               <span>Forbidden Apps</span>
-            </button>
-          )}
-
-          {isAdmin && (
-            <button
-              onClick={() => setShowScanner(true)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg transition text-slate-400 hover:bg-slate-700"
-            >
-              <Camera className="w-5 h-5" />
-              <span>Scan Asset QR</span>
             </button>
           )}
 
