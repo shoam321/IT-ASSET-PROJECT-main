@@ -3252,8 +3252,8 @@ app.post('/api/billing/enterprise/activate', authenticateToken, requireAdmin, [
   }
 });
 
-// Reset billing to free trial (for testing payments)
-app.post('/api/billing/reset-to-free', authenticateToken, async (req, res) => {
+// Reset billing to free trial (for testing payments) - ADMIN ONLY
+app.post('/api/billing/reset-to-free', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const userId = req.user?.userId ?? req.user?.id;
     let organizationId = req.user?.organizationId || null;

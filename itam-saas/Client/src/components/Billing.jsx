@@ -477,8 +477,8 @@ const Billing = () => {
                   )}
                 </div>
                 
-                {/* Reset to Free Trial Button (for testing) */}
-                {(tier === 'pro' || tier === 'regular' || tier === 'enterprise' || subStatus === 'active') && (
+                {/* Reset to Free Trial Button (for testing) - Admin only */}
+                {user?.role === 'admin' && (tier === 'pro' || tier === 'regular' || tier === 'enterprise' || subStatus === 'active') && (
                   <button
                     onClick={resetToFreeTrial}
                     className="mt-4 w-full py-2 px-4 bg-orange-500/20 border border-orange-500/50 text-orange-300 rounded-lg text-sm hover:bg-orange-500/30 transition-colors"
