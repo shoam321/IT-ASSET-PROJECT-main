@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, BarChart3, CreditCard } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, BarChart3, CreditCard, Zap } from 'lucide-react';
 import * as dbService from './services/db';
 import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from './config/assetCategories';
 import { useAuth } from './context/AuthContext';
@@ -2566,35 +2566,49 @@ export default function App() {
               </div>
             </div>
             
-            {['assets', 'licenses', 'users', 'contracts'].includes(currentScreen) && !universalSearch && (
-              <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Upgrade Now Button - Always visible */}
+              {currentScreen !== 'billing' && (
                 <button
-                  onClick={exportCurrentScreenCsv}
-                  className="bg-slate-700 hover:bg-slate-600 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base border border-slate-600 flex-shrink-0"
-                  title="Export CSV"
+                  onClick={() => setCurrentScreen('billing')}
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base flex-shrink-0 shadow-lg shadow-blue-500/25"
+                  title="Upgrade Now"
                 >
-                  <Download className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                  <span className="hidden md:inline">Export CSV</span>
+                  <Zap className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                  <span className="hidden md:inline">Upgrade Now</span>
                 </button>
+              )}
 
-                <button
-                  onClick={() => setShowForm(!showForm)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base flex-shrink-0"
-                  title={currentScreen === 'assets' ? 'Add Asset' : currentScreen === 'licenses' ? 'Add License' : currentScreen === 'users' ? 'Add User' : 'Add Contract'}
-                >
-                  <Plus className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
-                  <span className="hidden md:inline">
-                    {currentScreen === 'assets'
-                      ? 'Add Asset'
-                      : currentScreen === 'licenses'
-                        ? 'Add License'
-                        : currentScreen === 'users'
-                          ? 'Add User'
-                          : 'Add Contract'}
-                  </span>
-                </button>
-              </div>
-            )}
+              {['assets', 'licenses', 'users', 'contracts'].includes(currentScreen) && !universalSearch && (
+                <>
+                  <button
+                    onClick={exportCurrentScreenCsv}
+                    className="bg-slate-700 hover:bg-slate-600 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base border border-slate-600 flex-shrink-0"
+                    title="Export CSV"
+                  >
+                    <Download className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                    <span className="hidden md:inline">Export CSV</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowForm(!showForm)}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base flex-shrink-0"
+                    title={currentScreen === 'assets' ? 'Add Asset' : currentScreen === 'licenses' ? 'Add License' : currentScreen === 'users' ? 'Add User' : 'Add Contract'}
+                  >
+                    <Plus className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                    <span className="hidden md:inline">
+                      {currentScreen === 'assets'
+                        ? 'Add Asset'
+                        : currentScreen === 'licenses'
+                          ? 'Add License'
+                          : currentScreen === 'users'
+                            ? 'Add User'
+                            : 'Add Contract'}
+                    </span>
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </header>
 
