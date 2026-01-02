@@ -1214,7 +1214,7 @@ app.post('/api/organizations', authenticateToken, [
 
     // Update org with plan and settings if provided
     if (plan || settings) {
-      await db.query(
+      await pool.query(
         'UPDATE organizations SET plan = COALESCE($1, plan), settings = COALESCE($2, settings) WHERE id = $3',
         [plan, settings ? JSON.stringify(settings) : null, org.id]
       );
