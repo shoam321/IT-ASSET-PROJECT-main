@@ -8,6 +8,7 @@ const RippleGrid = ({
   rippleIntensity = 0.05,
   gridSize = 10.0,
   gridThickness = 15.0,
+  timeScale = 1.0,
   fadeDistance = 1.5,
   vignetteStrength = 2.0,
   glowIntensity = 0.1,
@@ -21,6 +22,7 @@ const RippleGrid = ({
   const targetMouseRef = useRef({ x: 0.5, y: 0.5 });
   const mouseInfluenceRef = useRef(0);
   const uniformsRef = useRef(null);
+  const timeScaleRef = useRef(timeScale);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -207,7 +209,7 @@ void main() {
     resize();
 
     const render = (t) => {
-      uniforms.iTime.value = t * 0.001;
+      uniforms.iTime.value = t * 0.001 * (timeScaleRef.current || 1);
 
       const lerpFactor = 0.1;
       mousePositionRef.current.x += (targetMouseRef.current.x - mousePositionRef.current.x) * lerpFactor;
@@ -267,12 +269,14 @@ void main() {
     uniformsRef.current.gridRotation.value = gridRotation;
     uniformsRef.current.mouseInteraction.value = mouseInteraction;
     uniformsRef.current.mouseInteractionRadius.value = mouseInteractionRadius;
+    timeScaleRef.current = timeScale;
   }, [
     enableRainbow,
     gridColor,
     rippleIntensity,
     gridSize,
     gridThickness,
+    timeScale,
     fadeDistance,
     vignetteStrength,
     glowIntensity,

@@ -458,12 +458,13 @@ export default function NetworkTopology() {
           <RippleGrid
             enableRainbow={false}
             gridColor="#ffffff"
-            rippleIntensity={0.05}
-            gridSize={10}
+            rippleIntensity={0.012}
+            gridSize={20}
             gridThickness={15}
+            timeScale={0.2}
             mouseInteraction={true}
-            mouseInteractionRadius={1.2}
-            opacity={0.8}
+            mouseInteractionRadius={0.8}
+            opacity={0.55}
           />
         </div>
 
