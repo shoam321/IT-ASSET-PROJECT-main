@@ -49,9 +49,9 @@ export async function createOrganizationWithOwner(orgName, orgDomain, username, 
     await client.query('BEGIN');
 
     const orgResult = await client.query(
-      `INSERT INTO organizations (name, domain)
-       VALUES ($1, $2)
-       RETURNING id, name, domain`,
+      `INSERT INTO organizations (name, domain, billing_tier, subscription_status)
+       VALUES ($1, $2, 'pro', 'active')
+       RETURNING id, name, domain, billing_tier, subscription_status`,
       [orgName, orgDomain || null]
     );
 
@@ -286,9 +286,9 @@ export async function createOrganizationForExistingUser(userId, orgName, orgDoma
     if (user.organization_id) throw new Error('User is already assigned to an organization');
 
     const orgRes = await c.query(
-      `INSERT INTO organizations (name, domain)
-       VALUES ($1, $2)
-       RETURNING id, name, domain, plan, created_at`,
+      `INSERT INTO organizations (name, domain, billing_tier, subscription_status)
+       VALUES ($1, $2, 'pro', 'active')
+       RETURNING id, name, domain, plan, billing_tier, subscription_status, created_at`,
       [String(orgName).trim(), orgDomain || null]
     );
 

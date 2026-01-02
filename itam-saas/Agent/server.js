@@ -1318,10 +1318,10 @@ app.post('/api/onboarding/complete', authenticateToken, async (req, res) => {
 
     // Create org and attach user as owner (idempotent per user)
     const orgResult = await client.query(
-      `INSERT INTO organizations (name, domain)
-       VALUES ($1, $2)
+      `INSERT INTO organizations (name, domain, billing_tier, subscription_status)
+       VALUES ($1, $2, 'pro', 'active')
        ON CONFLICT (domain) WHERE domain IS NOT NULL DO UPDATE SET name = EXCLUDED.name
-       RETURNING id, name, domain`,
+       RETURNING id, name, domain, billing_tier, subscription_status`,
       [String(orgName).trim(), orgDomain]
     );
     const organizationId = orgResult.rows[0].id;
