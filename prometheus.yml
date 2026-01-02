@@ -1,23 +1,21 @@
-# IT Asset Tracker - Prometheus Configuration
-# Add this to your Railway Prometheus service
-
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
 scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
   # IT Asset Tracker Backend
   - job_name: 'itasset-backend'
-    static_configs:
-      - targets: ['it-asset-project-production.up.railway.app']
     scheme: https
     metrics_path: /metrics
     scrape_interval: 30s
     scrape_timeout: 10s
-
-  # Optional: Health check endpoint (non-Prometheus format, for uptime monitoring)
-  # - job_name: 'itasset-health'
-  #   static_configs:
-  #     - targets: ['it-asset-project-production.up.railway.app']
-  #   scheme: https
-  #   metrics_path: /health
+    static_configs:
+      - targets: ['it-asset-project-production.up.railway.app']
+        labels:
+          app: 'it-asset-tracker'
+          env: 'production'
