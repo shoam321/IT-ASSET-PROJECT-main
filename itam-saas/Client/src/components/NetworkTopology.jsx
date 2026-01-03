@@ -472,9 +472,7 @@ export default function NetworkTopology() {
           <Controls 
             position="top-right"
             className="bg-slate-700 border-slate-600 rounded-lg shadow-xl"
-            showZoom={true}
-            showFitView={true}
-            showInteractive={true}
+            style={{ zIndex: 10 }}
           />
           <MiniMap 
             className="bg-slate-800 border-slate-600" 
