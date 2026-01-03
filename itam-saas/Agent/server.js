@@ -16,7 +16,6 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import axios from 'axios';
-import Tesseract from 'tesseract.js';
 import pool, { dbAsyncLocalStorage } from './db.js';
 import * as db from './queries.js';
 import * as authQueries from './authQueries.js';
@@ -121,9 +120,6 @@ try {
 } catch {
   console.warn('⚠️ DATABASE_URL is set but could not be parsed as a URL');
 }
-
-// Initialize Tesseract OCR for receipt parsing (fully local, no API key needed)
-console.log('✅ Tesseract OCR receipt parsing enabled (local processing)');
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads', 'receipts');
@@ -2411,84 +2407,10 @@ app.post('/api/assets/:id/receipts', cors(), authenticateToken, requireAdmin, up
     let totalAmount = null;
     let taxAmount = null;
     let currency = null;
-    let parsingStatus = 'pending';
-
-    // Parse receipt with Tesseract OCR if file is image (NOT PDF - Tesseract can't read PDFs)
-    const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (supportedTypes.includes(req.file.mimetype)) {
-      try {
-        console.log(`📄 Parsing receipt with Tesseract OCR: ${req.file.originalname}`);
-        
-        // Run Tesseract OCR
-        const { data: { text } } = await Tesseract.recognize(
-          req.file.path,
-          'eng',
-          {
-            logger: info => {
-              if (info.status === 'recognizing text') {
-                console.log(`OCR Progress: ${Math.round(info.progress * 100)}%`);
-              }
-            }
-          }
-        );
-
-        console.log('📊 Tesseract Extracted Text:', text.substring(0, 200));
-
-        // Parse the extracted text
-        const lines = text.split('\n').filter(line => line.trim());
-        
-        // Try to find total amount (look for patterns like "Total: $50.00" or "TOTAL 50.00")
-        const totalPatterns = [
-          /(?:total|amount|sum|balance)[:\s]*\$?([0-9]+\.?[0-9]{0,2})/i,
-          /\$\s*([0-9]+\.[0-9]{2})/,
-          /([0-9]+\.[0-9]{2})\s*(?:usd|eur|gbp)/i
-        ];
-        
-        for (const pattern of totalPatterns) {
-          const match = text.match(pattern);
-          if (match) {
-            totalAmount = parseFloat(match[1]);
-            break;
-          }
-        }
-        
-        // First non-empty line is often the merchant name
-        merchant = lines[0] || null;
-        
-        // Try to find date patterns
-        const datePattern = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/;
-        const dateMatch = text.match(datePattern);
-        purchaseDate = dateMatch ? dateMatch[1] : null;
-        
-        parsingStatus = 'success';
-        
-        parsedData = {
-          extracted_text: text,
-          total_amount: totalAmount,
-          merchant: merchant,
-          date: purchaseDate,
-          ocr_engine: 'tesseract'
-        };
-
-        console.log(`✅ Receipt parsed - Merchant: ${merchant}, Total: ${totalAmount}, Date: ${purchaseDate}`);
-
-        // Auto-update asset cost if total amount found
-        if (totalAmount && totalAmount > 0) {
-          const asset = await db.getAssetById(assetId);
-          if (asset && (!asset.cost || asset.cost === 0)) {
-            await db.updateAsset(assetId, { cost: totalAmount });
-            console.log(`💰 Auto-updated asset cost to ${totalAmount}`);
-          }
-        }
-
-      } catch (parseError) {
-        console.error('⚠️ Tesseract OCR error:', parseError.message);
-        parsingStatus = 'failed';
-        parsedData = { error: parseError.message };
-      }
-    } else {
-      parsingStatus = 'unsupported_type';
-    }
+    let parsingStatus = 'not_parsed'; // OCR removed - receipts stored only
+    
+    // OCR parsing removed - receipts are uploaded and stored without text extraction
+    parsedData = null;
 
     const receipt = await db.createReceipt(assetId, {
       file_name: req.file.originalname,
