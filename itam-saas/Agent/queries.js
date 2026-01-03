@@ -1,4 +1,4 @@
-import pool from './db.js';
+import pool, { dbAsyncLocalStorage } from './db.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -182,6 +182,32 @@ function normalizeIdentityValues(identity) {
     seen.add(k);
     return true;
   });
+}
+
+/**
+ * Run a callback with a dedicated pg client bound to AsyncLocalStorage and RLS context
+ */
+export async function withRLSContext(userId, callback) {
+  const client = await pool.connect();
+  try {
+    const store = { client };
+    return await dbAsyncLocalStorage.run(store, async () => {
+      // Set current user for RLS; default to 0 to avoid null issues
+      await client.query("SELECT set_config('app.current_user_id', $1, FALSE)", [String(userId ?? 0)]);
+
+      try {
+        return await callback(client);
+      } finally {
+        // Reset context for safety
+        await client.query("SELECT set_config('app.current_user_id', '0', FALSE)");
+      }
+    });
+  } catch (error) {
+    console.error('withRLSContext failed:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 // Asset schema capability checks (cached)
