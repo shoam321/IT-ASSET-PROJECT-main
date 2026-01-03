@@ -1101,7 +1101,10 @@ app.post('/api/auth/login', authLimiter, [
   try {
     const { username, password } = req.body;
     const user = await authQueries.authenticateUser(username, password);
-    
+
+    // Set RLS context for audit logging and downstream requests
+    await db.setCurrentUserId(user.id);
+
     const token = generateToken(user);
     
     // Track successful login
@@ -1111,6 +1114,7 @@ app.post('/api/auth/login', authLimiter, [
     await db.logAuditEvent('users', user.id, 'LOGIN', null, { logged_in: true }, {
       userId: user.id,
       username: user.username,
+      organizationId: user.organization_id || null,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
@@ -1177,11 +1181,13 @@ app.get('/api/auth/google/callback',
     try {
       // Generate JWT token
       const token = generateToken(req.user);
+      await db.setCurrentUserId(req.user.id);
       
       // Log audit event
       await db.logAuditEvent('users', req.user.id, 'LOGIN', null, { logged_in_via: 'google' }, {
         userId: req.user.id,
         username: req.user.username,
+        organizationId: req.user.organization_id || null,
         ipAddress: req.ip,
         userAgent: req.headers['user-agent']
       });
@@ -1534,11 +1540,12 @@ function toCsv(rows, columns) {
   return [header, ...lines].join('\r\n') + '\r\n';
 }
 
-function buildAuditFiltersFromQuery(query) {
+function buildAuditFiltersFromQuery(query, organizationId) {
   const MAX_LIMIT = 5000;
   const parsedLimit = query.limit ? parseInt(query.limit) : 1000;
 
   return {
+    organizationId: organizationId || null,
     tableName: query.table,
     recordId: query.recordId ? parseInt(query.recordId) : null,
     userId: query.userId ? parseInt(query.userId) : null,
@@ -1553,18 +1560,13 @@ function buildAuditFiltersFromQuery(query) {
 // Export audit logs (CSV/JSON) using the same filters as GET /api/audit-logs
 app.get('/api/audit-logs/export', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const userId = req.user?.userId || req.user?.id;
-    if (!userId) {
-      return res.status(401).json({ error: 'Invalid token structure' });
-    }
-    await db.setCurrentUserId(userId);
-
+    const { userId, organizationId } = await resolveUserOrgContext(req);
     const format = String(req.query.format || 'csv').toLowerCase();
     if (!['csv', 'json'].includes(format)) {
       return res.status(400).json({ error: 'Invalid format. Use csv or json.' });
     }
 
-    const filters = buildAuditFiltersFromQuery(req.query);
+    const filters = buildAuditFiltersFromQuery(req.query, organizationId);
     const logs = await db.getAuditLogs(filters);
 
     // Log export event after fetching so the export output doesn't include itself.
@@ -1575,6 +1577,7 @@ app.get('/api/audit-logs/export', authenticateToken, requireAdmin, async (req, r
     }, {
       userId,
       username: req.user?.username,
+      organizationId,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
@@ -1618,14 +1621,9 @@ app.get('/api/audit-logs/export', authenticateToken, requireAdmin, async (req, r
 app.get('/api/audit-logs', authenticateToken, requireAdmin, async (req, res) => {
   try {
     // Use userId from JWT token, fallback to id if userId not present
-    const userId = req.user?.userId || req.user?.id;
-    if (!userId) {
-      console.error('No userId found in token:', req.user);
-      return res.status(401).json({ error: 'Invalid token structure' });
-    }
-    await db.setCurrentUserId(userId);
+    const { userId, organizationId } = await resolveUserOrgContext(req);
     
-    const filters = buildAuditFiltersFromQuery(req.query);
+    const filters = buildAuditFiltersFromQuery(req.query, organizationId);
 
     const logs = await db.getAuditLogs(filters);
     res.json(logs);
@@ -1878,6 +1876,7 @@ app.post('/api/assets', authenticateToken, requireAdmin, async (req, res) => {
     await db.logAuditEvent('assets', asset.id, 'CREATE', null, asset, {
       userId: req.user.id,
       username: req.user.username,
+      organizationId,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
@@ -1928,6 +1927,7 @@ app.put('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) => 
     await db.logAuditEvent('assets', asset.id, 'UPDATE', oldAsset, asset, {
       userId: req.user.id,
       username: req.user.username,
+      organizationId,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
@@ -1956,6 +1956,7 @@ app.delete('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) 
     await db.logAuditEvent('assets', asset.id, 'DELETE', asset, null, {
       userId: req.user.id,
       username: req.user.username,
+      organizationId,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });

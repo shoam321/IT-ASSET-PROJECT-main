@@ -1756,14 +1756,27 @@ export async function cleanupOldAlerts(hoursOld = 5) {
  * @param {string} action - LOGIN, LOGOUT, CREATE, UPDATE, DELETE, or EXPORT
  * @param {object} oldData - Data before change (null for CREATE)
  * @param {object} newData - Data after change (null for DELETE)
- * @param {object} userInfo - {userId, username, ipAddress, userAgent}
+ * @param {object} userInfo - {userId, username, ipAddress, userAgent, organizationId}
  */
 export async function logAuditEvent(tableName, recordId, action, oldData, newData, userInfo = {}) {
   try {
+    let organizationId = userInfo.organizationId || null;
+    if (!organizationId && userInfo.userId) {
+      try {
+        const orgLookup = await pool.query(
+          'SELECT organization_id FROM auth_users WHERE id = $1 LIMIT 1',
+          [userInfo.userId]
+        );
+        organizationId = orgLookup.rows?.[0]?.organization_id || null;
+      } catch (lookupError) {
+        console.error('Failed to derive organization_id for audit log:', lookupError?.message || lookupError);
+      }
+    }
+
     await pool.query(
       `INSERT INTO audit_logs 
-       (table_name, record_id, action, old_data, new_data, user_id, username, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       (table_name, record_id, action, old_data, new_data, user_id, username, ip_address, user_agent, organization_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         tableName,
         recordId,
@@ -1773,7 +1786,8 @@ export async function logAuditEvent(tableName, recordId, action, oldData, newDat
         userInfo.userId || null,
         userInfo.username || null,
         userInfo.ipAddress || null,
-        userInfo.userAgent || null
+        userInfo.userAgent || null,
+        organizationId
       ]
     );
   } catch (error) {
@@ -1788,6 +1802,11 @@ export async function logAuditEvent(tableName, recordId, action, oldData, newDat
  */
 export async function getAuditLogs(filters = {}) {
   try {
+    const orgId = filters.organizationId || null;
+    if (!orgId) {
+      throw new Error('organizationId is required for audit log queries');
+    }
+
     let query = `
       SELECT
         al.*,
@@ -1795,10 +1814,10 @@ export async function getAuditLogs(filters = {}) {
         au.email AS user_email
       FROM audit_logs al
       LEFT JOIN auth_users au ON au.id = al.user_id
-      WHERE 1=1
+      WHERE al.organization_id = $1
     `;
-    const params = [];
-    let paramCount = 1;
+    const params = [orgId];
+    let paramCount = 2;
 
     if (filters.tableName) {
       query += ` AND al.table_name = $${paramCount}`;
