@@ -2480,7 +2480,7 @@ export default function App() {
         {/* User Info & Logout */}
         <div className="p-4 border-t border-slate-700">
           <div className="text-slate-400 text-sm mb-3">
-            <div className="font-medium text-white">{user?.username || 'User'}</div>
+            <div className="font-medium text-white">{user?.username?.replace(/_\d{4}$/, '') || 'User'}</div>
             <div className="text-xs">{user?.email || ''}</div>
           </div>
           <button

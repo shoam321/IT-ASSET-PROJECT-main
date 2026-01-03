@@ -167,7 +167,8 @@ export default function AuditTrail() {
   };
 
   const getUserDisplay = (log) => {
-    const name = log.user_full_name || log.username;
+    const rawName = log.user_full_name || log.username;
+    const name = rawName ? rawName.replace(/_\d{4}$/, '') : null; // Strip _#### suffix
     const email = log.user_email;
     if (!name && !email) return 'System';
     if (name && email) return `${name} (${email})`;
@@ -217,7 +218,8 @@ export default function AuditTrail() {
         return data.contract_name || data.vendor || 'Contract';
       }
       case 'users': {
-        return data.username || data.email || 'User';
+        const username = data.username || data.email || 'User';
+        return username.replace(/_\d{4}$/, ''); // Strip _#### suffix
       }
       default: {
         // Fallback: try a couple common fields.

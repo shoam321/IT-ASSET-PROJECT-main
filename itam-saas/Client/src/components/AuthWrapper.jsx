@@ -95,7 +95,8 @@ export default function AuthWrapper() {
             isOpen={showSignUpModal}
             onClose={() => setShowSignUpModal(false)}
             onSuccess={(token, userData) => {
-              setNewUserName(userData?.firstName || userData?.username || 'there');
+              const displayName = userData?.firstName || userData?.username?.replace(/_\d{4}$/, '') || 'there';
+              setNewUserName(displayName);
               login(token, userData);
               setShowSignUpModal(false);
               setShowWelcomeAnimation(true);
