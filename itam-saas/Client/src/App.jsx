@@ -17,7 +17,6 @@ import StockOverview from './components/StockOverview';
 import Consumables from './components/Consumables';
 import CategoryIcon from './components/CategoryIcon';
 import Billing from './components/Billing';
-import VhsGlitchLogo from './components/VhsGlitchLogo';
 import { downloadCsv } from './utils/csvExport';
 
 // Helper function to format dates in a user-friendly way
@@ -2507,11 +2506,6 @@ export default function App() {
         {/* Header */}
         <header className="bg-slate-800 border-b border-slate-700 shadow-lg relative z-5 flex-shrink-0">
           <div className="px-4 md:px-6 py-3 md:py-4 flex items-center justify-between gap-2 md:gap-4 min-w-0">
-            {/* Logo - visible on larger screens */}
-            <div className="hidden lg:block flex-shrink-0">
-              <VhsGlitchLogo />
-            </div>
-            
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="lg:hidden p-2 hover:bg-slate-700 rounded-lg transition text-slate-300"

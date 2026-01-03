@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Monitor, Shield, BarChart3, Zap, CheckCircle, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
-import VhsGlitchLogo from './VhsGlitchLogo';
 
 const API_URL = import.meta.env.VITE_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
@@ -72,7 +71,10 @@ export default function WelcomePage({ onShowSignIn, onShowSignUp, onGoogleAuth }
         <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
-              <VhsGlitchLogo />
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 sm:p-2.5 rounded-xl shadow-lg shadow-blue-500/20">
+                <Monitor className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+              </div>
+              <span className="text-lg sm:text-xl font-bold text-white">IT Asset Manager</span>
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
               <button
