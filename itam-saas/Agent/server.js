@@ -3015,10 +3015,11 @@ app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
       organizationId = dbUser?.organization_id || null;
     }
 
-    const plan = String(req.body.plan || 'regular').toLowerCase();
+    const plan = String(req.body.plan || 'starter').toLowerCase();
+    const starterPriceCents = Number.parseInt(process.env.PAYPAL_STARTER_PRICE_CENTS || '2500', 10);
     const proPriceCents = Number.parseInt(process.env.PAYPAL_PRO_PRICE_CENTS || '2900', 10);
     const enterprisePriceCents = Number.parseInt(process.env.PAYPAL_ENTERPRISE_PRICE_CENTS || '9900', 10);
-    const cents = plan === 'enterprise' ? enterprisePriceCents : proPriceCents;
+    const cents = plan === 'enterprise' ? enterprisePriceCents : (plan === 'regular' ? proPriceCents : starterPriceCents);
     if (!Number.isFinite(cents) || cents <= 0) {
       return res.status(500).json({ error: 'Server billing configuration is invalid' });
     }
@@ -3143,10 +3144,11 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
       return res.status(500).json({ error: 'Failed to capture order' });
     }
 
-    const normalizedPlan = String(plan || 'regular').toLowerCase();
+    const normalizedPlan = String(plan || 'starter').toLowerCase();
+    const starterPriceCents = Number.parseInt(process.env.PAYPAL_STARTER_PRICE_CENTS || '2500', 10);
     const proPriceCents = Number.parseInt(process.env.PAYPAL_PRO_PRICE_CENTS || '2900', 10);
     const enterprisePriceCents = Number.parseInt(process.env.PAYPAL_ENTERPRISE_PRICE_CENTS || '9900', 10);
-    const expectedCents = normalizedPlan === 'enterprise' ? enterprisePriceCents : proPriceCents;
+    const expectedCents = normalizedPlan === 'enterprise' ? enterprisePriceCents : (normalizedPlan === 'regular' ? proPriceCents : starterPriceCents);
     const capturedCurrency = (result?.amount?.currency_code || 'USD').toUpperCase();
     const capturedCents = result?.amount?.value ? toCents(result.amount.value) : null;
 

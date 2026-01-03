@@ -18,12 +18,25 @@ const Billing = () => {
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState('');
   const [needsOrganization, setNeedsOrganization] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState('regular');
+  const [selectedPlan, setSelectedPlan] = useState('starter');
   const [upgradeRequested, setUpgradeRequested] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [showPayPal, setShowPayPal] = useState(false);
 
   const plans = {
+    starter: {
+      name: 'Starter Plan',
+      price: 25,
+      period: 'month',
+      users: 30,
+      features: [
+        'Up to 30 Concurrent Users',
+        'Asset & License Management',
+        'Device Usage Tracking',
+        'Basic Audit Trail',
+        'Email Alerts'
+      ]
+    },
     regular: {
       name: 'Pro Plan',
       price: 29,
@@ -358,6 +371,30 @@ const Billing = () => {
               
               {/* Plan Cards */}
               <div className="space-y-3">
+                {/* Starter Plan */}
+                <button
+                  onClick={() => setSelectedPlan('starter')}
+                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                    selectedPlan === 'starter'
+                      ? 'border-green-500 bg-green-500/10'
+                      : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        selectedPlan === 'starter' ? 'border-green-500 bg-green-500' : 'border-slate-500'
+                      }`}>
+                        {selectedPlan === 'starter' && <CheckCircle className="w-3 h-3 text-white" />}
+                      </div>
+                      <span className="text-white font-semibold">Starter Plan</span>
+                      <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded-full">Best Value</span>
+                    </div>
+                    <span className="text-white font-bold">$25<span className="text-slate-400 text-sm">/mo</span></span>
+                  </div>
+                  <p className="text-slate-400 text-sm ml-8">Up to 30 concurrent users</p>
+                </button>
+
                 {/* Pro Plan */}
                 <button
                   onClick={() => setSelectedPlan('regular')}
@@ -398,7 +435,6 @@ const Billing = () => {
                         {selectedPlan === 'enterprise' && <CheckCircle className="w-3 h-3 text-white" />}
                       </div>
                       <span className="text-white font-semibold">Enterprise</span>
-                      <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded-full">Popular</span>
                     </div>
                     <span className="text-white font-bold">$99<span className="text-slate-400 text-sm">/mo</span></span>
                   </div>
