@@ -273,8 +273,8 @@ app.use(helmet({
 // CORS configuration
 const allowedOrigins = parseAllowedOrigins();
 const ALLOWED_VERCEL_DOMAINS = [
-  'it-asset-manager.vercel.app',
-  'it-asset-project-client.vercel.app'
+  'it-asset-project.vercel.app',
+  'it-asset-project-git-main-shoams-projects-578cf60a.vercel.app'
 ];
 console.log('🔧 CORS Origins:', allowedOrigins);
 console.log('🔧 Allowed Vercel Domains:', ALLOWED_VERCEL_DOMAINS);

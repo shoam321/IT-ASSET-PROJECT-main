@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, BarChart3, CreditCard, Zap } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, BarChart3, CreditCard, Zap, Clock } from 'lucide-react';
 import * as dbService from './services/db';
 import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from './config/assetCategories';
 import { useAuth } from './context/AuthContext';
@@ -2536,6 +2536,27 @@ export default function App() {
             </div>
             
             <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Trial Counter */}
+              {user?.trialEndsAt && !user?.subscriptionActive && (() => {
+                const now = new Date();
+                const trialEnd = new Date(user.trialEndsAt);
+                const daysRemaining = Math.max(0, Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)));
+                const isExpiringSoon = daysRemaining <= 7;
+                
+                return (
+                  <div className={`hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border transition ${
+                    isExpiringSoon 
+                      ? 'bg-red-500/10 border-red-500/30 text-red-400' 
+                      : 'bg-blue-500/10 border-blue-500/30 text-blue-400'
+                  }`}>
+                    <Clock className="w-4 h-4 flex-shrink-0" />
+                    <span className="text-sm font-medium whitespace-nowrap">
+                      {daysRemaining === 0 ? 'Trial Expired' : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} left`}
+                    </span>
+                  </div>
+                );
+              })()}
+
               {['assets', 'licenses', 'users', 'contracts'].includes(currentScreen) && !universalSearch && (
                 <>
                   <button
