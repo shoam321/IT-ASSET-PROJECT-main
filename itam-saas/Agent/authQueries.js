@@ -125,6 +125,44 @@ export async function findUserByEmail(email) {
 }
 
 /**
+ * Find a canonical user row for an email.
+ *
+ * This is a defense-in-depth fix for historic duplicate rows caused by
+ * mixed auth flows (local auth + Google SSO) or migrations.
+ *
+ * Selection strategy (stable + sane defaults):
+ * - Prefer users that are tied to an organization
+ * - Prefer active users
+ * - Prefer admin role (single-role system)
+ * - Prefer older rows for stability
+ */
+export async function findCanonicalUserByEmail(email) {
+  try {
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    if (!normalizedEmail) return null;
+
+    const result = await pool.query(
+      `SELECT id, username, email, full_name, role, is_active, created_at,
+              organization_id, org_role, onboarding_completed, trial_started_at, trial_ends_at
+         FROM auth_users
+        WHERE lower(email) = $1
+        ORDER BY
+          (organization_id IS NOT NULL) DESC,
+          (is_active = true) DESC,
+          (role = 'admin') DESC,
+          created_at ASC,
+          id ASC
+        LIMIT 1`,
+      [normalizedEmail]
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error finding canonical user by email:', error);
+    throw error;
+  }
+}
+
+/**
  * Find user by ID
  */
 export async function findUserById(id) {

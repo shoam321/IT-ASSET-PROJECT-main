@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { setCurrentUserId } from '../queries.js';
-import { findUserById } from '../authQueries.js';
+import { findUserById, findCanonicalUserByEmail } from '../authQueries.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -36,10 +36,43 @@ export const authenticateToken = async (req, res, next) => {
       normalized.role = normalized.role.toLowerCase();
     }
 
+    // Canonicalize identity across the ecosystem.
+    // If there are duplicate auth_users rows for the same email (historic),
+    // this forces a single stable userId for both the web app + desktop agent.
+    // This prevents "same email, different userId" mismatches.
+    const email = typeof normalized.email === 'string' ? normalized.email.trim() : '';
+    if (email) {
+      const cacheKey = email.toLowerCase();
+      if (!globalThis.__canonicalUserCache) {
+        globalThis.__canonicalUserCache = new Map();
+      }
+      const cache = globalThis.__canonicalUserCache;
+      const cached = cache.get(cacheKey);
+      const now = Date.now();
+      const ttlMs = 5 * 60 * 1000;
+
+      let canonicalUser = null;
+      if (cached && (now - cached.at) < ttlMs) {
+        canonicalUser = cached.user;
+      } else {
+        canonicalUser = await findCanonicalUserByEmail(email);
+        cache.set(cacheKey, { at: now, user: canonicalUser });
+      }
+
+      if (canonicalUser?.id) {
+        normalized.userId = canonicalUser.id;
+        normalized.id = canonicalUser.id;
+        normalized.username = canonicalUser.username || normalized.username;
+        normalized.email = canonicalUser.email || normalized.email;
+        normalized.role = (canonicalUser.role || normalized.role || 'admin').toLowerCase();
+        normalized.organizationId = canonicalUser.organization_id || normalized.organizationId || null;
+        normalized.orgRole = canonicalUser.org_role || normalized.orgRole || 'member';
+      }
+    }
+
     req.user = normalized; // Add user info to request
 
     // Set DB session context for Row-Level Security.
-    // This relies on the server binding a single DB client per request.
     const userIdForRls = normalized.userId ?? normalized.id;
     await setCurrentUserId(userIdForRls);
 
