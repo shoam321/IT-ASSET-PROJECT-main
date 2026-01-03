@@ -18,6 +18,7 @@ export default function AuthWrapper() {
   const [showSetupWizard, setShowSetupWizard] = useState(false);
   const [onboardingJustCompleted, setOnboardingJustCompleted] = useState(false);
   const [newUserName, setNewUserName] = useState('');
+  const [initialEmail, setInitialEmail] = useState('');
   const [usePremiumOnboarding, setUsePremiumOnboarding] = useState(true); // Toggle for new UX
 
   // Handle OAuth callback
@@ -90,10 +91,20 @@ export default function AuthWrapper() {
     if (showSignUpModal) {
       return (
         <>
-          <WelcomePage onGetStarted={() => {}} onSignIn={() => setShowRegister(false)} />
+          <WelcomePage 
+            onShowSignUp={(email) => {
+              setInitialEmail(email);
+              setShowSignUpModal(true);
+            }}
+            onShowSignIn={() => setShowRegister('login')}
+            onGoogleAuth={() => {
+              window.location.href = `${process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api'}/auth/google`;
+            }}
+          />
           <SignUpModal
             isOpen={showSignUpModal}
             onClose={() => setShowSignUpModal(false)}
+            initialEmail={initialEmail}
             onSuccess={(token, userData) => {
               const displayName = userData?.firstName || userData?.username?.replace(/_\d{4}$/, '') || 'there';
               setNewUserName(displayName);
@@ -128,10 +139,13 @@ export default function AuthWrapper() {
     // Default: Show WelcomePage
     return (
       <WelcomePage
-        onGetStarted={(email) => {
+        onShowSignUp={(email) => {
           setShowSignUpModal(true);
         }}
-        onSignIn={() => setShowRegister('login')}
+        onShowSignIn={() => setShowRegister('login')}
+        onGoogleAuth={() => {
+          window.location.href = `${process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api'}/auth/google`;
+        }}
       />
     );
   }
