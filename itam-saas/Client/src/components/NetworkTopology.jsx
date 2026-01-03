@@ -404,11 +404,6 @@ export default function NetworkTopology() {
     };
     setNodes((nds) => [...nds, newNode]);
   };
-        deviceInfo: null
-      },
-    };
-    setNodes((nds) => [...nds, newNode]);
-  };
 
   const addMonitoredDevice = (device) => {
     const status = getDeviceStatus(device.last_seen);
