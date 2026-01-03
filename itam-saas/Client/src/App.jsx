@@ -768,10 +768,10 @@ export default function App() {
       setSuccessMessage(`Imported ${successCount} records successfully${errorCount > 0 ? ` (${errorCount} failed)` : ''}`);
       
       // Refresh data
-      if (currentScreen === 'assets') fetchAssets();
-      else if (currentScreen === 'licenses') fetchLicenses();
-      else if (currentScreen === 'users') fetchUsers();
-      else if (currentScreen === 'contracts') fetchContracts();
+      if (currentScreen === 'assets') loadAssets();
+      else if (currentScreen === 'licenses') loadLicenses();
+      else if (currentScreen === 'users') loadUsers();
+      else if (currentScreen === 'contracts') loadContracts();
       
       setTimeout(() => setSuccessMessage(''), 3000);
     };
