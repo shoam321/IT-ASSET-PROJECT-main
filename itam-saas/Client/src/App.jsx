@@ -2573,6 +2573,32 @@ export default function App() {
         <main className="flex-1 overflow-auto p-4 md:p-6 lg:p-8">
           {renderScreen()}
         </main>
+
+        {/* Footer */}
+        <footer className="border-t border-slate-700 py-4 px-4 md:px-6 lg:px-8 bg-slate-800/50">
+          <div className="max-w-7xl mx-auto text-center text-slate-500 text-xs">
+            <p>© 2026 IT Asset Manager. All rights reserved.</p>
+            <div className="mt-2 flex items-center justify-center gap-4">
+              <a
+                href={`${import.meta.env.VITE_API_URL || 'https://it-asset-project-production.up.railway.app'}/api/legal/privacy-policy`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-blue-400 transition"
+              >
+                Privacy Policy
+              </a>
+              <span>•</span>
+              <a
+                href={`${import.meta.env.VITE_API_URL || 'https://it-asset-project-production.up.railway.app'}/api/legal/terms-of-service`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-slate-400 hover:text-blue-400 transition"
+              >
+                Terms of Service
+              </a>
+            </div>
+          </div>
+        </footer>
       </div>
 
       {/* QR Code Scanner Modal */}

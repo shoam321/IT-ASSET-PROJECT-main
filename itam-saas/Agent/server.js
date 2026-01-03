@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
 import { body, validationResult } from 'express-validator';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
@@ -71,6 +72,16 @@ const parseAllowedOrigins = () => {
   ];
 };
 
+// Production-safe error response helper
+const safeError = (error, fallbackMessage = 'Internal server error') => {
+  if (process.env.NODE_ENV === 'production') {
+    // Never expose internal error details in production
+    return { error: fallbackMessage };
+  }
+  // Development: show full error for debugging
+  return { error: error?.message || fallbackMessage, stack: error?.stack };
+};
+
 // Startup diagnostics (do not print secrets)
 console.log('🔧 Environment:', {
   NODE_ENV: process.env.NODE_ENV || 'development',
@@ -79,6 +90,18 @@ console.log('🔧 Environment:', {
   HAS_JWT_SECRET: Boolean(process.env.JWT_SECRET),
   HAS_SESSION_SECRET: Boolean(process.env.SESSION_SECRET)
 });
+
+// Validate required environment variables in production
+if (process.env.NODE_ENV === 'production') {
+  const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'SESSION_SECRET', 'GOOGLE_CLIENT_SECRET'];
+  const missing = requiredEnvVars.filter(v => !process.env[v]);
+  if (missing.length > 0) {
+    console.error('❌ FATAL: Missing required environment variables:', missing.join(', '));
+    console.error('   Set these in Railway dashboard before deployment');
+    process.exit(1);
+  }
+  console.log('✅ All required environment variables present');
+}
 
 try {
   if (process.env.DATABASE_URL) {
@@ -227,9 +250,34 @@ const apiLimiter = rateLimit({
   skip: () => !API_RATE_LIMIT_ENABLED
 });
 
+// Security headers with Helmet.js
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.paypal.com", "https://www.paypal.com"],
+      frameSrc: ["'self'", "https://www.paypal.com"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
+}));
+
 // CORS configuration
 const allowedOrigins = parseAllowedOrigins();
+const ALLOWED_VERCEL_DOMAINS = [
+  'it-asset-manager.vercel.app',
+  'it-asset-project-client.vercel.app'
+];
 console.log('🔧 CORS Origins:', allowedOrigins);
+console.log('🔧 Allowed Vercel Domains:', ALLOWED_VERCEL_DOMAINS);
 
 // Trust Railway proxy for proper IP forwarding
 app.set('trust proxy', 1);
@@ -239,12 +287,23 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
-    // Check if origin is allowed or is a vercel.app domain
-    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    
+    // Check if origin is in explicit allowlist
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
+    
+    // Check if origin is an allowed Vercel domain
+    try {
+      const originHost = new URL(origin).hostname;
+      if (ALLOWED_VERCEL_DOMAINS.includes(originHost)) {
+        return callback(null, true);
+      }
+    } catch (e) {
+      // Invalid origin URL
+    }
+    
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -256,7 +315,19 @@ app.use(cors({
 // Ensure allowed origins always receive the CORS headers (including error responses)
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app'))) {
+  if (!origin) return next();
+  
+  let allowed = allowedOrigins.includes(origin);
+  if (!allowed) {
+    try {
+      const originHost = new URL(origin).hostname;
+      allowed = ALLOWED_VERCEL_DOMAINS.includes(originHost);
+    } catch (e) {
+      // Invalid origin
+    }
+  }
+  
+  if (allowed) {
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Vary', 'Origin');
@@ -1859,7 +1930,7 @@ app.get('/api/stats', async (req, res) => {
     const stats = await db.getAssetStats();
     res.json(stats);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -1987,7 +2058,7 @@ app.delete('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) 
     
     res.json({ message: 'Asset deleted', asset });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2005,7 +2076,7 @@ app.get('/api/licenses', authenticateToken, requireAdmin, async (req, res) => {
     }, 120); // Cache for 2 minutes
     res.json(licenses);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2017,7 +2088,7 @@ app.get('/api/licenses/search/:query', authenticateToken, async (req, res) => {
     const licenses = await db.searchLicenses(req.params.query, organizationId);
     res.json(licenses);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2114,7 +2185,7 @@ app.delete('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res
     
     res.json({ message: 'License deleted', license });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2128,7 +2199,7 @@ app.get('/api/users', authenticateToken, requireAdmin, async (req, res) => {
     }, 60); // Cache for 60 seconds
     res.json(users);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2138,7 +2209,7 @@ app.get('/api/users/search/:query', authenticateToken, async (req, res) => {
     const users = await db.searchUsers(req.params.query);
     res.json(users);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2212,7 +2283,7 @@ app.delete('/api/users/:id', authenticateToken, requireAdmin, async (req, res) =
     
     res.json({ message: 'User deleted', user });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2226,7 +2297,7 @@ app.get('/api/contracts', authenticateToken, requireAdmin, async (req, res) => {
     }, 120); // Cache for 2 minutes
     res.json(contracts);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2236,7 +2307,7 @@ app.get('/api/contracts/search/:query', authenticateToken, async (req, res) => {
     const contracts = await db.searchContracts(req.params.query);
     res.json(contracts);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2313,7 +2384,7 @@ app.delete('/api/contracts/:id', authenticateToken, requireAdmin, async (req, re
     
     res.json({ message: 'Contract deleted', contract });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2563,7 +2634,7 @@ app.post('/api/agent/usage', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error recording usage data:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2609,7 +2680,7 @@ app.post('/api/agent/heartbeat', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error recording heartbeat:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2635,7 +2706,7 @@ app.post('/api/agent/apps', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating installed apps:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2659,7 +2730,7 @@ app.get('/api/agent/devices', authenticateToken, async (req, res) => {
     res.json(devices);
   } catch (error) {
     console.error('Error fetching devices:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2677,7 +2748,7 @@ app.get('/api/agent/devices/:deviceId/usage', authenticateToken, async (req, res
     res.json(usage);
   } catch (error) {
     console.error('Error fetching device usage:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2694,7 +2765,7 @@ app.get('/api/agent/apps/usage', authenticateToken, async (req, res) => {
     res.json(appUsage);
   } catch (error) {
     console.error('Error fetching app usage:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2731,7 +2802,7 @@ app.get('/api/forbidden-apps', authenticateToken, async (req, res) => {
     res.json(forbiddenApps);
   } catch (error) {
     console.error('Error fetching forbidden apps:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2745,7 +2816,7 @@ app.get('/api/forbidden-apps/list', authenticateToken, async (req, res) => {
     res.json(list);
   } catch (error) {
     console.error('Error fetching forbidden apps list:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2791,7 +2862,7 @@ app.post('/api/forbidden-apps', [
     res.status(201).json(newApp);
   } catch (error) {
     console.error('Error creating forbidden app:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2826,7 +2897,7 @@ app.put('/api/forbidden-apps/:id', authenticateToken, async (req, res) => {
     res.json(updatedApp);
   } catch (error) {
     console.error('Error updating forbidden app:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2861,7 +2932,7 @@ app.delete('/api/forbidden-apps/:id', authenticateToken, async (req, res) => {
     res.json({ message: 'Forbidden app deleted successfully', deleted });
   } catch (error) {
     console.error('Error deleting forbidden app:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2901,7 +2972,7 @@ app.post('/api/alerts', [
     res.status(201).json(alert);
   } catch (error) {
     console.error('Error creating security alert:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2920,7 +2991,7 @@ app.get('/api/alerts', authenticateToken, async (req, res) => {
     res.json(alerts);
   } catch (error) {
     console.error('Error fetching alerts:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -2934,7 +3005,7 @@ app.get('/api/alerts/stats', authenticateToken, async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Error fetching alert stats:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -3677,7 +3748,7 @@ app.patch('/api/alerts/:id', authenticateToken, async (req, res) => {
     res.json(updated);
   } catch (error) {
     console.error('Error updating alert:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -3694,7 +3765,7 @@ app.get('/api/alerts/device/:deviceId', authenticateToken, async (req, res) => {
     res.json(alerts);
   } catch (error) {
     console.error('Error fetching device alerts:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json(safeError(error));
   }
 });
 
@@ -3890,9 +3961,12 @@ process.on('SIGINT', async () => {
 
 // Start listening (both production and development)
 httpServer.listen(PORT, () => {
-  console.log(`\n🚀 IT Asset Tracker Server running on http://localhost:${PORT}`);
-  console.log(`📊 API available at http://localhost:${PORT}/api`);
-  console.log(`🏥 Health check: http://localhost:${PORT}/health`);
-  console.log(`📈 Prometheus metrics: http://localhost:${PORT}/metrics`);
+  const host = process.env.RAILWAY_PUBLIC_DOMAIN || `localhost:${PORT}`;
+  const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+  
+  console.log(`\n🚀 IT Asset Tracker Server running on ${protocol}://${host}`);
+  console.log(`📊 API available at ${protocol}://${host}/api`);
+  console.log(`🏥 Health check: ${protocol}://${host}/health`);
+  console.log(`📈 Prometheus metrics: ${protocol}://${host}/metrics`);
   console.log(`🔌 WebSocket ready for real-time alerts\n`);
 });

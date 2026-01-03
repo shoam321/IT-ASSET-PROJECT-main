@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { UserPlus, User, Mail, Lock, AlertCircle, Loader, CheckCircle } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
 export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
   const [formData, setFormData] = useState({
@@ -10,15 +10,17 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
     password: '',
     confirmPassword: '',
     firstName: '',
-    lastName: ''
+    lastName: '',
+    agreeToTerms: false
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: type === 'checkbox' ? checked : value
     });
     setError('');
   };
@@ -29,6 +31,11 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
     // Validation
     if (!formData.username.trim() || !formData.email.trim() || !formData.password.trim()) {
       setError('Please fill in all required fields');
+      return;
+    }
+
+    if (!formData.agreeToTerms) {
+      setError('You must agree to the Terms of Service and Privacy Policy');
       return;
     }
 
@@ -210,6 +217,39 @@ export default function Register({ onRegisterSuccess, onSwitchToLogin }) {
                   <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-green-400" />
                 )}
               </div>
+            </div>
+
+            {/* Terms & Privacy Agreement */}
+            <div className="flex items-start gap-3 p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+              <input
+                type="checkbox"
+                name="agreeToTerms"
+                checked={formData.agreeToTerms}
+                onChange={handleChange}
+                className="mt-1 w-4 h-4 text-blue-600 bg-slate-700 border-slate-500 rounded focus:ring-blue-500 focus:ring-2"
+                disabled={loading}
+              />
+              <label className="text-sm text-slate-300">
+                I agree to the{' '}
+                <a
+                  href={`${API_URL}/api/legal/terms-of-service`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 underline"
+                >
+                  Terms of Service
+                </a>
+                {' '}and{' '}
+                <a
+                  href={`${API_URL}/api/legal/privacy-policy`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 underline"
+                >
+                  Privacy Policy
+                </a>
+                <span className="text-red-400 ml-1">*</span>
+              </label>
             </div>
 
             {/* Register Button */}

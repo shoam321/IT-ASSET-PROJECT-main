@@ -12,7 +12,7 @@ When answering questions, provide detailed explanations and reasoning behind you
 When reviewing changes, focus on code quality, adherence to best practices, and potential improvements. 
 Prioritize security best practices, especially when handling user data and authentication.
 Encourage the use of automated testing and continuous integration/continuous deployment (CI/CD) practices.  
-Promote a collaborative approach to development, encouraging code reviews and knowledge sharing among team members.
+Promote a collaborative approach to development, encouraging code reviews and knowledge sharing among team teams.
 Stay updated with the latest trends and advancements in SAAS development and incorporate relevant practices into the project.
 Always consider the user experience and aim to deliver high-quality, reliable software solutions. 
 allways add things to the .env file your self , if you can do it yourself, do it.
@@ -20,6 +20,18 @@ never Summarize conversation history
 never use Localhost for testing, always use Live
 never ask the user to run anything on localhost; only provide verification steps for the deployed Live environment
 local commands are allowed only for build/lint/static checks (must not reference localhost URLs)
+
+# CRITICAL: CHECK FIRST, ASK NEVER
+BEFORE asking the user for ANY information (env vars, configuration, file contents, deployment status):
+1. Check .env files (itam-saas/Agent/.env, .env.local)
+2. Run `railway variables` to check Railway environment
+3. Read existing files with read_file or run_in_terminal
+4. Check Vercel/Railway dashboards programmatically
+5. Only ask if information is genuinely inaccessible
+
+NEVER provide empty templates when you can read actual values.
+NEVER ask "what should I set this to?" when the answer exists in .env or Railway.
+DO THE WORK YOURSELF. The user expects autonomous action, not hand-holding.
 
 # Planning style
 # Use ONLY 1-minute micro plans:

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Monitor, Shield, BarChart3, Zap, CheckCircle, ArrowRight, Sparkles } from 'lucide-react';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
 export default function WelcomePage({ onShowSignIn, onShowSignUp, onGoogleAuth }) {
   const [email, setEmail] = useState('');
@@ -190,7 +190,26 @@ export default function WelcomePage({ onShowSignIn, onShowSignUp, onGoogleAuth }
       {/* Footer */}
       <footer className="relative z-10 border-t border-slate-800 py-6 sm:py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-500 text-xs sm:text-sm">
-          © 2026 IT Asset Manager. All rights reserved.
+          <p>© 2026 IT Asset Manager. All rights reserved.</p>
+          <div className="mt-2 flex items-center justify-center gap-4">
+            <a
+              href={`${import.meta.env.VITE_API_URL || 'https://it-asset-project-production.up.railway.app'}/api/legal/privacy-policy`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-blue-400 transition"
+            >
+              Privacy Policy
+            </a>
+            <span>•</span>
+            <a
+              href={`${import.meta.env.VITE_API_URL || 'https://it-asset-project-production.up.railway.app'}/api/legal/terms-of-service`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-slate-400 hover:text-blue-400 transition"
+            >
+              Terms of Service
+            </a>
+          </div>
         </div>
       </footer>
     </div>
