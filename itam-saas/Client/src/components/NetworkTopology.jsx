@@ -501,8 +501,108 @@ export default function NetworkTopology() {
               <Shield className="w-4 h-4" />
               Add Firewall
             </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="text-slate-400 text-sm font-semibold mb-3">Data Infrastructure</h3>
+          <div className="space-y-2">
             <button
-              onClick={() => addDeviceNode('server', '🖥️', 'Server')}
+              onClick={() => addDeviceNode('database', '🗄️', 'Database Server')}
+              className="w-full bg-purple-700 hover:bg-purple-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Server className="w-4 h-4" />
+              Add Database
+            </button>
+            <button
+              onClick={() => addDeviceNode('storage', '💾', 'Storage Array')}
+              className="w-full bg-purple-700 hover:bg-purple-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Server className="w-4 h-4" />
+              Add Storage
+            </button>
+            <button
+              onClick={() => addDeviceNode('backup', '📦', 'Backup Server')}
+              className="w-full bg-purple-700 hover:bg-purple-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Server className="w-4 h-4" />
+              Add Backup
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="text-slate-400 text-sm font-semibold mb-3">Servers</h3>
+          <div className="space-y-2">
+            <button
+              onClick={() => addDeviceNode('web-server', '🌐', 'Web Server')}
+              className="w-full bg-green-700 hover:bg-green-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Server className="w-4 h-4" />
+              Add Web Server
+            </button>
+            <button
+              onClick={() => addDeviceNode('app-server', '⚙️', 'App Server')}
+              className="w-full bg-green-700 hover:bg-green-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Server className="w-4 h-4" />
+              Add App Server
+            </button>
+            <button
+              onClick={() => addDeviceNode('mail-server', '📧', 'Mail Server')}
+              className="w-full bg-green-700 hover:bg-green-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Server className="w-4 h-4" />
+              Add Mail Server
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="text-slate-400 text-sm font-semibold mb-3">Security & Monitoring</h3>
+          <div className="space-y-2">
+            <button
+              onClick={() => addDeviceNode('ids', '🛡️', 'IDS/IPS')}
+              className="w-full bg-red-700 hover:bg-red-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Shield className="w-4 h-4" />
+              Add IDS/IPS
+            </button>
+            <button
+              onClick={() => addDeviceNode('monitoring', '📊', 'Monitoring')}
+              className="w-full bg-red-700 hover:bg-red-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Monitor className="w-4 h-4" />
+              Add Monitoring
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="text-slate-400 text-sm font-semibold mb-3">Cloud Services</h3>
+          <div className="space-y-2">
+            <button
+              onClick={() => addDeviceNode('cloud', '☁️', 'Cloud Service')}
+              className="w-full bg-blue-700 hover:bg-blue-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Wifi className="w-4 h-4" />
+              Add Cloud
+            </button>
+            <button
+              onClick={() => addDeviceNode('saas', '🌟', 'SaaS Platform')}
+              className="w-full bg-blue-700 hover:bg-blue-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
+            >
+              <Server className="w-4 h-4" />
+              Add SaaS
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="text-slate-400 text-sm font-semibold mb-3">Infrastructure</h3>
+          <div className="space-y-2">
+            <button
+              onClick={() => addDeviceNode('server', '🖥️', 'Generic Server')}
               className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
             >
               <Server className="w-4 h-4" />
