@@ -1204,16 +1204,33 @@ export async function upsertInstalledApps(device_id, apps) {
  */
 export async function getAllDevices() {
   try {
+    // Defense-in-depth: even if RLS is misconfigured/disabled, only return devices
+    // for the current authenticated user (set via setCurrentUserId / withRLSContext).
     const result = await pool.query(
-      `SELECT 
+      `SELECT
         d.*,
-        COUNT(DISTINCT du.app_name) as app_count,
-        COUNT(du.id) as usage_records,
-        MAX(du.timestamp) as last_activity
-       FROM devices d
-       LEFT JOIN device_usage du ON d.device_id = du.device_id
-       GROUP BY d.id
-       ORDER BY d.last_seen DESC`
+        au.username AS owner_username,
+        au.email AS owner_email,
+        au.organization_id AS owner_organization_id,
+        (
+          SELECT COUNT(DISTINCT du2.app_name)
+          FROM device_usage du2
+          WHERE du2.device_id = d.device_id
+        ) as app_count,
+        (
+          SELECT COUNT(*)
+          FROM device_usage du3
+          WHERE du3.device_id = d.device_id
+        ) as usage_records,
+        (
+          SELECT MAX(du4.timestamp)
+          FROM device_usage du4
+          WHERE du4.device_id = d.device_id
+        ) as last_activity
+      FROM devices d
+      LEFT JOIN auth_users au ON au.id = d.user_id
+      WHERE d.user_id = COALESCE(current_setting('app.current_user_id', true), '0')::integer
+      ORDER BY d.last_seen DESC`
     );
     return result.rows;
   } catch (error) {
