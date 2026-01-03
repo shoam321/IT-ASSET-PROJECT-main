@@ -33,11 +33,13 @@ const CustomDeviceNode = ({ data }) => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-pink-600 via-purple-600 to-cyan-600 border-8 border-yellow-400 rounded-3xl p-8 min-w-[300px] shadow-[0_0_80px_rgba(255,0,255,0.9)] hover:shadow-[0_0_120px_rgba(0,255,255,1)] hover:border-lime-400 transition-all duration-300 hover:scale-125 transform animate-pulse">
-      <div className="flex items-center gap-4 mb-4">
-        <div className={`w-8 h-8 rounded-full ${getStatusColor(data.status)} ${getStatusGlow(data.status)} shadow-[0_0_40px] ${data.status === 'online' ? 'animate-ping' : 'animate-pulse'}`}></div>
-        <span className="text-6xl drop-shadow-[0_0_20px_rgba(255,255,0,1)] animate-bounce filter brightness-150">{data.icon}</span>
-        <span className="text-white font-black text-2xl tracking-widest drop-shadow-[0_0_10px_rgba(255,255,255,1)]">{data.label}</span>
+    <div className="relative bg-gradient-to-br from-slate-800 via-slate-900 to-black border-2 rounded-xl p-5 min-w-[220px] shadow-[0_8px_32px_rgba(0,0,0,0.4)] hover:shadow-[0_12px_48px_rgba(59,130,246,0.3)] transition-all duration-500 hover:scale-105 overflow-hidden group">
+      <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-500"></div>
+      <div className="absolute inset-0 border-2 border-transparent bg-gradient-to-r from-blue-500/50 via-purple-500/50 to-pink-500/50 bg-clip-border opacity-0 group-hover:opacity-100 rounded-xl transition-opacity duration-500"></div>
+      <div className="relative z-10 flex items-center gap-3 mb-2">
+        <div className={`w-3 h-3 rounded-full ${getStatusColor(data.status)} ${getStatusGlow(data.status)} shadow-lg ${data.status === 'online' ? 'animate-pulse' : ''} ring-2 ring-white/20`}></div>
+        <span className="text-3xl filter drop-shadow-md">{data.icon}</span>
+        <span className="text-white font-semibold text-base tracking-tight">{data.label}</span>
       </div>
       
       {data.deviceInfo && (
@@ -143,32 +145,32 @@ const ZoomSlider = () => {
 const connectionTypes = {
   ethernet: { 
     label: '🔵 Ethernet', 
-    color: '#00ffff', 
-    style: { strokeWidth: 10, stroke: '#00ffff', filter: 'drop-shadow(0 0 20px #00ffff) drop-shadow(0 0 40px #00ffff)' },
+    color: '#3b82f6', 
+    style: { strokeWidth: 3, stroke: '#3b82f6', filter: 'drop-shadow(0 0 4px rgba(59,130,246,0.6))' },
     animated: true
   },
   fiber: { 
     label: '🟢 Fiber Optic', 
-    color: '#00ff00', 
-    style: { strokeWidth: 12, stroke: '#00ff00', filter: 'drop-shadow(0 0 25px #00ff00) drop-shadow(0 0 50px #00ff00)' },
+    color: '#10b981', 
+    style: { strokeWidth: 4, stroke: '#10b981', filter: 'drop-shadow(0 0 5px rgba(16,185,129,0.6))' },
     animated: true
   },
   wifi: { 
     label: '📡 WiFi', 
-    color: '#ff00ff', 
-    style: { strokeWidth: 8, stroke: '#ff00ff', strokeDasharray: '15,5', filter: 'drop-shadow(0 0 20px #ff00ff) drop-shadow(0 0 35px #ff00ff)' },
+    color: '#8b5cf6', 
+    style: { strokeWidth: 2.5, stroke: '#8b5cf6', strokeDasharray: '8,4', filter: 'drop-shadow(0 0 4px rgba(139,92,246,0.5))' },
     animated: true
   },
   vpn: { 
     label: '🔒 VPN', 
-    color: '#ff0099', 
-    style: { strokeWidth: 10, stroke: '#ff0099', filter: 'drop-shadow(0 0 20px #ff0099) drop-shadow(0 0 40px #ff0099)' },
+    color: '#ec4899', 
+    style: { strokeWidth: 3, stroke: '#ec4899', filter: 'drop-shadow(0 0 4px rgba(236,72,153,0.6))' },
     animated: true
   },
   power: { 
     label: '⚡ Power', 
-    color: '#ffff00', 
-    style: { strokeWidth: 8, stroke: '#ffff00', strokeDasharray: '10,3', filter: 'drop-shadow(0 0 20px #ffff00) drop-shadow(0 0 35px #ffff00)' },
+    color: '#f59e0b', 
+    style: { strokeWidth: 2.5, stroke: '#f59e0b', strokeDasharray: '6,3', filter: 'drop-shadow(0 0 4px rgba(245,158,11,0.5))' },
     animated: true
   },
 };
