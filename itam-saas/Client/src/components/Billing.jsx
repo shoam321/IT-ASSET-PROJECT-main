@@ -33,7 +33,7 @@ const Billing = () => {
         'Device Usage Tracking',
         'Audit Trail & Logs',
         'Email Alerts',
-        'Receipt OCR Processing'
+        'Receipt Upload & Storage'
       ]
     },
     enterprise: {

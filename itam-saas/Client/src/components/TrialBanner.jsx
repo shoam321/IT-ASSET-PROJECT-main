@@ -120,7 +120,7 @@ function UpgradeModal({ onClose }) {
     {
       name: 'Pro',
       price: 29,
-      features: ['Asset & License Tracking', 'Device Usage Monitoring', 'Audit Logs', 'Email Alerts', 'Receipt OCR'],
+      features: ['Asset & License Tracking', 'Device Usage Monitoring', 'Audit Logs', 'Email Alerts', 'Receipt Storage'],
       popular: false
     },
     {
