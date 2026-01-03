@@ -210,6 +210,35 @@ export async function withRLSContext(userId, callback) {
   }
 }
 
+/**
+ * Run a callback with system-level privileges (bypasses RLS policies)
+ * Used for operations like creating organizations where user context doesn't exist yet
+ */
+export async function withSystemContext(callback) {
+  const client = await pool.connect();
+  try {
+    const store = { client };
+    return await dbAsyncLocalStorage.run(store, async () => {
+      // Set system flag to bypass RLS policies
+      await client.query("SELECT set_config('app.system', '1', FALSE)");
+      await client.query("SELECT set_config('app.current_user_id', '0', FALSE)");
+
+      try {
+        return await callback(client);
+      } finally {
+        // Reset context for safety
+        await client.query("SELECT set_config('app.system', '0', FALSE)");
+        await client.query("SELECT set_config('app.current_user_id', '0', FALSE)");
+      }
+    });
+  } catch (error) {
+    console.error('withSystemContext failed:', error);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 // Asset schema capability checks (cached)
 let assetsUserIdColumnExists = null;
 let assetsOrganizationIdColumnExists = null;
@@ -2319,3 +2348,22 @@ export async function setOrganizationBillingTier(organizationId, updates = {}, c
   }
 }
 
+/**
+ * List all Grafana dashboards for an organization
+ */
+export async function listGrafanaDashboards(organizationId, client = null) {
+  const queryClient = client || pool;
+  try {
+    const result = await queryClient.query(
+      `SELECT id, organization_id, name, description, embed_url, created_by, created_at, updated_at
+       FROM grafana_dashboards
+       WHERE organization_id = $1
+       ORDER BY name ASC`,
+      [organizationId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error listing Grafana dashboards:', error);
+    throw error;
+  }
+}
