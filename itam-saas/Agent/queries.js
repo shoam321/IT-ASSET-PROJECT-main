@@ -184,6 +184,38 @@ function normalizeIdentityValues(identity) {
   });
 }
 
+// Asset schema capability checks (cached)
+let assetsUserIdColumnExists = null;
+let assetsOrganizationIdColumnExists = null;
+let assetsCategoryColumnExists = null;
+
+async function assetsHasUserIdColumn() {
+  if (assetsUserIdColumnExists !== null) return assetsUserIdColumnExists;
+  const result = await pool.query(
+    "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'assets' AND column_name = 'user_id') AS exists"
+  );
+  assetsUserIdColumnExists = result.rows[0]?.exists === true;
+  return assetsUserIdColumnExists;
+}
+
+async function assetsHasOrganizationIdColumn() {
+  if (assetsOrganizationIdColumnExists !== null) return assetsOrganizationIdColumnExists;
+  const result = await pool.query(
+    "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'assets' AND column_name = 'organization_id') AS exists"
+  );
+  assetsOrganizationIdColumnExists = result.rows[0]?.exists === true;
+  return assetsOrganizationIdColumnExists;
+}
+
+async function assetsHasCategoryColumn() {
+  if (assetsCategoryColumnExists !== null) return assetsCategoryColumnExists;
+  const result = await pool.query(
+    "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'assets' AND column_name = 'category') AS exists"
+  );
+  assetsCategoryColumnExists = result.rows[0]?.exists === true;
+  return assetsCategoryColumnExists;
+}
+
 /**
  * Get assets for a specific user (defense-in-depth alongside RLS)
  */
@@ -254,6 +286,25 @@ export async function getAssetByIdForUser(id, userId, organizationId = null) {
     return result.rows[0];
   } catch (error) {
     console.error('Error fetching asset:', error);
+    throw error;
+  }
+}
+
+// Admin/org scoped asset fetch
+export async function getAssetById(id, organizationId = null) {
+  try {
+    const hasOrganizationId = await assetsHasOrganizationIdColumn();
+    const params = [id];
+    let sql = 'SELECT * FROM assets WHERE id = $1';
+    if (hasOrganizationId) {
+      if (!organizationId) throw new Error('organization_id is required');
+      sql += ' AND organization_id = $2';
+      params.push(organizationId);
+    }
+    const result = await pool.query(sql, params);
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error fetching asset by id:', error);
     throw error;
   }
 }
@@ -511,6 +562,26 @@ export async function searchAssetsForUser(query, userId, organizationId = null) 
     return result.rows;
   } catch (error) {
     console.error('Error searching assets for user:', error);
+    throw error;
+  }
+}
+
+// Admin/org scoped asset list
+export async function getAllAssets(organizationId = null) {
+  try {
+    const hasOrganizationId = await assetsHasOrganizationIdColumn();
+    const params = [];
+    let sql = 'SELECT * FROM assets';
+    if (hasOrganizationId) {
+      if (!organizationId) throw new Error('organization_id is required');
+      sql += ' WHERE organization_id = $1';
+      params.push(organizationId);
+    }
+    sql += ' ORDER BY created_at DESC';
+    const result = await pool.query(sql, params);
+    return result.rows;
+  } catch (error) {
+    console.error('Error fetching all assets:', error);
     throw error;
   }
 }
