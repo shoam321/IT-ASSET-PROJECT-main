@@ -187,8 +187,6 @@ export default function NetworkTopology() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNodes, setSelectedNodes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showEdgePanel, setShowEdgePanel] = useState(false);
-  const [showLoadDialog, setShowLoadDialog] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
