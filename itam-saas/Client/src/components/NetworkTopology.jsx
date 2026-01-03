@@ -13,7 +13,6 @@ import {
 } from '@xyflow/react';
 import { Save, Download, Plus, Server, Monitor, Wifi, Shield, AlignLeft, Grid3x3, FolderOpen } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
-import RippleGrid from './RippleGrid';
 
 const SNAP_GRID = [20, 20]; // Snap to 20px grid
 const MIN_DISTANCE = 150; // Minimum distance between nodes (increased padding)
@@ -453,21 +452,7 @@ export default function NetworkTopology() {
       </div>
 
       {/* Main Canvas */}
-      <div className="flex-1 relative overflow-hidden">
-        <div className="absolute inset-0 z-0">
-          <RippleGrid
-            enableRainbow={false}
-            gridColor="#ffffff"
-            rippleIntensity={0.012}
-            gridSize={20}
-            gridThickness={15}
-            timeScale={0.2}
-            mouseInteraction={true}
-            mouseInteractionRadius={0.8}
-            opacity={0.55}
-          />
-        </div>
-
+      <div className="flex-1 relative overflow-hidden bg-slate-900">
         <div className="relative z-10 h-full">
           <ReactFlow
             nodes={nodes}
