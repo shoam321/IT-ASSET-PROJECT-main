@@ -2544,7 +2544,9 @@ export default function App() {
                 const isExpiringSoon = daysRemaining <= 7;
                 
                 return (
-                  <div className={`hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border transition ${
+                  <button
+                    onClick={() => setCurrentScreen('billing')}
+                    className={`hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border transition cursor-pointer hover:opacity-80 ${
                     isExpiringSoon 
                       ? 'bg-red-500/10 border-red-500/30 text-red-400' 
                       : 'bg-blue-500/10 border-blue-500/30 text-blue-400'
@@ -2553,7 +2555,7 @@ export default function App() {
                     <span className="text-sm font-medium whitespace-nowrap">
                       {daysRemaining === 0 ? 'Trial Expired' : `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} left`}
                     </span>
-                  </div>
+                  </button>
                 );
               })()}
 
