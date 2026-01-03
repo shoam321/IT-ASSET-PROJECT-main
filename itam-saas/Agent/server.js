@@ -2622,14 +2622,17 @@ app.post('/api/agent/apps', authenticateToken, async (req, res) => {
 app.get('/api/agent/devices', authenticateToken, async (req, res) => {
   try {
     const { userId, role } = req.user; // From JWT
-    
-    // Set PostgreSQL session variable for Row-Level Security
-    await db.setCurrentUserId(userId);
-    
+
+    // IMPORTANT: bind RLS + query to the SAME DB connection
+    // Otherwise setCurrentUserId can run on one pooled connection and the
+    // subsequent SELECT runs on another (leading to empty/incorrect results).
+
     // Cache devices per user (5 minutes TTL)
     const cacheKey = `devices:user:${userId}`;
     const devices = await getCached(cacheKey, async () => {
-      return await db.getAllDevices();
+      return await db.withRLSContext(userId, async () => {
+        return await db.getAllDevices();
+      });
     }, 300); // 5 minutes cache
     
     res.json(devices);
@@ -2645,12 +2648,11 @@ app.get('/api/agent/devices/:deviceId/usage', authenticateToken, async (req, res
     const { deviceId } = req.params;
     const { startDate, endDate } = req.query;
     const { userId } = req.user; // From JWT
-    
-    // Set PostgreSQL session variable for Row-Level Security
-    await db.setCurrentUserId(userId);
-    
-    // Row-Level Security will automatically filter - users can only see their own device usage
-    const usage = await db.getDeviceUsageStats(deviceId, startDate, endDate);
+
+    const usage = await db.withRLSContext(userId, async () => {
+      // Row-Level Security will automatically filter - users can only see their own device usage
+      return await db.getDeviceUsageStats(deviceId, startDate, endDate);
+    });
     res.json(usage);
   } catch (error) {
     console.error('Error fetching device usage:', error);
@@ -2663,12 +2665,11 @@ app.get('/api/agent/apps/usage', authenticateToken, async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     const { userId } = req.user; // From JWT
-    
-    // Set PostgreSQL session variable for Row-Level Security
-    await db.setCurrentUserId(userId);
-    
-    // Row-Level Security will automatically filter - users see only their devices' apps
-    const appUsage = await db.getAppUsageSummary(startDate, endDate);
+
+    const appUsage = await db.withRLSContext(userId, async () => {
+      // Row-Level Security will automatically filter - users see only their devices' apps
+      return await db.getAppUsageSummary(startDate, endDate);
+    });
     res.json(appUsage);
   } catch (error) {
     console.error('Error fetching app usage:', error);
