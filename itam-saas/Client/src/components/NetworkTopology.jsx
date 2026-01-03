@@ -471,7 +471,7 @@ export default function NetworkTopology() {
           >
           <Controls 
             position="top-right"
-            className="bg-slate-700 border-slate-600 rounded-lg shadow-xl"
+            className="bg-slate-700/90 border-slate-600 rounded-lg shadow-xl backdrop-blur-sm"
             style={{ zIndex: 10 }}
           />
           <MiniMap 
@@ -512,24 +512,24 @@ export default function NetworkTopology() {
             </div>
           </Panel>
           
-          <Panel position="top-right" className="flex gap-2" style={{ marginTop: '60px' }}>
+          <Panel position="bottom-right" className="flex gap-2 mb-2">
             <button
               onClick={() => setShowLoadDialog(true)}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg"
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition shadow-lg text-sm"
             >
               <FolderOpen className="w-4 h-4" />
               Load ({savedTopologies.length})
             </button>
             <button
               onClick={() => setShowSaveDialog(true)}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg"
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition shadow-lg text-sm"
             >
               <Save className="w-4 h-4" />
-              Save Topology
+              Save
             </button>
             <button
               onClick={exportAsImage}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 transition shadow-lg text-sm"
             >
               <Download className="w-4 h-4" />
               Export
