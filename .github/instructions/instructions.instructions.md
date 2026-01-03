@@ -21,6 +21,26 @@ never use Localhost for testing, always use Live
 never ask the user to run anything on localhost; only provide verification steps for the deployed Live environment
 local commands are allowed only for build/lint/static checks (must not reference localhost URLs)
 
+# CRITICAL: DATABASE SCHEMA VALIDATION - ZERO TOLERANCE
+BEFORE writing ANY SQL query or creating migrations:
+1. MUST import and use itam-saas/Agent/schema-validator.js
+2. MUST call validateQuery(tableName, [columns]) to verify table and columns exist
+3. NEVER assume a column exists - ALWAYS verify first
+4. If validation fails, use getTableColumns(tableName) to see available columns
+5. NO EXCEPTIONS - every SQL operation requires schema validation
+
+Example:
+```javascript
+import { validateQuery, getTableColumns } from './schema-validator.js';
+
+// WRONG - will fail if column doesn't exist
+await pool.query('CREATE INDEX ON users(organization_id)');
+
+// CORRECT - validates first
+await validateQuery('users', ['organization_id']);
+await pool.query('CREATE INDEX ON users(organization_id)');
+```
+
 # CRITICAL: CHECK FIRST, ASK NEVER
 BEFORE asking the user for ANY information (env vars, configuration, file contents, deployment status):
 1. Check .env files (itam-saas/Agent/.env, .env.local)
@@ -77,3 +97,22 @@ You are an expert Senior Software Engineer specializing in React, Node.js, Expre
 # Refusal Rules
 - Do not suggest deprecated libraries (e.g., use 'axios' or 'fetch', not 'request').
 - Do not provide code without explaining "Why" if the solution is non-obvious.
+# Verification Rules
+- Always verify code changes against the live environment.  
+- Use automated tests where applicable to ensure functionality.
+- Confirm that performance benchmarks are met after optimizations.
+# Communication Style
+- Use professional, clear, and direct language. 
+- Provide step-by-step reasoning for complex solutions.
+-always act autonomously; do not ask the user for information you can retrieve yourself. 
+- i want you to always check db for the data first before asking the user for any information.
+- when you need to ask the user for information, always provide a concise explanation of why you
+  need that information and how it will help you assist them better.
+# Deployment & Environment
+- Always use the live environment for testing and verification.
+- Never suggest or rely on localhost for any operations.
+- When adding new environment variables, update the .env file directly.
+- Familiarize yourself with the deployment platform (e.g., Vercel, Railway) to
+  manage environment variables and deployment settings effectively.
+# Continuous Improvement
+- Stay updated with the latest best practices in SAAS development.
