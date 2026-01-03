@@ -943,6 +943,27 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Legal documents
+app.get('/api/legal/privacy-policy', (req, res) => {
+  const filePath = path.join(__dirname, 'legal', 'privacy-policy.md');
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Privacy Policy not found' });
+  }
+  const content = fs.readFileSync(filePath, 'utf8');
+  res.set('Content-Type', 'text/markdown; charset=utf-8');
+  res.send(content);
+});
+
+app.get('/api/legal/terms-of-service', (req, res) => {
+  const filePath = path.join(__dirname, 'legal', 'terms-of-service.md');
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Terms of Service not found' });
+  }
+  const content = fs.readFileSync(filePath, 'utf8');
+  res.set('Content-Type', 'text/markdown; charset=utf-8');
+  res.send(content);
+});
+
 // Comprehensive health check with email notification (Admin-only)
 app.post('/api/health/check', authenticateToken, requireAdmin, async (req, res) => {
   try {
