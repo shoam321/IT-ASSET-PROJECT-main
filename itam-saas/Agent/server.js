@@ -1975,8 +1975,12 @@ app.delete('/api/assets/:id', authenticateToken, requireAdmin, async (req, res) 
 // Get all licenses
 app.get('/api/licenses', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const licenses = await getCached('licenses:all', async () => {
-      return await db.getAllLicenses();
+    const { userId, organizationId } = await resolveUserOrgContext(req);
+    await db.setCurrentUserId(userId);
+
+    const cacheKey = `licenses:org:${organizationId}`;
+    const licenses = await getCached(cacheKey, async () => {
+      return await db.getAllLicenses(organizationId);
     }, 120); // Cache for 2 minutes
     res.json(licenses);
   } catch (error) {
@@ -1987,7 +1991,9 @@ app.get('/api/licenses', authenticateToken, requireAdmin, async (req, res) => {
 // Search licenses
 app.get('/api/licenses/search/:query', authenticateToken, async (req, res) => {
   try {
-    const licenses = await db.searchLicenses(req.params.query);
+    const { userId, organizationId } = await resolveUserOrgContext(req);
+    await db.setCurrentUserId(userId);
+    const licenses = await db.searchLicenses(req.params.query, organizationId);
     res.json(licenses);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -1997,20 +2003,25 @@ app.get('/api/licenses/search/:query', authenticateToken, async (req, res) => {
 // Create new license
 app.post('/api/licenses', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    console.log('📝 Creating license with data:', req.body);
-    const license = await db.createLicense(req.body);
+    const { userId, organizationId } = await resolveUserOrgContext(req);
+    await db.setCurrentUserId(userId);
+
+    const licenseData = { ...req.body, organization_id: organizationId };
+    console.log('📝 Creating license with data:', licenseData);
+    const license = await db.createLicense(licenseData);
     console.log('✅ License created:', license);
     
     // Audit log
     await db.logAuditEvent('licenses', license.id, 'CREATE', null, license, {
       userId: req.user.id,
       username: req.user.username,
+      organizationId,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
     
     // Invalidate cache
-    await invalidateCache('licenses:*');
+    await invalidateCache(`licenses:org:${organizationId}`);
     await invalidateCache('analytics:*');
     
     res.status(201).json(license);
@@ -2023,11 +2034,14 @@ app.post('/api/licenses', authenticateToken, requireAdmin, async (req, res) => {
 // Update license
 app.put('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
+    const { userId, organizationId } = await resolveUserOrgContext(req);
+    await db.setCurrentUserId(userId);
+
     console.log('📝 Updating license', req.params.id, 'with data:', req.body);
     
     // Get old license for audit
-    const oldLicense = await db.getLicenseById(req.params.id);
-    const license = await db.updateLicense(req.params.id, req.body);
+    const oldLicense = await db.getLicenseById(req.params.id, organizationId);
+    const license = await db.updateLicense(req.params.id, { ...req.body, organization_id: organizationId });
     if (!license) {
       return res.status(404).json({ error: 'License not found' });
     }
@@ -2037,12 +2051,13 @@ app.put('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res) =
     await db.logAuditEvent('licenses', license.id, 'UPDATE', oldLicense, license, {
       userId: req.user.id,
       username: req.user.username,
+      organizationId,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
     
     // Invalidate cache
-    await invalidateCache('licenses:*');
+    await invalidateCache(`licenses:org:${organizationId}`);
     await invalidateCache('analytics:*');
     
     res.json(license);
@@ -2055,7 +2070,10 @@ app.put('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res) =
 // Delete license
 app.delete('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const license = await db.deleteLicense(req.params.id);
+    const { userId, organizationId } = await resolveUserOrgContext(req);
+    await db.setCurrentUserId(userId);
+
+    const license = await db.deleteLicense(req.params.id, organizationId);
     if (!license) {
       return res.status(404).json({ error: 'License not found' });
     }
@@ -2064,12 +2082,13 @@ app.delete('/api/licenses/:id', authenticateToken, requireAdmin, async (req, res
     await db.logAuditEvent('licenses', license.id, 'DELETE', license, null, {
       userId: req.user.id,
       username: req.user.username,
+      organizationId,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
     
     // Invalidate cache
-    await invalidateCache('licenses:*');
+    await invalidateCache(`licenses:org:${organizationId}`);
     await invalidateCache('analytics:*');
     
     res.json({ message: 'License deleted', license });

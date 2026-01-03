@@ -19,6 +19,17 @@ export function getPool() {
 export async function setCurrentUserId(userId) {
   try {
     const shouldLogRls = String(process.env.DEBUG_RLS || '').toLowerCase() === 'true';
+    if (!hasOrgCol) {
+      console.warn('[SECURITY] assets table missing organization_id - returning empty analytics');
+      return {
+        overview: { total_assets: 0, total_users: 0, total_licenses: 0, total_contracts: 0, total_consumables: 0, low_stock_items: 0, active_contracts: 0, unresolved_alerts: 0 },
+        assetsByCategory: [],
+        assetsByStatus: [],
+        recentActivity: [],
+        upcomingExpirations: [],
+        userRole: role
+      };
+    }
 
     if (userId === undefined || userId === null) {
       console.warn('⚠️ setCurrentUserId called with undefined/null userId, using 0');
@@ -500,90 +511,91 @@ export async function getAssetByIdForUser(id, userId, organizationId = null) {
         'SELECT * FROM assets WHERE id = $1 AND user_id = $2',
         [id, userId]
       );
-      return result.rows[0];
-    }
 
-    const identity = await getUserIdentityById(userId);
-    const values = normalizeIdentityValues(identity);
-    if (values.length === 0) return null;
+    // Check if assets table has organization_id column
+    const hasOrgCol = await assetsHasOrganizationIdColumn();
 
-    const params = [id, values.map(v => v.toLowerCase())];
-    let sql = `SELECT *
-       FROM assets
-       WHERE id = $1
-         AND lower(assigned_user_name) = ANY ($2)`;
-    if (await assetsHasOrganizationIdColumn()) {
-      sql += ' AND organization_id = $3';
-      params.push(organizationId);
-    }
-    const result = await pool.query(sql, params);
-    return result.rows[0];
-  } catch (error) {
-    console.error('Error fetching asset for user:', error);
-    throw error;
-  }
-}
-
-/**
- * Get asset by tag
- */
-export async function getAssetByTag(assetTag) {
-  try {
-    const result = await pool.query('SELECT * FROM assets WHERE asset_tag = $1', [assetTag]);
-    return result.rows[0];
-  } catch (error) {
-    console.error('Error fetching asset by tag:', error);
-    throw error;
-  }
-}
-
-/**
- * Create new asset
- */
-export async function createAsset(assetData) {
-  const { asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category, organization_id } = assetData;
-  
-  try {
-    // Check if category column exists
-    const hasCategoryColumn = await assetsHasCategoryColumn();
+    const orgFilter = hasOrgCol ? 'WHERE organization_id = $1' : '';
+    const orgParams = hasOrgCol ? [organizationId] : [];
     
-    if (await assetsHasUserIdColumn()) {
-      const hasOrg = await assetsHasOrganizationIdColumn();
-      if (hasCategoryColumn) {
-        const result = await pool.query(
-          `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id, category${hasOrg ? ', organization_id' : ''})
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11${hasOrg ? ', $12' : ''})
-           RETURNING *`,
-          hasOrg
-            ? [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, category, organization_id]
-            : [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, category]
-        );
-        return result.rows[0];
-      } else {
-        const result = await pool.query(
-          `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, user_id${hasOrg ? ', organization_id' : ''})
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10${hasOrg ? ', $11' : ''})
-           RETURNING *`,
-          hasOrg
-            ? [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id, organization_id]
-            : [asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status || 'In Use', cost || 0, discovered || false, user_id]
-        );
-        return result.rows[0];
-      }
-    }
+    // Overview counts - filtered by organization
+    const overviewQuery = await pool.query(`
+      SELECT
+        (SELECT COUNT(*) FROM assets ${orgFilter}) as total_assets,
+        (SELECT COUNT(*) FROM auth_users WHERE is_active = true AND organization_id = $1) as total_users,
+        (SELECT COUNT(*) FROM licenses WHERE organization_id = $1) as total_licenses,
+        (SELECT COUNT(*) FROM contracts WHERE organization_id = $1) as total_contracts,
+        (SELECT COUNT(*) FROM consumables WHERE organization_id = $1) as total_consumables,
+        (SELECT COUNT(*) FROM consumables WHERE quantity <= min_quantity AND organization_id = $1) as low_stock_items
+    `, [organizationId]);
 
-    // Legacy schema fallback: store ownership in assigned_user_name.
-    let assignedName = assigned_user_name;
-    if ((!assignedName || !String(assignedName).trim()) && user_id) {
-      const identity = await getUserIdentityById(user_id);
-      assignedName = identity?.username || identity?.full_name || identity?.email || null;
-    }
+    // Assets by category - filtered by organization
+    const assetsByCategoryQuery = await pool.query(`
+      SELECT category, COUNT(*) as count
+      FROM assets
+      WHERE category IS NOT NULL AND category != '' ${hasOrgCol ? 'AND organization_id = $1' : ''}
+      GROUP BY category
+      ORDER BY count DESC
+      LIMIT 10
+    `, orgParams);
 
-    if (hasCategoryColumn) {
-      const result = await pool.query(
-        `INSERT INTO assets (asset_tag, asset_type, manufacturer, model, serial_number, assigned_user_name, status, cost, discovered, category${await assetsHasOrganizationIdColumn() ? ', organization_id' : ''})
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10${await assetsHasOrganizationIdColumn() ? ', $11' : ''})
-         RETURNING *`,
+    // Assets by status - filtered by organization
+    const assetsByStatusQuery = await pool.query(`
+      SELECT status, COUNT(*) as count
+      FROM assets
+      WHERE status IS NOT NULL AND status != '' ${hasOrgCol ? 'AND organization_id = $1' : ''}
+      GROUP BY status
+      ORDER BY count DESC
+    `, orgParams);
+
+    // Recent activity from audit logs - filtered by organization
+    const recentActivityQuery = await pool.query(`
+      SELECT action, entity_type, entity_id, user_id, username, details, created_at
+      FROM audit_logs
+      WHERE user_id IN (SELECT id FROM auth_users WHERE organization_id = $1)
+      ORDER BY created_at DESC
+      LIMIT 20
+    `, [organizationId]);
+
+    // Upcoming license expirations
+    const upcomingExpirationsQuery = await pool.query(`
+      SELECT license_name, software_name, vendor, expiration_date,
+             EXTRACT(DAY FROM (expiration_date - CURRENT_DATE)) as days_remaining
+      FROM licenses
+      WHERE organization_id = $1
+        AND expiration_date IS NOT NULL
+        AND expiration_date > CURRENT_DATE
+        AND expiration_date <= CURRENT_DATE + INTERVAL '90 days'
+      ORDER BY expiration_date ASC
+      LIMIT 10
+    `, [organizationId]);
+
+    // Active contracts
+    const activeContractsQuery = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM contracts
+      WHERE status = 'Active' AND organization_id = $1
+    `, [organizationId]);
+
+    // Security alerts (unresolved)
+    const unresolvedAlertsQuery = await pool.query(`
+      SELECT COUNT(*) as count
+      FROM security_alerts
+      WHERE status = 'active' AND organization_id = $1
+    `, [organizationId]);
+
+    return {
+      overview: {
+        ...overviewQuery.rows[0],
+        active_contracts: parseInt(activeContractsQuery.rows[0].count),
+        unresolved_alerts: parseInt(unresolvedAlertsQuery.rows[0].count)
+      },
+      assetsByCategory: assetsByCategoryQuery.rows,
+      assetsByStatus: assetsByStatusQuery.rows,
+      recentActivity: recentActivityQuery.rows,
+      upcomingExpirations: upcomingExpirationsQuery.rows,
+      userRole: role // Include role in response so UI can adapt
+    };
         await assetsHasOrganizationIdColumn()
           ? [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false, category, organization_id]
           : [asset_tag, asset_type, manufacturer, model, serial_number, assignedName, status || 'In Use', cost || 0, discovered || false, category]
@@ -800,11 +812,12 @@ export async function getAssetStats() {
 // ============ LICENSES FUNCTIONS ============
 
 /**
- * Get all licenses
+ * Get all licenses for an organization
  */
-export async function getAllLicenses() {
+export async function getAllLicenses(organizationId) {
   try {
-    const result = await pool.query('SELECT * FROM licenses ORDER BY created_at DESC');
+    if (!organizationId) throw new Error('organizationId is required');
+    const result = await pool.query('SELECT * FROM licenses WHERE organization_id = $1 ORDER BY created_at DESC', [organizationId]);
     return result.rows;
   } catch (error) {
     console.error('Error fetching licenses:', error);
@@ -816,7 +829,11 @@ export async function getAllLicenses() {
  * Create license
  */
 export async function createLicense(licenseData) {
-  const { license_name, license_type, license_key, software_name, vendor, expiration_date, quantity, status, cost, notes } = licenseData;
+  const { license_name, license_type, license_key, software_name, vendor, expiration_date, quantity, status, cost, notes, organization_id } = licenseData;
+
+  if (!organization_id) {
+    throw new Error('organization_id is required');
+  }
   
   // Validate required fields
   if (!license_name || !license_name.trim()) {
@@ -848,8 +865,8 @@ export async function createLicense(licenseData) {
   
   try {
     const result = await pool.query(
-      `INSERT INTO licenses (license_name, license_type, license_key, software_name, vendor, expiration_date, quantity, status, cost, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO licenses (license_name, license_type, license_key, software_name, vendor, expiration_date, quantity, status, cost, notes, organization_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         license_name.trim(), 
@@ -861,7 +878,8 @@ export async function createLicense(licenseData) {
         quantity || 1, 
         status || 'Active', 
         cost || 0, 
-        notes?.trim() || null
+        notes?.trim() || null,
+        organization_id
       ]
     );
     return result.rows[0];
@@ -876,6 +894,10 @@ export async function createLicense(licenseData) {
  * Update license
  */
 export async function updateLicense(id, licenseData) {
+  if (!licenseData.organization_id) {
+    throw new Error('organization_id is required');
+  }
+
   const fields = [];
   const values = [];
   let paramCount = 1;
@@ -922,10 +944,12 @@ export async function updateLicense(id, licenseData) {
 
   fields.push(`updated_at = $${paramCount}`);
   values.push(new Date());
+  fields.push(`organization_id = $${paramCount + 1}`);
+  values.push(licenseData.organization_id);
   values.push(id);
 
   try {
-    const query = `UPDATE licenses SET ${fields.join(', ')} WHERE id = $${paramCount + 1} RETURNING *`;
+    const query = `UPDATE licenses SET ${fields.join(', ')} WHERE id = $${paramCount + 2} AND organization_id = $${paramCount + 1} RETURNING *`;
     console.log('Update query:', query);
     console.log('Update values:', values);
     const result = await pool.query(query, values);
@@ -939,9 +963,10 @@ export async function updateLicense(id, licenseData) {
 /**
  * Delete license
  */
-export async function deleteLicense(id) {
+export async function deleteLicense(id, organizationId) {
   try {
-    const result = await pool.query('DELETE FROM licenses WHERE id = $1 RETURNING *', [id]);
+    if (!organizationId) throw new Error('organizationId is required');
+    const result = await pool.query('DELETE FROM licenses WHERE id = $1 AND organization_id = $2 RETURNING *', [id, organizationId]);
     return result.rows[0];
   } catch (error) {
     console.error('Error deleting license:', error);
@@ -952,9 +977,10 @@ export async function deleteLicense(id) {
 /**
  * Get license by ID (for audit logging)
  */
-export async function getLicenseById(id) {
+export async function getLicenseById(id, organizationId) {
   try {
-    const result = await pool.query('SELECT * FROM licenses WHERE id = $1', [id]);
+    if (!organizationId) throw new Error('organizationId is required');
+    const result = await pool.query('SELECT * FROM licenses WHERE id = $1 AND organization_id = $2', [id, organizationId]);
     return result.rows[0];
   } catch (error) {
     console.error('Error fetching license by ID:', error);
@@ -965,17 +991,19 @@ export async function getLicenseById(id) {
 /**
  * Search licenses
  */
-export async function searchLicenses(query) {
+export async function searchLicenses(query, organizationId) {
   try {
+    if (!organizationId) throw new Error('organizationId is required');
     const searchTerm = `%${query}%`;
     const result = await pool.query(
       `SELECT * FROM licenses 
-       WHERE license_name ILIKE $1 
+       WHERE organization_id = $2 AND (
+             license_name ILIKE $1 
           OR software_name ILIKE $1 
           OR vendor ILIKE $1 
-          OR license_key ILIKE $1
+          OR license_key ILIKE $1)
        ORDER BY created_at DESC`,
-      [searchTerm]
+      [searchTerm, organizationId]
     );
     return result.rows;
   } catch (error) {
@@ -1846,66 +1874,64 @@ export async function getAuditLogs(filters = {}) {
     if (filters.startDate) {
       query += ` AND al.created_at >= $${paramCount}`;
       params.push(filters.startDate);
-      paramCount++;
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    // Fields that should not be updated
+    const excludeFields = ['id', 'created_at', 'updated_at', 'organization_id'];
+
+    for (const [key, value] of Object.entries(licenseData)) {
+      if (excludeFields.includes(key) || value === undefined) continue;
+
+      let processedValue = value;
+      if (value !== null) {
+        if (key === 'expiration_date' && typeof value === 'string') {
+          if (value.includes('T')) {
+            processedValue = value.split('T')[0];
+          } else if (value.includes('/')) {
+            const parts = value.split('/');
+            if (parts.length === 3) {
+              processedValue = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+          }
+        }
+        if (typeof processedValue === 'string') {
+          processedValue = processedValue.trim();
+        }
+      }
+
+      fields.push(`${key} = $${idx}`);
+      values.push(processedValue);
+      idx++;
     }
 
-    if (filters.endDate) {
-      query += ` AND al.created_at <= $${paramCount}`;
-      params.push(filters.endDate);
-      paramCount++;
+    if (fields.length === 0) {
+      throw new Error('No fields to update');
     }
 
-    query += ` ORDER BY al.created_at DESC`;
+    fields.push(`updated_at = $${idx}`);
+    values.push(new Date());
+    idx++;
 
-    if (filters.limit) {
-      query += ` LIMIT $${paramCount}`;
-      params.push(filters.limit);
-      paramCount++;
+    // organization_id used in WHERE to enforce scoping
+    values.push(licenseData.organization_id);
+    const orgParam = idx;
+    idx++;
+
+    values.push(id);
+    const idParam = idx;
+
+    try {
+      const query = `UPDATE licenses SET ${fields.join(', ')} WHERE organization_id = $${orgParam} AND id = $${idParam} RETURNING *`;
+      console.log('Update query:', query);
+      console.log('Update values:', values);
+      const result = await pool.query(query, values);
+      return result.rows[0];
+    } catch (error) {
+      console.error('Error updating license:', error);
+      throw error;
     }
-
-    if (filters.offset) {
-      query += ` OFFSET $${paramCount}`;
-      params.push(filters.offset);
-      paramCount++;
-    }
-
-    const result = await pool.query(query, params);
-    return result.rows;
-  } catch (error) {
-    console.error('Error fetching audit logs:', error);
-    throw error;
-  }
-}
-
-/**
- * Get audit history for a specific record
- */
-export async function getRecordHistory(tableName, recordId) {
-  try {
-    const result = await pool.query(
-      `SELECT
-         al.*,
-         au.full_name AS user_full_name,
-         au.email AS user_email
-       FROM audit_logs al
-       LEFT JOIN auth_users au ON au.id = al.user_id
-       WHERE al.table_name = $1 AND al.record_id = $2
-       ORDER BY al.timestamp DESC`,
-      [tableName, recordId]
-    );
-    return result.rows;
-  } catch (error) {
-    console.error('Error fetching record history:', error);
-    throw error;
-  }
-}
-
-/**
- * DIGITAL RECEIPTS FUNCTIONS
- */
-
-/**
- * Upload a receipt for an asset
  */
 export async function createReceipt(assetId, receiptData) {
   const client = await pool.connect();
@@ -2071,13 +2097,14 @@ export async function getDashboardAnalytics(role = 'user', userId = null, organi
         overview: { total_assets: 0, total_users: 0, total_licenses: 0, total_contracts: 0, total_consumables: 0, low_stock_items: 0, active_contracts: 0, unresolved_alerts: 0 },
         assetsByCategory: [],
         assetsByStatus: [],
-        recentActivity: [],
-        upcomingExpirations: []
-      };
-    }
-
-    // Check if tables have organization_id column
-    const hasOrgCol = await assetsHasOrganizationIdColumn();
+          `SELECT * FROM licenses 
+           WHERE organization_id = $2 AND (
+                 license_name ILIKE $1 
+              OR software_name ILIKE $1 
+              OR vendor ILIKE $1 
+              OR license_key ILIKE $1)
+            ORDER BY created_at DESC`,
+          [searchTerm, organizationId]
     const orgFilter = hasOrgCol ? 'WHERE organization_id = $1' : '';
     const orgParams = hasOrgCol ? [organizationId] : [];
     
