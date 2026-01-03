@@ -33,6 +33,19 @@ NEVER provide empty templates when you can read actual values.
 NEVER ask "what should I set this to?" when the answer exists in .env or Railway.
 DO THE WORK YOURSELF. The user expects autonomous action, not hand-holding.
 
+# CRITICAL: USER CANNOT RUN COMMANDS
+When the user asks "how do we verify X?" or "how do we check Y?":
+- DO NOT suggest commands for the user to run
+- DO NOT say "you can run..." or "try running..."
+- INSTEAD: Run the commands yourself using run_in_terminal
+- INSTEAD: Check the live system yourself and report findings
+- The user expects YOU to do the verification, not instructions on how to do it
+
+If you cannot verify something programmatically:
+- State what you checked and what the limitation is
+- Provide the actual data you found
+- Do NOT hand off verification tasks to the user
+
 # Planning style
 # Use ONLY 1-minute micro plans:
 # - Break work into steps that each take <= ~1 minute.
