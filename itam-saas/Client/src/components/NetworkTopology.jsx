@@ -512,7 +512,7 @@ export default function NetworkTopology() {
             </div>
           </Panel>
           
-          <Panel position="top-right" className="flex gap-2">
+          <Panel position="top-right" className="flex gap-2" style={{ marginTop: '60px' }}>
             <button
               onClick={() => setShowLoadDialog(true)}
               className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg"
