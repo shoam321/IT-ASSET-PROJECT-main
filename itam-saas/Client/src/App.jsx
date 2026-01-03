@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, QrCode, Camera, Receipt, Boxes, BarChart3, CreditCard, Zap, Clock } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Menu, X, HardDrive, FileText, Users, FileCheck, HelpCircle, CheckCircle, LogOut, Activity, Shield, AlertTriangle, Network, Download, Upload, QrCode, Camera, Receipt, Boxes, BarChart3, CreditCard, Zap, Clock } from 'lucide-react';
 import * as dbService from './services/db';
 import { ASSET_CATEGORIES, getCategoryById, getCategoryColorClasses } from './config/assetCategories';
 import { useAuth } from './context/AuthContext';
@@ -65,6 +65,9 @@ export default function App() {
   const [showScanner, setShowScanner] = useState(false);
   const [showQRGenerator, setShowQRGenerator] = useState(false);
   const [selectedAssetForQR, setSelectedAssetForQR] = useState(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importPreview, setImportPreview] = useState([]);
   
   // Prevent duplicate submissions
   const isSubmittingRef = useRef(false);
@@ -644,6 +647,200 @@ export default function App() {
         c.vendor?.toLowerCase().includes(searchTerm.toLowerCase())
       : true
   );
+
+  const handleImportCsv = () => {
+    setShowImportModal(true);
+    setImportFile(null);
+    setImportPreview([]);
+  };
+
+  const handleFileSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    setImportFile(file);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result;
+      if (!text) return;
+      
+      const lines = text.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      const preview = lines.slice(1, 6).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const obj = {};
+        headers.forEach((header, idx) => {
+          obj[header] = values[idx] || '';
+        });
+        return obj;
+      });
+      
+      setImportPreview(preview);
+    };
+    
+    reader.readAsText(file);
+  };
+
+  const processImport = async () => {
+    if (!importFile) return;
+    
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result;
+      if (!text) return;
+      
+      const lines = text.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',').map(h => h.trim());
+      
+      const records = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim());
+        const obj = {};
+        headers.forEach((header, idx) => {
+          obj[header] = values[idx] || '';
+        });
+        return obj;
+      });
+      
+      setLoading(true);
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const record of records) {
+        try {
+          if (currentScreen === 'assets') {
+            await dbService.createAsset({
+              asset_tag: record['Asset Tag'] || '',
+              asset_type: record['Type'] || '',
+              category: record['Category'] || '',
+              manufacturer: record['Manufacturer'] || '',
+              model: record['Model'] || '',
+              serial_number: record['Serial Number'] || '',
+              assigned_user_name: record['Assigned User'] || '',
+              status: record['Status'] || 'In Use',
+              cost: parseFloat(record['Cost']) || 0
+            });
+          } else if (currentScreen === 'licenses') {
+            await dbService.createLicense({
+              license_name: record['License Name'] || '',
+              software_name: record['Software'] || '',
+              vendor: record['Vendor'] || '',
+              license_type: record['License Type'] || '',
+              license_key: record['License Key'] || '',
+              quantity: parseInt(record['Quantity']) || 1,
+              expiration_date: record['Expiration Date'] || '',
+              status: record['Status'] || 'Active',
+              cost: parseFloat(record['Cost']) || 0,
+              notes: record['Notes'] || ''
+            });
+          } else if (currentScreen === 'users') {
+            await dbService.createUser({
+              user_name: record['User Name'] || '',
+              email: record['Email'] || '',
+              department: record['Department'] || '',
+              phone: record['Phone'] || '',
+              role: record['Role'] || '',
+              status: record['Status'] || 'Active',
+              notes: record['Notes'] || ''
+            });
+          } else if (currentScreen === 'contracts') {
+            await dbService.createContract({
+              contract_name: record['Contract Name'] || '',
+              vendor: record['Vendor'] || '',
+              contract_type: record['Contract Type'] || '',
+              start_date: record['Start Date'] || '',
+              end_date: record['End Date'] || '',
+              value: parseFloat(record['Value']) || 0,
+              currency: record['Currency'] || 'USD',
+              status: record['Status'] || 'Active'
+            });
+          }
+          successCount++;
+        } catch (err) {
+          errorCount++;
+          console.error('Import error:', err);
+        }
+      }
+      
+      setLoading(false);
+      setShowImportModal(false);
+      setSuccessMessage(`Imported ${successCount} records successfully${errorCount > 0 ? ` (${errorCount} failed)` : ''}`);
+      
+      // Refresh data
+      if (currentScreen === 'assets') fetchAssets();
+      else if (currentScreen === 'licenses') fetchLicenses();
+      else if (currentScreen === 'users') fetchUsers();
+      else if (currentScreen === 'contracts') fetchContracts();
+      
+      setTimeout(() => setSuccessMessage(''), 3000);
+    };
+    
+    reader.readAsText(importFile);
+  };
+
+  const getImportGuide = () => {
+    if (currentScreen === 'assets') {
+      return {
+        title: 'Import Assets',
+        fields: [
+          { name: 'Asset Tag', required: true, example: 'LAPTOP-001' },
+          { name: 'Type', required: true, example: 'Laptop' },
+          { name: 'Category', required: false, example: 'IT Equipment' },
+          { name: 'Manufacturer', required: true, example: 'Dell' },
+          { name: 'Model', required: true, example: 'Latitude 5420' },
+          { name: 'Serial Number', required: true, example: 'ABC123XYZ' },
+          { name: 'Assigned User', required: false, example: 'John Doe' },
+          { name: 'Status', required: true, example: 'In Use' },
+          { name: 'Cost', required: false, example: '1299.99' }
+        ]
+      };
+    } else if (currentScreen === 'licenses') {
+      return {
+        title: 'Import Licenses',
+        fields: [
+          { name: 'License Name', required: true, example: 'Microsoft Office 365 E3' },
+          { name: 'Software', required: true, example: 'Microsoft Office 365' },
+          { name: 'Vendor', required: true, example: 'Microsoft' },
+          { name: 'License Type', required: true, example: 'Subscription' },
+          { name: 'License Key', required: false, example: 'XXXXX-XXXXX-XXXXX' },
+          { name: 'Quantity', required: true, example: '100' },
+          { name: 'Expiration Date', required: false, example: '2026-12-31' },
+          { name: 'Status', required: true, example: 'Active' },
+          { name: 'Cost', required: false, example: '12.50' },
+          { name: 'Notes', required: false, example: 'Annual subscription' }
+        ]
+      };
+    } else if (currentScreen === 'users') {
+      return {
+        title: 'Import Users',
+        fields: [
+          { name: 'User Name', required: true, example: 'John Doe' },
+          { name: 'Email', required: true, example: 'john.doe@company.com' },
+          { name: 'Department', required: false, example: 'IT' },
+          { name: 'Phone', required: false, example: '+1-555-0123' },
+          { name: 'Role', required: false, example: 'System Administrator' },
+          { name: 'Status', required: true, example: 'Active' },
+          { name: 'Notes', required: false, example: 'Senior staff member' }
+        ]
+      };
+    } else if (currentScreen === 'contracts') {
+      return {
+        title: 'Import Contracts',
+        fields: [
+          { name: 'Contract Name', required: true, example: 'Cloud Services Agreement' },
+          { name: 'Vendor', required: true, example: 'AWS' },
+          { name: 'Contract Type', required: true, example: 'Service Agreement' },
+          { name: 'Start Date', required: true, example: '2026-01-01' },
+          { name: 'End Date', required: true, example: '2027-01-01' },
+          { name: 'Value', required: true, example: '50000.00' },
+          { name: 'Currency', required: false, example: 'USD' },
+          { name: 'Status', required: true, example: 'Active' }
+        ]
+      };
+    }
+    return { title: '', fields: [] };
+  };
 
   const exportCurrentScreenCsv = () => {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -2263,6 +2460,135 @@ export default function App() {
         </div>
       )}
 
+      {/* Import CSV Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-800 rounded-xl p-6 md:p-8 max-w-4xl w-full shadow-2xl border border-slate-700 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <Upload className="w-8 h-8 text-emerald-500" />
+                <h2 className="text-2xl font-bold text-white">{getImportGuide().title}</h2>
+              </div>
+              <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Import Guide */}
+            <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+              <h3 className="text-lg font-semibold text-blue-400 mb-3">CSV Format Requirements</h3>
+              <p className="text-slate-300 text-sm mb-4">
+                Your CSV file must have the following columns in this exact order:
+              </p>
+              
+              <div className="bg-slate-900/50 p-4 rounded-lg overflow-x-auto mb-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700">
+                      <th className="text-left py-2 px-3 text-emerald-400">Column Name</th>
+                      <th className="text-left py-2 px-3 text-blue-400">Required</th>
+                      <th className="text-left py-2 px-3 text-slate-400">Example</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {getImportGuide().fields.map((field, idx) => (
+                      <tr key={idx} className="border-b border-slate-800">
+                        <td className="py-2 px-3 text-white font-medium">{field.name}</td>
+                        <td className="py-2 px-3">
+                          {field.required ? (
+                            <span className="text-red-400 font-semibold">Yes</span>
+                          ) : (
+                            <span className="text-slate-500">No</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-slate-400 font-mono text-xs">{field.example}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="text-xs text-slate-400 space-y-1">
+                <p>• First row must contain the column headers exactly as shown above</p>
+                <p>• Each subsequent row represents one record</p>
+                <p>• Use commas to separate values</p>
+                <p>• Dates should be in YYYY-MM-DD format</p>
+                <p>• Numbers should not include currency symbols or commas</p>
+              </div>
+            </div>
+
+            {/* File Upload */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Select CSV File
+              </label>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleFileSelect}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-emerald-600 file:text-white file:cursor-pointer hover:file:bg-emerald-700"
+              />
+            </div>
+
+            {/* Preview */}
+            {importPreview.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-slate-300 mb-3">
+                  Preview (First 5 rows)
+                </h4>
+                <div className="bg-slate-900/50 p-4 rounded-lg overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-700">
+                        {Object.keys(importPreview[0]).map((key, idx) => (
+                          <th key={idx} className="text-left py-2 px-2 text-emerald-400">{key}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.map((row, idx) => (
+                        <tr key={idx} className="border-b border-slate-800">
+                          {Object.values(row).map((val, i) => (
+                            <td key={i} className="py-2 px-2 text-slate-300">{val}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={processImport}
+                disabled={!importFile || loading}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Import Data
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Error Notification */}
       {error && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in">
@@ -2561,6 +2887,15 @@ export default function App() {
 
               {['assets', 'licenses', 'users', 'contracts'].includes(currentScreen) && !universalSearch && (
                 <>
+                  <button
+                    onClick={handleImportCsv}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base border border-emerald-500 flex-shrink-0"
+                    title="Import CSV"
+                  >
+                    <Upload className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" />
+                    <span className="hidden md:inline">Import CSV</span>
+                  </button>
+                  
                   <button
                     onClick={exportCurrentScreenCsv}
                     className="bg-slate-700 hover:bg-slate-600 text-white px-3 md:px-4 py-2 rounded-lg flex items-center gap-2 transition whitespace-nowrap text-sm md:text-base border border-slate-600 flex-shrink-0"
