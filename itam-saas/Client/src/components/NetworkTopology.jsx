@@ -139,11 +139,6 @@ const ZoomSlider = () => {
   );
 };
 
-const nodeTypes = {
-  custom: CustomDeviceNode,
-  group: GroupNode,
-};
-
 // Connection type styles
 const connectionTypes = {
   ethernet: { 
