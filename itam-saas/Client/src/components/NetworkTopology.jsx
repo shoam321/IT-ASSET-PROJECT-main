@@ -31,11 +31,11 @@ const CustomDeviceNode = ({ data }) => {
   };
 
   return (
-    <div className="bg-gradient-to-br from-slate-700 to-slate-800 border-2 border-slate-600 rounded-xl p-4 min-w-[200px] shadow-2xl hover:shadow-blue-500/50 hover:border-blue-400 transition-all duration-300 hover:scale-105">
-      <div className="flex items-center gap-3 mb-2">
-        <div className={`w-3 h-3 rounded-full ${getStatusColor(data.status)} ${getStatusGlow(data.status)} shadow-lg ${data.status === 'online' ? 'animate-pulse' : ''}`}></div>
-        <span className="text-2xl drop-shadow-lg">{data.icon}</span>
-        <span className="text-white font-semibold text-sm">{data.label}</span>
+    <div className="bg-gradient-to-br from-blue-600 to-purple-700 border-4 border-cyan-400 rounded-2xl p-6 min-w-[240px] shadow-[0_0_40px_rgba(34,211,238,0.6)] hover:shadow-[0_0_60px_rgba(34,211,238,0.9)] hover:border-yellow-400 transition-all duration-500 hover:scale-110 transform">
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-5 h-5 rounded-full ${getStatusColor(data.status)} ${getStatusGlow(data.status)} shadow-[0_0_20px] ${data.status === 'online' ? 'animate-pulse' : ''}`}></div>
+        <span className="text-4xl drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] animate-bounce">{data.icon}</span>
+        <span className="text-white font-bold text-lg tracking-wide">{data.label}</span>
       </div>
       
       {data.deviceInfo && (
@@ -80,31 +80,31 @@ const connectionTypes = {
   ethernet: { 
     label: '🔵 Ethernet', 
     color: '#3b82f6', 
-    style: { strokeWidth: 3, stroke: '#3b82f6', filter: 'drop-shadow(0 0 4px #3b82f6)' },
+    style: { strokeWidth: 6, stroke: '#00d9ff', filter: 'drop-shadow(0 0 12px #00d9ff) drop-shadow(0 0 20px #00d9ff)' },
     animated: true
   },
   fiber: { 
     label: '🟢 Fiber Optic', 
     color: '#22c55e', 
-    style: { strokeWidth: 4, stroke: '#22c55e', filter: 'drop-shadow(0 0 6px #22c55e)' },
+    style: { strokeWidth: 8, stroke: '#00ff88', filter: 'drop-shadow(0 0 15px #00ff88) drop-shadow(0 0 25px #00ff88)' },
     animated: true
   },
   wifi: { 
     label: '📡 WiFi', 
     color: '#f97316', 
-    style: { strokeWidth: 2, stroke: '#f97316', strokeDasharray: '8,4', filter: 'drop-shadow(0 0 3px #f97316)' },
+    style: { strokeWidth: 5, stroke: '#ff6600', strokeDasharray: '12,6', filter: 'drop-shadow(0 0 10px #ff6600) drop-shadow(0 0 18px #ff6600)' },
     animated: true
   },
   vpn: { 
     label: '🔒 VPN', 
     color: '#a855f7', 
-    style: { strokeWidth: 3, stroke: '#a855f7', filter: 'drop-shadow(0 0 5px #a855f7)' },
+    style: { strokeWidth: 6, stroke: '#dd00ff', filter: 'drop-shadow(0 0 12px #dd00ff) drop-shadow(0 0 22px #dd00ff)' },
     animated: true
   },
   power: { 
     label: '⚡ Power', 
     color: '#eab308', 
-    style: { strokeWidth: 2, stroke: '#eab308', strokeDasharray: '4,2', filter: 'drop-shadow(0 0 4px #eab308)' },
+    style: { strokeWidth: 5, stroke: '#ffee00', strokeDasharray: '8,4', filter: 'drop-shadow(0 0 12px #ffee00) drop-shadow(0 0 20px #ffee00)' },
     animated: true
   },
 };
