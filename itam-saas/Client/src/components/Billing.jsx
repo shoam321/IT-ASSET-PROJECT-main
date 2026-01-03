@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 
 const PAYPAL_CLIENT_ID = process.env.REACT_APP_PAYPAL_CLIENT_ID || 'sb'; // 'sb' = sandbox fallback
+const PAYPAL_PRO_PLAN_ID = process.env.REACT_APP_PAYPAL_PRO_PLAN_ID || '';
+const PAYPAL_ENTERPRISE_PLAN_ID = process.env.REACT_APP_PAYPAL_ENTERPRISE_PLAN_ID || '';
 
 const Billing = () => {
   const { user, token } = useAuth();
@@ -18,25 +20,12 @@ const Billing = () => {
   const [billingLoading, setBillingLoading] = useState(false);
   const [billingError, setBillingError] = useState('');
   const [needsOrganization, setNeedsOrganization] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState('starter');
+  const [selectedPlan, setSelectedPlan] = useState('regular');
   const [upgradeRequested, setUpgradeRequested] = useState(false);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [showPayPal, setShowPayPal] = useState(false);
 
   const plans = {
-    starter: {
-      name: 'Starter Plan',
-      price: 25,
-      period: 'month',
-      users: 30,
-      features: [
-        'Up to 30 Concurrent Users',
-        'Asset & License Management',
-        'Device Usage Tracking',
-        'Basic Audit Trail',
-        'Email Alerts'
-      ]
-    },
     regular: {
       name: 'Pro Plan',
       price: 29,
@@ -46,7 +35,9 @@ const Billing = () => {
         'Device Usage Tracking',
         'Audit Trail & Logs',
         'Email Alerts',
-        'Receipt Upload & Storage'
+        'Receipt Upload & Storage',
+        'Low Stock Alerts',
+        'Forbidden Apps Detection'
       ]
     },
     enterprise: {
@@ -56,10 +47,11 @@ const Billing = () => {
       features: [
         'Everything in Pro',
         'Google SSO Integration',
-        'Grafana Dashboards',
+        'Grafana Analytics Dashboards',
         'Custom Security Policies',
         'Multi-Organization Support',
-        'Priority Email Support'
+        'Priority Email Support',
+        'Advanced Reporting'
       ]
     }
   };
@@ -180,27 +172,27 @@ const Billing = () => {
     }
   };
 
-  // PayPal: Capture payment on backend
-  const capturePayPalOrder = async (orderId) => {
+  // PayPal: Approve subscription on backend
+  const approvePayPalSubscription = async (subscriptionId) => {
     try {
-      const response = await fetch(`${apiUrl}/payments/paypal/capture`, {
+      const response = await fetch(`${apiUrl}/billing/paypal/subscription/approve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${effectiveToken}`
         },
-        body: JSON.stringify({ orderId, plan: selectedPlan })
+        body: JSON.stringify({ subscriptionId, plan: selectedPlan })
       });
       
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to capture payment');
+        throw new Error(data.error || 'Failed to activate subscription');
       }
       
-      // Payment successful!
+      // Subscription successful!
       setStatus('success');
-      setMessage('🎉 Payment successful! Your subscription is now active.');
+      setMessage('🎉 Subscription activated! Your plan is now active.');
       setShowPayPal(false);
       
       // Refresh billing info
@@ -208,9 +200,9 @@ const Billing = () => {
       
       return data;
     } catch (error) {
-      console.error('PayPal capture error:', error);
+      console.error('PayPal subscription approval error:', error);
       setStatus('error');
-      setMessage(error.message || 'Payment failed. Please try again.');
+      setMessage(error.message || 'Subscription activation failed. Please try again.');
       throw error;
     } finally {
       setPaymentProcessing(false);
@@ -228,7 +220,8 @@ const Billing = () => {
     <PayPalScriptProvider options={{ 
       clientId: PAYPAL_CLIENT_ID,
       currency: 'USD',
-      intent: 'capture'
+      intent: 'subscription',
+      vault: true
     }}>
     <div className="min-h-screen bg-slate-900">
       {/* Decorative Background Elements */}
@@ -371,30 +364,6 @@ const Billing = () => {
               
               {/* Plan Cards */}
               <div className="space-y-3">
-                {/* Starter Plan */}
-                <button
-                  onClick={() => setSelectedPlan('starter')}
-                  className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
-                    selectedPlan === 'starter'
-                      ? 'border-green-500 bg-green-500/10'
-                      : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                        selectedPlan === 'starter' ? 'border-green-500 bg-green-500' : 'border-slate-500'
-                      }`}>
-                        {selectedPlan === 'starter' && <CheckCircle className="w-3 h-3 text-white" />}
-                      </div>
-                      <span className="text-white font-semibold">Starter Plan</span>
-                      <span className="px-2 py-0.5 bg-green-500/20 text-green-300 text-xs rounded-full">Best Value</span>
-                    </div>
-                    <span className="text-white font-bold">$25<span className="text-slate-400 text-sm">/mo</span></span>
-                  </div>
-                  <p className="text-slate-400 text-sm ml-8">Up to 30 concurrent users</p>
-                </button>
-
                 {/* Pro Plan */}
                 <button
                   onClick={() => setSelectedPlan('regular')}
@@ -412,6 +381,7 @@ const Billing = () => {
                         {selectedPlan === 'regular' && <CheckCircle className="w-3 h-3 text-white" />}
                       </div>
                       <span className="text-white font-semibold">Pro Plan</span>
+                      <span className="px-2 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded-full">Popular</span>
                     </div>
                     <span className="text-white font-bold">$29<span className="text-slate-400 text-sm">/mo</span></span>
                   </div>
@@ -566,16 +536,28 @@ const Billing = () => {
                             layout: 'vertical',
                             color: 'gold',
                             shape: 'rect',
-                            label: 'paypal'
+                            label: 'subscribe'
                           }}
-                          createOrder={createPayPalOrder}
+                          createSubscription={(data, actions) => {
+                            const planId = selectedPlan === 'enterprise' ? PAYPAL_ENTERPRISE_PLAN_ID : PAYPAL_PRO_PLAN_ID;
+                            if (!planId) {
+                              setStatus('error');
+                              setMessage('Plan ID not configured. Please contact support.');
+                              setPaymentProcessing(false);
+                              return Promise.reject(new Error('Plan ID not configured'));
+                            }
+                            setPaymentProcessing(true);
+                            return actions.subscription.create({
+                              plan_id: planId
+                            });
+                          }}
                           onApprove={async (data) => {
-                            await capturePayPalOrder(data.orderID);
+                            await approvePayPalSubscription(data.subscriptionID);
                           }}
                           onError={(err) => {
                             console.error('PayPal error:', err);
                             setStatus('error');
-                            setMessage('Payment failed. Please try again.');
+                            setMessage('Subscription failed. Please try again.');
                             setPaymentProcessing(false);
                           }}
                           onCancel={() => {

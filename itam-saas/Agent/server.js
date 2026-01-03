@@ -3019,7 +3019,7 @@ app.post('/api/payments/paypal/order', paymentLimiter, authenticateToken, [
     const starterPriceCents = Number.parseInt(process.env.PAYPAL_STARTER_PRICE_CENTS || '2500', 10);
     const proPriceCents = Number.parseInt(process.env.PAYPAL_PRO_PRICE_CENTS || '2900', 10);
     const enterprisePriceCents = Number.parseInt(process.env.PAYPAL_ENTERPRISE_PRICE_CENTS || '9900', 10);
-    const cents = plan === 'enterprise' ? enterprisePriceCents : (plan === 'regular' ? proPriceCents : starterPriceCents);
+    const cents = plan === 'enterprise' ? enterprisePriceCents : proPriceCents;
     if (!Number.isFinite(cents) || cents <= 0) {
       return res.status(500).json({ error: 'Server billing configuration is invalid' });
     }
@@ -3148,7 +3148,7 @@ app.post('/api/payments/paypal/capture', paymentLimiter, authenticateToken, [
     const starterPriceCents = Number.parseInt(process.env.PAYPAL_STARTER_PRICE_CENTS || '2500', 10);
     const proPriceCents = Number.parseInt(process.env.PAYPAL_PRO_PRICE_CENTS || '2900', 10);
     const enterprisePriceCents = Number.parseInt(process.env.PAYPAL_ENTERPRISE_PRICE_CENTS || '9900', 10);
-    const expectedCents = normalizedPlan === 'enterprise' ? enterprisePriceCents : (normalizedPlan === 'regular' ? proPriceCents : starterPriceCents);
+    const expectedCents = normalizedPlan === 'enterprise' ? enterprisePriceCents : proPriceCents;
     const capturedCurrency = (result?.amount?.currency_code || 'USD').toUpperCase();
     const capturedCents = result?.amount?.value ? toCents(result.amount.value) : null;
 
@@ -3312,7 +3312,8 @@ app.get('/api/billing', authenticateToken, async (req, res) => {
 // Store an approved PayPal subscription against the current organization.
 // This is called from the client after PayPal returns subscriptionID.
 app.post('/api/billing/paypal/subscription/approve', paymentLimiter, authenticateToken, [
-  body('subscriptionId').isString().notEmpty().withMessage('subscriptionId is required')
+  body('subscriptionId').isString().notEmpty().withMessage('subscriptionId is required'),
+  body('plan').optional().isString().isIn(['regular', 'enterprise']).withMessage('plan must be regular or enterprise')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -3344,11 +3345,25 @@ app.post('/api/billing/paypal/subscription/approve', paymentLimiter, authenticat
 
     await db.setCurrentUserId(userId);
 
-    const { subscriptionId } = req.body;
+    const { subscriptionId, plan } = req.body;
     const subscription = await getPayPalSubscription(subscriptionId);
-    const expectedPlanId = process.env.PAYPAL_REGULAR_PLAN_ID;
+    
+    // Determine expected plan ID and billing tier based on plan parameter
+    const normalizedPlan = String(plan || 'regular').toLowerCase();
+    let expectedPlanId;
+    let billingTier;
+    
+    if (normalizedPlan === 'enterprise') {
+      expectedPlanId = process.env.PAYPAL_ENTERPRISE_PLAN_ID;
+      billingTier = 'enterprise';
+    } else {
+      expectedPlanId = process.env.PAYPAL_PRO_PLAN_ID || process.env.PAYPAL_REGULAR_PLAN_ID;
+      billingTier = 'pro';
+    }
+    
+    // Validate plan ID if configured
     if (expectedPlanId && subscription?.plan_id && subscription.plan_id !== expectedPlanId) {
-      return res.status(400).json({ error: 'Subscription plan does not match REGULAR plan' });
+      return res.status(400).json({ error: `Subscription plan does not match ${normalizedPlan} plan` });
     }
 
     const normalizedStatus = normalizePayPalSubscriptionStatus(subscription?.status);
@@ -3362,12 +3377,12 @@ app.post('/api/billing/paypal/subscription/approve', paymentLimiter, authenticat
         subscriptionStatus: normalizedStatus,
         subscriptionStartedAt: startedAt,
         subscriptionCurrentPeriodEnd: nextBilling,
-        billingTier: 'regular'
+        billingTier
       }
     );
 
     // Track subscription activation
-    subscriptionEvents.inc({ event_type: 'activated', plan: 'regular' });
+    subscriptionEvents.inc({ event_type: 'activated', plan: billingTier });
 
     return res.json({ billing: updated, paypalStatus: subscription?.status || null });
   } catch (error) {
