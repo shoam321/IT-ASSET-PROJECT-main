@@ -29,11 +29,11 @@ const Billing = () => {
       price: 29,
       period: 'month',
       features: [
-        'Unlimited Assets',
-        'Team Collaboration',
-        'Advanced Analytics',
-        'Priority Support',
-        'API Access'
+        'Asset & License Management',
+        'Device Usage Tracking',
+        'Audit Trail & Logs',
+        'Email Alerts',
+        'Receipt OCR Processing'
       ]
     },
     enterprise: {
@@ -42,11 +42,11 @@ const Billing = () => {
       period: 'month',
       features: [
         'Everything in Pro',
-        'Custom Onboarding',
-        'Dedicated Support',
-        'SLA Guarantee',
-        'Custom Integrations',
-        'Unlimited Users'
+        'Google SSO Integration',
+        'Grafana Dashboards',
+        'Custom Security Policies',
+        'Multi-Organization Support',
+        'Priority Email Support'
       ]
     }
   };

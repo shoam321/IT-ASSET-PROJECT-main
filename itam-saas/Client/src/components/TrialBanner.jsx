@@ -118,22 +118,16 @@ export default function TrialBanner({ token, user }) {
 function UpgradeModal({ onClose }) {
   const plans = [
     {
-      name: 'Starter',
+      name: 'Pro',
       price: 29,
-      features: ['Up to 100 assets', '5 team members', 'Basic reports', 'Email support'],
+      features: ['Asset & License Tracking', 'Device Usage Monitoring', 'Audit Logs', 'Email Alerts', 'Receipt OCR'],
       popular: false
-    },
-    {
-      name: 'Professional',
-      price: 79,
-      features: ['Up to 1,000 assets', '25 team members', 'Advanced reports', 'Priority support', 'API access'],
-      popular: true
     },
     {
       name: 'Enterprise',
-      price: 199,
-      features: ['Unlimited assets', 'Unlimited team members', 'Custom reports', 'Dedicated support', 'SSO', 'Audit logs'],
-      popular: false
+      price: 99,
+      features: ['Everything in Pro', 'Google SSO', 'Grafana Analytics', 'Security Policies', 'Multi-Org Support'],
+      popular: true
     }
   ];
 
