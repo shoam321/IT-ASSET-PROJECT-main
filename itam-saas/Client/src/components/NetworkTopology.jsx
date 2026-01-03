@@ -469,7 +469,13 @@ export default function NetworkTopology() {
             connectionMode="loose"
             className="bg-transparent"
           >
-          <Controls className="bg-slate-700 border-slate-600" />
+          <Controls 
+            position="top-right"
+            className="bg-slate-700 border-slate-600 rounded-lg shadow-xl"
+            showZoom={true}
+            showFitView={true}
+            showInteractive={true}
+          />
           <MiniMap 
             className="bg-slate-800 border-slate-600" 
             nodeColor={(node) => {
