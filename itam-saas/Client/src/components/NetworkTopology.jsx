@@ -3,6 +3,7 @@ import {
   ReactFlow,
   MiniMap,
   Controls,
+  Background,
   useNodesState,
   useEdgesState,
   addEdge,
@@ -10,8 +11,9 @@ import {
   MarkerType,
   Handle,
   Position,
+  useReactFlow,
 } from '@xyflow/react';
-import { Save, Download, Plus, Server, Monitor, Wifi, Shield, AlignLeft, Grid3x3, FolderOpen } from 'lucide-react';
+import { Save, Download, Plus, Server, Monitor, Wifi, Shield, AlignLeft, Grid3x3, FolderOpen, Layers } from 'lucide-react';
 import '@xyflow/react/dist/style.css';
 
 const SNAP_GRID = [20, 20]; // Snap to 20px grid
@@ -71,8 +73,75 @@ const CustomDeviceNode = ({ data }) => {
   );
 };
 
+const GroupNode = ({ data }) => {
+  return (
+    <div className="bg-slate-800/30 border-2 border-dashed border-cyan-400/50 rounded-2xl p-6 min-w-[400px] min-h-[300px] backdrop-blur-sm">
+      {data.label && (
+        <div className="absolute -top-3 left-4 bg-cyan-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg">
+          {data.label}
+        </div>
+      )}
+      <div className="text-slate-400 text-xs text-center mt-2">
+        {data.description || 'Network Zone'}
+      </div>
+    </div>
+  );
+};
+
 const nodeTypes = {
   custom: CustomDeviceNode,
+  group: GroupNode,
+};
+
+const ZoomSlider = () => {
+  const { zoomIn, zoomOut, setViewport, getZoom } = useReactFlow();
+  const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setZoom(getZoom());
+    }, 100);
+    return () => clearInterval(interval);
+  }, [getZoom]);
+
+  const handleZoomChange = (e) => {
+    const newZoom = parseFloat(e.target.value);
+    setViewport({ x: 0, y: 0, zoom: newZoom }, { duration: 200 });
+  };
+
+  return (
+    <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-600 rounded-lg p-3 shadow-xl">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => zoomOut()}
+          className="w-8 h-8 bg-slate-700 hover:bg-slate-600 text-white rounded flex items-center justify-center transition"
+        >
+          -
+        </button>
+        <input
+          type="range"
+          min="0.1"
+          max="2"
+          step="0.1"
+          value={zoom}
+          onChange={handleZoomChange}
+          className="w-32 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+        />
+        <button
+          onClick={() => zoomIn()}
+          className="w-8 h-8 bg-slate-700 hover:bg-slate-600 text-white rounded flex items-center justify-center transition"
+        >
+          +
+        </button>
+        <span className="text-white text-sm font-mono w-12">{Math.round(zoom * 100)}%</span>
+      </div>
+    </div>
+  );
+};
+
+const nodeTypes = {
+  custom: CustomDeviceNode,
+  group: GroupNode,
 };
 
 // Connection type styles
@@ -320,6 +389,29 @@ export default function NetworkTopology() {
         label,
         status: 'offline',
         deviceInfo: null
+      }
+    };
+    setNodes((nds) => [...nds, newNode]);
+  };
+
+  const addGroupNode = (label, description) => {
+    const newNode = {
+      id: `group-${Date.now()}`,
+      type: 'group',
+      position: { x: Math.random() * 300 + 100, y: Math.random() * 200 + 100 },
+      data: { 
+        label,
+        description
+      },
+      style: {
+        width: 400,
+        height: 300,
+        zIndex: -1,
+      }
+    };
+    setNodes((nds) => [...nds, newNode]);
+  };
+        deviceInfo: null
       },
     };
     setNodes((nds) => [...nds, newNode]);
@@ -440,6 +532,44 @@ export default function NetworkTopology() {
             ))}
           </select>
           <p className="text-xs text-slate-400 mt-2">Draw connections with selected type</p>
+        </div>
+
+        {/* Network Zones/Groups */}
+        <div className="mb-6">
+          <h3 className="text-slate-400 text-sm font-semibold mb-3 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-purple-400" />
+            Network Zones
+          </h3>
+          <div className="space-y-2">
+            <button
+              onClick={() => addGroupNode('DMZ', 'Demilitarized Zone')}
+              className="w-full bg-purple-700 hover:bg-purple-600 text-white p-2 rounded-lg transition flex items-center gap-2 text-xs"
+            >
+              <Layers className="w-3 h-3" />
+              Add DMZ Zone
+            </button>
+            <button
+              onClick={() => addGroupNode('Internal', 'Internal Network')}
+              className="w-full bg-purple-700 hover:bg-purple-600 text-white p-2 rounded-lg transition flex items-center gap-2 text-xs"
+            >
+              <Layers className="w-3 h-3" />
+              Add Internal Zone
+            </button>
+            <button
+              onClick={() => addGroupNode('Cloud', 'Cloud Infrastructure')}
+              className="w-full bg-purple-700 hover:bg-purple-600 text-white p-2 rounded-lg transition flex items-center gap-2 text-xs"
+            >
+              <Layers className="w-3 h-3" />
+              Add Cloud Zone
+            </button>
+            <button
+              onClick={() => addGroupNode('Guest', 'Guest Network')}
+              className="w-full bg-purple-700 hover:bg-purple-600 text-white p-2 rounded-lg transition flex items-center gap-2 text-xs"
+            >
+              <Layers className="w-3 h-3" />
+              Add Guest Zone
+            </button>
+          </div>
         </div>
         
         {/* Device Types */}
@@ -688,11 +818,20 @@ export default function NetworkTopology() {
             connectionMode="loose"
             className="bg-transparent"
           >
+          <Background color="#1e293b" gap={20} size={1} />
           <Controls 
             position="top-right"
             className="bg-slate-700/90 border-slate-600 rounded-lg shadow-xl backdrop-blur-sm"
             style={{ zIndex: 10 }}
+            showZoom={false}
+            showFitView={true}
+            showInteractive={true}
           />
+          
+          <Panel position="top-right" className="mt-16">
+            <ZoomSlider />
+          </Panel>
+          
           <MiniMap 
             className="bg-slate-800 border-slate-600" 
             nodeColor={(node) => {
