@@ -1162,6 +1162,23 @@ app.post('/api/auth/register', authLimiter, [
   }
 });
 
+// Check if email exists (for signup validation)
+app.get('/api/auth/check-email', authLimiter, async (req, res) => {
+  try {
+    const { email } = req.query;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const user = await authQueries.findUserByEmail(email);
+    res.json({ exists: !!user });
+  } catch (error) {
+    console.error('Check email error:', error);
+    res.status(500).json({ error: 'Failed to check email' });
+  }
+});
+
 // Complete Onboarding
 app.post('/api/auth/complete-onboarding', authenticateToken, async (req, res) => {
   try {
