@@ -178,10 +178,20 @@ io.on('connection', (socket) => {
   });
 });
 
-// Rate limiting for authentication endpoints
+// Rate limiting (tunable via env to avoid 429s behind shared proxies)
+const AUTH_RATE_LIMIT_WINDOW_MS = parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || `${15 * 60 * 1000}`, 10);
+const AUTH_RATE_LIMIT_MAX = parseInt(process.env.AUTH_RATE_LIMIT_MAX || '20', 10);
+
+const PAYMENT_RATE_LIMIT_WINDOW_MS = parseInt(process.env.PAYMENT_RATE_LIMIT_WINDOW_MS || `${60 * 60 * 1000}`, 10);
+const PAYMENT_RATE_LIMIT_MAX = parseInt(process.env.PAYMENT_RATE_LIMIT_MAX || '100', 10);
+
+const API_RATE_LIMIT_WINDOW_MS = parseInt(process.env.API_RATE_LIMIT_WINDOW_MS || `${15 * 60 * 1000}`, 10);
+const API_RATE_LIMIT_MAX = parseInt(process.env.API_RATE_LIMIT_MAX || '2000', 10);
+const API_RATE_LIMIT_ENABLED = process.env.API_RATE_LIMIT_ENABLED !== 'false';
+
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 requests per window per IP
+  windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+  max: AUTH_RATE_LIMIT_MAX,
   message: 'Too many authentication attempts. Please try again in 15 minutes.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -193,10 +203,9 @@ const authLimiter = rateLimit({
   }
 });
 
-// Rate limiting for payment endpoints
 const paymentLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20, // 20 payment attempts per hour per IP
+  windowMs: PAYMENT_RATE_LIMIT_WINDOW_MS,
+  max: PAYMENT_RATE_LIMIT_MAX,
   message: 'Too many payment requests. Please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -208,14 +217,14 @@ const paymentLimiter = rateLimit({
   }
 });
 
-// General API rate limiter
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // 100 requests per 15 min per IP
+  windowMs: API_RATE_LIMIT_WINDOW_MS,
+  max: API_RATE_LIMIT_MAX,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
-  skipSuccessfulRequests: false
+  skipSuccessfulRequests: false,
+  skip: () => !API_RATE_LIMIT_ENABLED
 });
 
 // CORS configuration
