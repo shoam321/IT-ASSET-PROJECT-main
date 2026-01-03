@@ -718,19 +718,6 @@ export default function NetworkTopology() {
           </div>
         </div>
 
-        <div className="mb-6">
-          <h3 className="text-slate-400 text-sm font-semibold mb-3">Infrastructure</h3>
-          <div className="space-y-2">
-            <button
-              onClick={() => addDeviceNode('server', '🖥️', 'Generic Server')}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg transition flex items-center gap-2 text-sm"
-            >
-              <Server className="w-4 h-4" />
-              Add Server
-            </button>
-          </div>
-        </div>
-
         {/* Monitored Devices */}
         {devices.length > 0 && (
           <div>
