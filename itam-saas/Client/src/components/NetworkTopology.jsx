@@ -24,11 +24,17 @@ const CustomDeviceNode = ({ data }) => {
     return 'bg-red-500';
   };
 
+  const getStatusGlow = (status) => {
+    if (status === 'online') return 'shadow-green-500/50';
+    if (status === 'idle') return 'shadow-yellow-500/50';
+    return 'shadow-red-500/50';
+  };
+
   return (
-    <div className="bg-slate-700 border-2 border-slate-600 rounded-lg p-4 min-w-[200px] shadow-xl hover:border-blue-500 transition-all">
+    <div className="bg-gradient-to-br from-slate-700 to-slate-800 border-2 border-slate-600 rounded-xl p-4 min-w-[200px] shadow-2xl hover:shadow-blue-500/50 hover:border-blue-400 transition-all duration-300 hover:scale-105">
       <div className="flex items-center gap-3 mb-2">
-        <div className={`w-3 h-3 rounded-full ${getStatusColor(data.status)} shadow-lg`}></div>
-        <span className="text-lg">{data.icon}</span>
+        <div className={`w-3 h-3 rounded-full ${getStatusColor(data.status)} ${getStatusGlow(data.status)} shadow-lg ${data.status === 'online' ? 'animate-pulse' : ''}`}></div>
+        <span className="text-2xl drop-shadow-lg">{data.icon}</span>
         <span className="text-white font-semibold text-sm">{data.label}</span>
       </div>
       
@@ -74,32 +80,32 @@ const connectionTypes = {
   ethernet: { 
     label: '🔵 Ethernet', 
     color: '#3b82f6', 
-    style: { strokeWidth: 2, stroke: '#3b82f6' },
-    animated: false
+    style: { strokeWidth: 3, stroke: '#3b82f6', filter: 'drop-shadow(0 0 4px #3b82f6)' },
+    animated: true
   },
   fiber: { 
     label: '🟢 Fiber Optic', 
     color: '#22c55e', 
-    style: { strokeWidth: 3, stroke: '#22c55e' },
+    style: { strokeWidth: 4, stroke: '#22c55e', filter: 'drop-shadow(0 0 6px #22c55e)' },
     animated: true
   },
   wifi: { 
     label: '📡 WiFi', 
     color: '#f97316', 
-    style: { strokeWidth: 2, stroke: '#f97316', strokeDasharray: '5,5' },
-    animated: false
+    style: { strokeWidth: 2, stroke: '#f97316', strokeDasharray: '8,4', filter: 'drop-shadow(0 0 3px #f97316)' },
+    animated: true
   },
   vpn: { 
     label: '🔒 VPN', 
     color: '#a855f7', 
-    style: { strokeWidth: 2, stroke: '#a855f7' },
+    style: { strokeWidth: 3, stroke: '#a855f7', filter: 'drop-shadow(0 0 5px #a855f7)' },
     animated: true
   },
   power: { 
     label: '⚡ Power', 
     color: '#eab308', 
-    style: { strokeWidth: 2, stroke: '#eab308' },
-    animated: false
+    style: { strokeWidth: 2, stroke: '#eab308', strokeDasharray: '4,2', filter: 'drop-shadow(0 0 4px #eab308)' },
+    animated: true
   },
 };
 
@@ -114,13 +120,19 @@ export default function NetworkTopology() {
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [showEdgePanel, setShowEdgePanel] = useState(false);
   const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedNodes, setSelectedNodes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showEdgePanel, setShowEdgePanel] = useState(false);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || 'https://it-asset-project-production.up.railway.app/api';
 
   const fetchDevices = useCallback(async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('authToken');
-      const response = await fetch(`${API_URL}/agent/devices`, {
+      const response = await fetch(`${API_URL}/devices`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -133,6 +145,8 @@ export default function NetworkTopology() {
       }
     } catch (err) {
       console.error('Error fetching devices:', err);
+    } finally {
+      setLoading(false);
     }
   }, [API_URL]);
 
@@ -142,6 +156,41 @@ export default function NetworkTopology() {
     const saved = JSON.parse(localStorage.getItem('networkTopologies') || '[]');
     setSavedTopologies(saved);
   }, [fetchDevices]);
+
+  // Auto-save topology changes
+  useEffect(() => {
+    if (nodes.length > 0 || edges.length > 0) {
+      const autoSaveTimer = setTimeout(() => {
+        const currentState = { nodes, edges, name: currentTopologyName || 'Auto-saved' };
+        localStorage.setItem('topologyAutoSave', JSON.stringify(currentState));
+      }, 2000);
+      return () => clearTimeout(autoSaveTimer);
+    }
+  }, [nodes, edges, currentTopologyName]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Delete key - remove selected nodes/edges
+      if (e.key === 'Delete' && selectedNodes.length > 0) {
+        setNodes((nds) => nds.filter(n => !selectedNodes.includes(n.id)));
+        setEdges((eds) => eds.filter(e => !selectedNodes.includes(e.source) && !selectedNodes.includes(e.target)));
+        setSelectedNodes([]);
+      }
+      // Ctrl+A - select all nodes
+      if (e.ctrlKey && e.key === 'a') {
+        e.preventDefault();
+        setSelectedNodes(nodes.map(n => n.id));
+      }
+      // Escape - clear selection
+      if (e.key === 'Escape') {
+        setSelectedNodes([]);
+        setShowEdgePanel(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [nodes, selectedNodes, setNodes, setEdges]);
 
   // Custom node change handler with collision prevention
   const handleNodesChange = useCallback((changes) => {
@@ -322,9 +371,26 @@ export default function NetworkTopology() {
     setCurrentTopologyName('');
   };
 
-  const exportAsImage = () => {
-    // Would implement canvas export here
-    alert('Export feature coming soon!');
+  const exportAsImage = async () => {
+    try {
+      const { toPng } = await import('html-to-image');
+      const element = document.querySelector('.react-flow');
+      if (!element) return;
+      
+      const dataUrl = await toPng(element, {
+        backgroundColor: '#0f172a',
+        width: element.offsetWidth,
+        height: element.offsetHeight,
+      });
+      
+      const link = document.createElement('a');
+      link.download = `topology-${currentTopologyName || Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Export failed. Please try again.');
+    }
   };
 
   const loadTopology = (topology) => {
@@ -344,8 +410,22 @@ export default function NetworkTopology() {
   return (
     <div className="h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex">
       {/* Sidebar */}
-      <div className="w-72 bg-slate-800 border-r border-slate-700 p-4 overflow-y-auto">
-        <h2 className="text-white font-bold text-lg mb-4">Device Palette</h2>
+      <div className="w-72 bg-slate-800 border-r border-slate-700 p-4 overflow-y-auto shadow-2xl">
+        <h2 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-blue-400" />
+          Network Planner
+        </h2>
+        
+        {/* Search Bar */}
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="🔍 Search nodes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none text-sm"
+          />
+        </div>
         
         {/* Connection Type Selector */}
         <div className="mb-6">
@@ -434,38 +514,77 @@ export default function NetworkTopology() {
         {/* Monitored Devices */}
         {devices.length > 0 && (
           <div>
-            <h3 className="text-slate-400 text-sm font-semibold mb-3">Your Monitored Devices</h3>
+            <h3 className="text-slate-400 text-sm font-semibold mb-3 flex items-center gap-2">
+              <Server className="w-4 h-4 text-green-400" />
+              Your Monitored Devices {loading && <span className="text-xs text-blue-400 animate-pulse">Loading...</span>}
+            </h3>
             <div className="space-y-2 max-h-64 overflow-y-auto">
-              {devices.map((device) => (
-                <button
-                  key={device.device_id}
-                  onClick={() => addMonitoredDevice(device)}
-                  className="w-full bg-blue-900 hover:bg-blue-800 text-white p-2 rounded text-xs transition text-left"
-                >
-                  <div className="font-medium">{device.hostname || device.device_id}</div>
-                  <div className="text-blue-300 text-xs">{device.os_name}</div>
-                </button>
-              ))}
+              {devices
+                .filter(d => !searchQuery || d.hostname?.toLowerCase().includes(searchQuery.toLowerCase()) || d.os_name?.toLowerCase().includes(searchQuery.toLowerCase()))
+                .map((device) => (
+                  <button
+                    key={device.device_id}
+                    onClick={() => addMonitoredDevice(device)}
+                    className="w-full bg-gradient-to-r from-blue-900 to-blue-800 hover:from-blue-800 hover:to-blue-700 text-white p-2 rounded-lg text-xs transition text-left shadow-lg hover:shadow-blue-500/30 border border-blue-700"
+                  >
+                    <div className="font-medium flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                      {device.hostname || device.device_id}
+                    </div>
+                    <div className="text-blue-300 text-xs mt-1">{device.os_name}</div>
+                  </button>
+                ))}
             </div>
+          </div>
+        )}
+
+        {loading && devices.length === 0 && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-slate-400 text-sm animate-pulse">Loading devices...</div>
           </div>
         )}
       </div>
 
       {/* Main Canvas */}
       <div className="flex-1 relative overflow-hidden bg-slate-900">
+        {loading && nodes.length === 0 && (
+          <div className="absolute inset-0 flex items-center justify-center z-50 bg-slate-900/80 backdrop-blur-sm">
+            <div className="text-center">
+              <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-white text-lg font-semibold">Loading Network Topology...</p>
+            </div>
+          </div>
+        )}
         <div className="relative z-10 h-full">
           <ReactFlow
-            nodes={nodes}
+            nodes={nodes.map(node => ({
+              ...node,
+              className: selectedNodes.includes(node.id) ? 'ring-4 ring-blue-500' : '',
+              style: {
+                ...node.style,
+                filter: searchQuery && !node.data.label.toLowerCase().includes(searchQuery.toLowerCase()) ? 'opacity(0.3)' : 'opacity(1)',
+              }
+            }))}
             edges={edges}
             onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onEdgeClick={onEdgeClick}
+            onNodeClick={(e, node) => {
+              if (e.ctrlKey || e.metaKey) {
+                setSelectedNodes(prev => 
+                  prev.includes(node.id) ? prev.filter(id => id !== node.id) : [...prev, node.id]
+                );
+              } else {
+                setSelectedNodes([node.id]);
+              }
+            }}
+            onPaneClick={() => setSelectedNodes([])}
             nodeTypes={nodeTypes}
             snapToGrid={true}
             snapGrid={SNAP_GRID}
             fitView
-            connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2 }}
+            connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 3, filter: 'drop-shadow(0 0 4px #3b82f6)' }}
             connectionMode="loose"
             className="bg-transparent"
           >
