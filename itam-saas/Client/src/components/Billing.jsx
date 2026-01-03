@@ -289,8 +289,6 @@ const Billing = () => {
 
             {/* Plan Visual Card */}
             <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 mb-6 relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxjaXJjbGUgY3g9IjIwIiBjeT0iMjAiIHI9IjIiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4xKSIvPjwvZz48L3N2Zz4=')] opacity-50" />
-              
               <div className="relative">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="w-5 h-5 text-white/80" />
