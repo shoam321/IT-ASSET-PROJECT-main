@@ -3263,36 +3263,54 @@ app.post('/api/payments/paypal/webhook', async (req, res) => {
     }
 
     const resource = body?.resource || {};
-    const orderId = resource?.id || resource?.supplementary_data?.related_ids?.order_id;
-    const captureId = resource?.id;
-    const amountValue = resource?.amount?.value || resource?.purchase_units?.[0]?.amount?.value;
-    const amountCurrency = (resource?.amount?.currency_code || resource?.purchase_units?.[0]?.amount?.currency_code || 'USD').toUpperCase();
-    const amountCents = amountValue ? toCents(amountValue) : null;
-    const payerEmail = resource?.payer?.email_address || resource?.payer_email;
-    const payerName = resource?.payer?.name ? `${resource.payer.name.given_name || ''} ${resource.payer.name.surname || ''}`.trim() : null;
 
-    if (orderId) {
-      const existing = await db.getPaymentByOrderId(orderId);
-      if (existing) {
-        await db.updatePaymentStatus(orderId, {
-          status: eventType || existing.status,
-          captureId: captureId || existing.capture_id,
-          payerEmail: payerEmail || existing.payer_email,
-          payerName: payerName || existing.payer_name,
-          metadata: resource || existing.metadata
-        });
-      } else {
+    // Only persist real monetary payment events to the payments table.
+    // PayPal sends many non-monetary events (plan/product/subscription lifecycle) that must NOT create payment rows.
+    const paymentEventTypes = new Set([
+      'PAYMENT.CAPTURE.COMPLETED',
+      'PAYMENT.SALE.COMPLETED',
+      'CHECKOUT.ORDER.COMPLETED'
+    ]);
+
+    if (paymentEventTypes.has(eventType)) {
+      const isCapture = eventType === 'PAYMENT.CAPTURE.COMPLETED' || eventType === 'PAYMENT.SALE.COMPLETED';
+      const captureId = isCapture ? resource?.id : (resource?.purchase_units?.[0]?.payments?.captures?.[0]?.id || null);
+
+      // For capture events, the order id lives in related_ids. For checkout.order.completed, resource.id is the order id.
+      const orderId =
+        (!isCapture ? resource?.id : null) ||
+        resource?.supplementary_data?.related_ids?.order_id ||
+        resource?.supplementary_data?.related_ids?.order_id ||
+        eventId;
+
+      const amountValue =
+        resource?.amount?.value ||
+        resource?.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.value ||
+        resource?.purchase_units?.[0]?.amount?.value;
+      const amountCurrency = (
+        resource?.amount?.currency_code ||
+        resource?.purchase_units?.[0]?.payments?.captures?.[0]?.amount?.currency_code ||
+        resource?.purchase_units?.[0]?.amount?.currency_code ||
+        'USD'
+      ).toUpperCase();
+      const amountCents = amountValue ? toCents(amountValue) : 0;
+
+      // Guardrail: don't write $0 "payments".
+      if (amountCents > 0) {
+        const payerEmail = resource?.payer?.email_address || resource?.payer_email || null;
+        const payerName = resource?.payer?.name ? `${resource.payer.name.given_name || ''} ${resource.payer.name.surname || ''}`.trim() : null;
+
         await db.createPaymentRecord({
           orderId,
           captureId,
           userId: null,
-          amountCents: amountCents || 0,
+          amountCents,
           currency: amountCurrency,
-          status: eventType || 'WEBHOOK',
+          status: resource?.status || 'COMPLETED',
           intent: 'CAPTURE',
           payerEmail,
           payerName,
-          metadata: resource || {}
+          metadata: body
         });
       }
     }
@@ -3468,6 +3486,12 @@ app.post('/api/billing/paypal/webhook', async (req, res) => {
       return res.status(400).json({ error: 'Invalid webhook signature' });
     }
 
+    // Log raw billing webhook events for audit + idempotency.
+    const inserted = await db.logWebhookEvent(eventId, eventType, 'received', body);
+    if (!inserted) {
+      return res.status(200).json({ status: 'duplicate' });
+    }
+
     const resource = body?.resource || {};
     const subscriptionId = resource?.id;
     if (!subscriptionId) {
@@ -3505,11 +3529,51 @@ app.post('/api/billing/paypal/webhook', async (req, res) => {
         },
         client
       );
+
+      // Insert a proper payment record when PayPal confirms a successful subscription charge.
+      const paymentSucceededTypes = new Set([
+        'BILLING.SUBSCRIPTION.PAYMENT.SUCCEEDED',
+        'BILLING.SUBSCRIPTION.PAYMENT.COMPLETED'
+      ]);
+      if (paymentSucceededTypes.has(eventType)) {
+        const lastPayment = resource?.billing_info?.last_payment || {};
+        const amountValue = lastPayment?.amount?.value || lastPayment?.amount?.total || null;
+        const currency = (lastPayment?.amount?.currency_code || lastPayment?.amount?.currency || 'USD').toUpperCase();
+        const amountCents = amountValue ? toCents(amountValue) : 0;
+
+        // Use PayPal transaction id if present; else fall back to webhook event id.
+        const transactionId = lastPayment?.transaction_id || lastPayment?.id || null;
+        const paymentOrderId = transactionId || eventId;
+
+        if (amountCents > 0 && paymentOrderId) {
+          await db.createPaymentRecord({
+            orderId: paymentOrderId,
+            captureId: transactionId,
+            userId: null,
+            organizationId: org.id,
+            paypalSubscriptionId: subscriptionId,
+            amountCents,
+            currency,
+            status: 'COMPLETED',
+            intent: 'SUBSCRIPTION',
+            payerEmail: null,
+            payerName: null,
+            metadata: body
+          });
+        }
+      }
     });
+
+    await db.markWebhookProcessed(eventId, 'processed');
 
     res.json({ status: 'ok', eventId, eventType });
   } catch (error) {
     console.error('PayPal billing webhook error:', error);
+    try {
+      if (eventId) {
+        await db.markWebhookProcessed(eventId, 'failed');
+      }
+    } catch {}
     res.status(500).json({ error: 'Failed to process webhook' });
   }
 });

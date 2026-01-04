@@ -2,6 +2,7 @@ import pool, { dbAsyncLocalStorage } from './db.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { validateQuery, columnExists } from './schema-validator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2094,6 +2095,8 @@ export async function createPaymentRecord({
   orderId,
   captureId = null,
   userId = null,
+  organizationId = null,
+  paypalSubscriptionId = null,
   amountCents,
   currency,
   status,
@@ -2103,27 +2106,110 @@ export async function createPaymentRecord({
   description = null,
   metadata = {}
 }) {
+  const normalizedAmountCents = Number.isFinite(amountCents) ? amountCents : 0;
+  const amount = normalizedAmountCents / 100;
+
+  // Schema-aware insert/update: support both legacy and newer payments schemas.
+  const hasOrderId = await columnExists('payments', 'order_id');
+  const hasPaypalOrderId = await columnExists('payments', 'paypal_order_id');
+  const keyColumn = hasOrderId ? 'order_id' : hasPaypalOrderId ? 'paypal_order_id' : null;
+  if (!keyColumn) {
+    throw new Error('payments table has no order identifier column (expected order_id or paypal_order_id)');
+  }
+
+  const hasCaptureId = await columnExists('payments', 'capture_id');
+  const hasUserId = await columnExists('payments', 'user_id');
+  const hasOrganizationId = await columnExists('payments', 'organization_id');
+  const hasPaypalSubscriptionId = await columnExists('payments', 'paypal_subscription_id');
+  const hasAmount = await columnExists('payments', 'amount');
+  const hasAmountCents = await columnExists('payments', 'amount_cents');
+  const hasCurrency = await columnExists('payments', 'currency');
+  const hasStatus = await columnExists('payments', 'status');
+  const hasIntent = await columnExists('payments', 'intent');
+  const hasPayerEmail = await columnExists('payments', 'payer_email') || await columnExists('payments', 'paypal_payer_email');
+  const payerEmailCol = (await columnExists('payments', 'payer_email')) ? 'payer_email' : (await columnExists('payments', 'paypal_payer_email') ? 'paypal_payer_email' : null);
+  const hasPayerName = await columnExists('payments', 'payer_name');
+  const hasDescription = await columnExists('payments', 'description');
+  const hasMetadata = await columnExists('payments', 'metadata');
+
+  const columns = [];
+  const values = [];
+
+  const push = (col, val) => {
+    columns.push(col);
+    values.push(val);
+  };
+
+  push(keyColumn, orderId);
+  if (hasCaptureId) push('capture_id', captureId);
+  if (hasUserId) push('user_id', userId);
+  if (hasOrganizationId) push('organization_id', organizationId);
+  if (hasPaypalSubscriptionId) push('paypal_subscription_id', paypalSubscriptionId);
+  if (hasAmount) push('amount', amount);
+  if (hasAmountCents) push('amount_cents', normalizedAmountCents);
+  if (hasCurrency) push('currency', currency);
+  if (hasStatus) push('status', status);
+  if (hasIntent) push('intent', intent);
+  if (payerEmailCol) push(payerEmailCol, payerEmail);
+  if (hasPayerName) push('payer_name', payerName);
+  if (hasDescription) push('description', description);
+  if (hasMetadata) push('metadata', metadata);
+
+  await validateQuery('payments', columns);
+
   try {
-    const normalizedAmountCents = Number.isFinite(amountCents) ? amountCents : 0;
-    const amount = normalizedAmountCents / 100;
-    const result = await pool.query(
-      `INSERT INTO payments (
-         order_id, capture_id, user_id, amount, amount_cents, currency,
-         status, intent, payer_email, payer_name, description, metadata
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-       ON CONFLICT (order_id) DO UPDATE SET
-         capture_id = COALESCE(EXCLUDED.capture_id, payments.capture_id),
-         status = EXCLUDED.status,
-         amount = COALESCE(EXCLUDED.amount, payments.amount),
-         amount_cents = COALESCE(EXCLUDED.amount_cents, payments.amount_cents),
-         payer_email = COALESCE(EXCLUDED.payer_email, payments.payer_email),
-         payer_name = COALESCE(EXCLUDED.payer_name, payments.payer_name),
-         metadata = COALESCE(EXCLUDED.metadata, payments.metadata),
-         updated_at = NOW()
-       RETURNING *` ,
-      [orderId, captureId, userId, amount, normalizedAmountCents, currency, status, intent, payerEmail, payerName, description, metadata]
-    );
-    return result.rows[0];
+    // If order_id exists, it is expected to be unique; use upsert.
+    if (keyColumn === 'order_id') {
+      const placeholders = columns.map((_, i) => `$${i + 1}`).join(',');
+      const updateFields = columns
+        .filter((c) => c !== 'order_id')
+        .map((c) => {
+          if (c === 'status') return `status = EXCLUDED.status`;
+          if (c === 'amount' || c === 'amount_cents' || c === 'currency') return `${c} = COALESCE(EXCLUDED.${c}, payments.${c})`;
+          if (c === 'metadata') return `metadata = COALESCE(EXCLUDED.metadata, payments.metadata)`;
+          return `${c} = COALESCE(EXCLUDED.${c}, payments.${c})`;
+        })
+        .concat(['updated_at = NOW()'])
+        .join(', ');
+
+      const sql = `INSERT INTO payments (${columns.join(',')}) VALUES (${placeholders}) ON CONFLICT (order_id) DO UPDATE SET ${updateFields} RETURNING *`;
+      const result = await pool.query(sql, values);
+      return result.rows[0] || null;
+    }
+
+    // Legacy schema: update-first by paypal_order_id (may not have a unique constraint).
+    const setParts = [];
+    const updateValues = [];
+    let idx = 1;
+
+    // WHERE paypal_order_id = $1
+    updateValues.push(orderId);
+    idx++;
+
+    for (let i = 0; i < columns.length; i++) {
+      const col = columns[i];
+      const val = values[i];
+      if (col === 'paypal_order_id') continue;
+      if (col === 'status') {
+        setParts.push(`status = $${idx}`);
+        updateValues.push(val);
+        idx++;
+        continue;
+      }
+      setParts.push(`${col} = COALESCE($${idx}, ${col})`);
+      updateValues.push(val);
+      idx++;
+    }
+    setParts.push('updated_at = NOW()');
+
+    const updateSql = `UPDATE payments SET ${setParts.join(', ')} WHERE paypal_order_id = $1 RETURNING *`;
+    const updated = await pool.query(updateSql, updateValues);
+    if (updated.rows[0]) return updated.rows[0];
+
+    const placeholders = columns.map((_, i) => `$${i + 1}`).join(',');
+    const insertSql = `INSERT INTO payments (${columns.join(',')}) VALUES (${placeholders}) RETURNING *`;
+    const inserted = await pool.query(insertSql, values);
+    return inserted.rows[0] || null;
   } catch (error) {
     console.error('Error creating payment record:', error);
     throw error;
@@ -2132,7 +2218,11 @@ export async function createPaymentRecord({
 
 export async function getPaymentByOrderId(orderId) {
   try {
-    const result = await pool.query('SELECT * FROM payments WHERE order_id = $1', [orderId]);
+    const hasOrderId = await columnExists('payments', 'order_id');
+    const keyColumn = hasOrderId ? 'order_id' : (await columnExists('payments', 'paypal_order_id')) ? 'paypal_order_id' : null;
+    if (!keyColumn) return null;
+    await validateQuery('payments', [keyColumn]);
+    const result = await pool.query(`SELECT * FROM payments WHERE ${keyColumn} = $1 ORDER BY created_at DESC LIMIT 1`, [orderId]);
     return result.rows[0] || null;
   } catch (error) {
     console.error('Error fetching payment by order id:', error);
@@ -2222,6 +2312,7 @@ export async function updatePaymentStatus(orderId, updates = {}) {
 
 export async function logWebhookEvent(eventId, eventType, status, payload) {
   try {
+    await validateQuery('webhook_events', ['event_id', 'event_type', 'status', 'payload']);
     const result = await pool.query(
       `INSERT INTO webhook_events (event_id, event_type, status, payload)
        VALUES ($1,$2,$3,$4)
@@ -2238,6 +2329,7 @@ export async function logWebhookEvent(eventId, eventType, status, payload) {
 
 export async function markWebhookProcessed(eventId, status = 'processed') {
   try {
+    await validateQuery('webhook_events', ['status', 'processed_at', 'event_id']);
     await pool.query(
       `UPDATE webhook_events SET status = $1, processed_at = NOW() WHERE event_id = $2`,
       [status, eventId]
