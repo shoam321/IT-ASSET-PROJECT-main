@@ -3532,7 +3532,6 @@ app.post('/api/billing/paypal/webhook', async (req, res) => {
 
       // Insert a proper payment record when PayPal confirms a successful subscription charge.
       const paymentSucceededTypes = new Set([
-        'BILLING.SUBSCRIPTION.PAYMENT.SUCCEEDED',
         'BILLING.SUBSCRIPTION.PAYMENT.COMPLETED'
       ]);
       if (paymentSucceededTypes.has(eventType)) {

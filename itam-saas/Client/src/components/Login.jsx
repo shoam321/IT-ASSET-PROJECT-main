@@ -192,12 +192,6 @@ export default function Login({ onLoginSuccess, onSwitchToRegister }) {
           </p>
         </div>
 
-        {/* Demo Credentials */}
-        <div className="mt-6 bg-slate-800 bg-opacity-50 border border-slate-700 rounded-lg p-4">
-          <p className="text-slate-400 text-xs text-center">
-            <strong className="text-slate-300">Demo Credentials:</strong> admin / SecureAdmin2025
-          </p>
-        </div>
       </div>
     </div>
   );

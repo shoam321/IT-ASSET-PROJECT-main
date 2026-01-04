@@ -126,9 +126,14 @@ export async function captureOrder(orderId) {
 }
 
 export async function verifyWebhookSignature(headers, body) {
-  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
-  if (!webhookId) {
-    throw new Error('PAYPAL_WEBHOOK_ID is not configured');
+  const webhookIds = [
+    process.env.PAYPAL_PAYMENTS_WEBHOOK_ID,
+    process.env.PAYPAL_BILLING_WEBHOOK_ID,
+    process.env.PAYPAL_WEBHOOK_ID
+  ].filter(Boolean);
+
+  if (webhookIds.length === 0) {
+    throw new Error('No PayPal webhook id configured (set PAYPAL_PAYMENTS_WEBHOOK_ID/PAYPAL_BILLING_WEBHOOK_ID or PAYPAL_WEBHOOK_ID)');
   }
 
   const transmissionId = headers['paypal-transmission-id'];
@@ -144,25 +149,31 @@ export async function verifyWebhookSignature(headers, body) {
 
   const accessToken = await getAccessToken();
 
-  const response = await axios.post(
-    `${getApiBaseUrl()}/v1/notifications/verify-webhook-signature`,
-    {
-      auth_algo: authAlgo,
-      cert_url: certUrl,
-      transmission_id: transmissionId,
-      transmission_sig: transmissionSig,
-      transmission_time: timestamp,
-      webhook_id: webhookId,
-      webhook_event: webhookEvent
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+  for (const webhookId of webhookIds) {
+    const response = await axios.post(
+      `${getApiBaseUrl()}/v1/notifications/verify-webhook-signature`,
+      {
+        auth_algo: authAlgo,
+        cert_url: certUrl,
+        transmission_id: transmissionId,
+        transmission_sig: transmissionSig,
+        transmission_time: timestamp,
+        webhook_id: webhookId,
+        webhook_event: webhookEvent
       },
-      timeout: 15_000
-    }
-  );
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 15_000
+      }
+    );
 
-  return response?.data?.verification_status === 'SUCCESS';
+    if (response?.data?.verification_status === 'SUCCESS') {
+      return true;
+    }
+  }
+
+  return false;
 }
