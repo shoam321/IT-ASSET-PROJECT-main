@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { PayPalScriptProvider, PayPalButtons } from '@paypal/react-paypal-js';
 
 const PAYPAL_CLIENT_ID = process.env.REACT_APP_PAYPAL_CLIENT_ID || 'sb'; // 'sb' = sandbox fallback
-const PAYPAL_PRO_PLAN_ID = process.env.REACT_APP_PAYPAL_PRO_PLAN_ID || '';
+// Backwards compatible: older docs/installs used *_REGULAR_PLAN_ID
+const PAYPAL_PRO_PLAN_ID = process.env.REACT_APP_PAYPAL_PRO_PLAN_ID || process.env.REACT_APP_PAYPAL_REGULAR_PLAN_ID || '';
 const PAYPAL_ENTERPRISE_PLAN_ID = process.env.REACT_APP_PAYPAL_ENTERPRISE_PLAN_ID || '';
 
 const Billing = () => {

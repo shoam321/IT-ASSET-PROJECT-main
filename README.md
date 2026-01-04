@@ -70,11 +70,11 @@ Use this when you run the product as a hosted SaaS (recommended for distribution
 - Frontend env (Vercel build-time):
   - `REACT_APP_API_URL=https://api.example.com/api`
   - `REACT_APP_PAYPAL_CLIENT_ID=<your-live-client-id>`
-  - `REACT_APP_PAYPAL_REGULAR_PLAN_ID=<P-... live plan id>`
+  - `REACT_APP_PAYPAL_PRO_PLAN_ID=<P-... live plan id>`
 - Backend env (Railway runtime):
   - `DATABASE_URL` for the managed Postgres instance
   - `JWT_SECRET` for auth
-  - `PAYPAL_REGULAR_PLAN_ID=<P-... live plan id>` (must match the frontend)
+  - `PAYPAL_PRO_PLAN_ID=<P-... live plan id>` (must match the frontend)
 - CI/CD: protect `main`, merge via PR, and auto-deploy to Vercel (frontend) and Railway (backend) on merge. Keep a staging environment (staging domains + staging PayPal plan) for smoke tests before production.
 - Billing flow: users must belong to an organization. If no org exists, `/api/billing` returns `needsOrganization=true` and the UI hides the PayPal button until the user creates/joins an org.
 - PayPal setup: create a live Subscription Plan in PayPal, copy the `P-...` ID into both frontend and backend envs, then redeploy frontend so the build picks up the new plan.

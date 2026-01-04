@@ -12,12 +12,26 @@ This project supports **company-level** monthly subscriptions:
    - Status: **Active**
 3. Copy the **Plan ID** (looks like `P-...`).
 
+### 1.1) 30-day trial (recommended: $0 for first month)
+If you offer a **30-day trial**, you must configure it on the **PayPal Plan**.
+
+Conceptually, the Plan should have billing cycles like:
+- Cycle 1: `tenure_type=TRIAL`, `interval_unit=MONTH`, `interval_count=1`, `total_cycles=1`, `fixed_price=0`
+- Cycle 2: `tenure_type=REGULAR`, `interval_unit=MONTH`, `interval_count=1`, `total_cycles=0`, `fixed_price=<your monthly price>`
+
+Notes:
+- PayPal allows up to **two** TRIAL cycles per plan.
+- During the PayPal trial tenure, the subscription is typically `ACTIVE` in PayPal, but this app will store and display it as `subscription_status=trial` until the trial billing cycle is completed.
+
 ## 2) Live Environment Variables
 
 ### Frontend (Vercel)
 Set:
 - `REACT_APP_PAYPAL_CLIENT_ID` = your PayPal **Client ID**
-- `REACT_APP_PAYPAL_REGULAR_PLAN_ID` = your PayPal **Plan ID** (e.g. `P-...`)
+- `REACT_APP_PAYPAL_PRO_PLAN_ID` = your PayPal **Plan ID** (e.g. `P-...`) (the Pro/Regular monthly plan)
+
+Backwards compatibility:
+- `REACT_APP_PAYPAL_REGULAR_PLAN_ID` is also supported as a fallback.
 
 Notes:
 - For Create React App, `REACT_APP_*` variables are **build-time**. After changing them in Vercel, trigger a **new deployment**.
@@ -30,7 +44,10 @@ Set:
 - `PAYPAL_CLIENT_ID` = your PayPal **Client ID**
 - `PAYPAL_CLIENT_SECRET` = your PayPal **Client Secret**
 - `PAYPAL_WEBHOOK_ID` = your PayPal **Webhook ID**
-- `PAYPAL_REGULAR_PLAN_ID` = your PayPal **Plan ID** (e.g. `P-...`) (recommended for validation)
+- `PAYPAL_PRO_PLAN_ID` = your PayPal **Plan ID** (e.g. `P-...`) (recommended for validation)
+
+Backwards compatibility:
+- `PAYPAL_REGULAR_PLAN_ID` is also supported as a fallback.
 
 Optional (debug only):
 - `DEBUG_RLS=true` to enable verbose `app.current_user_id` logs. Leave unset/false in production to reduce log noise.
@@ -55,4 +72,4 @@ Then copy the generated **Webhook ID** into `PAYPAL_WEBHOOK_ID`.
 - Go to the app → **Billing**
 - Click **Subscribe** under Regular
 - Approve in PayPal
-- Billing page should show company `subscription_status` becoming **active**
+- If the selected PayPal plan includes a trial cycle, the Billing page should show company `subscription_status` becoming **trial** until the trial ends (then **active**)

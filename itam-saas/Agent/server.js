@@ -166,6 +166,38 @@ const normalizePayPalSubscriptionStatus = (status) => {
   return normalized ? normalized.toLowerCase() : 'unknown';
 };
 
+// PayPal subscriptions can be ACTIVE while still in a TRIAL billing cycle.
+// We surface that as `trial` to match our product semantics (30-day trial).
+const isPayPalSubscriptionInTrial = (subscriptionOrResource) => {
+  const executions = subscriptionOrResource?.billing_info?.cycle_executions;
+  if (!Array.isArray(executions)) return false;
+  return executions.some((execution) => {
+    const tenure = String(execution?.tenure_type || '').toUpperCase();
+    const remaining = Number(execution?.cycles_remaining ?? 0);
+    return tenure === 'TRIAL' && remaining > 0;
+  });
+};
+
+const deriveOrganizationSubscriptionStatus = (subscriptionOrResource, fallbackEventType = null) => {
+  const statusFromResource = subscriptionOrResource?.status;
+  let normalized = statusFromResource ? normalizePayPalSubscriptionStatus(statusFromResource) : 'unknown';
+
+  // If PayPal didn't include a status, infer from event type.
+  if (!statusFromResource) {
+    const type = String(fallbackEventType || '').toUpperCase();
+    if (type === 'BILLING.SUBSCRIPTION.ACTIVATED') normalized = 'active';
+    else if (type === 'BILLING.SUBSCRIPTION.CANCELLED') normalized = 'canceled';
+    else if (type === 'BILLING.SUBSCRIPTION.SUSPENDED') normalized = 'suspended';
+    else if (type === 'BILLING.SUBSCRIPTION.EXPIRED') normalized = 'expired';
+  }
+
+  // Translate ACTIVE + TRIAL tenure into our `trial` state.
+  if (normalized === 'active' && isPayPalSubscriptionInTrial(subscriptionOrResource)) {
+    return 'trial';
+  }
+  return normalized;
+};
+
 // Socket.IO configuration
 const io = new Server(httpServer, {
   cors: {
@@ -3366,7 +3398,7 @@ app.post('/api/billing/paypal/subscription/approve', paymentLimiter, authenticat
       return res.status(400).json({ error: `Subscription plan does not match ${normalizedPlan} plan` });
     }
 
-    const normalizedStatus = normalizePayPalSubscriptionStatus(subscription?.status);
+    const normalizedStatus = deriveOrganizationSubscriptionStatus(subscription);
     const startedAt = subscription?.start_time ? new Date(subscription.start_time) : null;
     const nextBilling = subscription?.billing_info?.next_billing_time ? new Date(subscription.billing_info.next_billing_time) : null;
 
@@ -3442,17 +3474,18 @@ app.post('/api/billing/paypal/webhook', async (req, res) => {
       return res.json({ status: 'ignored' });
     }
 
-    const statusFromResource = resource?.status;
-    let status = statusFromResource ? normalizePayPalSubscriptionStatus(statusFromResource) : 'unknown';
-
-    // Fall back to event type mapping if resource.status isn’t present
-    const type = String(eventType || '').toUpperCase();
-    if (!statusFromResource) {
-      if (type === 'BILLING.SUBSCRIPTION.ACTIVATED') status = 'active';
-      else if (type === 'BILLING.SUBSCRIPTION.CANCELLED') status = 'canceled';
-      else if (type === 'BILLING.SUBSCRIPTION.SUSPENDED') status = 'suspended';
-      else if (type === 'BILLING.SUBSCRIPTION.EXPIRED') status = 'expired';
+    // Determine billing tier from PayPal plan_id (if available)
+    const planId = resource?.plan_id;
+    const expectedEnterprisePlanId = process.env.PAYPAL_ENTERPRISE_PLAN_ID;
+    const expectedProPlanId = process.env.PAYPAL_PRO_PLAN_ID || process.env.PAYPAL_REGULAR_PLAN_ID;
+    let billingTier = 'pro';
+    if (planId && expectedEnterprisePlanId && planId === expectedEnterprisePlanId) {
+      billingTier = 'enterprise';
+    } else if (planId && expectedProPlanId && planId === expectedProPlanId) {
+      billingTier = 'pro';
     }
+
+    const status = deriveOrganizationSubscriptionStatus(resource, eventType);
 
     const nextBilling = resource?.billing_info?.next_billing_time ? new Date(resource.billing_info.next_billing_time) : null;
     const startedAt = resource?.start_time ? new Date(resource.start_time) : null;
@@ -3468,7 +3501,7 @@ app.post('/api/billing/paypal/webhook', async (req, res) => {
           subscriptionStatus: status,
           subscriptionStartedAt: startedAt,
           subscriptionCurrentPeriodEnd: nextBilling,
-          billingTier: 'regular'
+          billingTier
         },
         client
       );
