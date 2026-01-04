@@ -1,8 +1,52 @@
 import paypal from '@paypal/checkout-server-sdk';
+import axios from 'axios';
 
 const PAYPAL_MODE = (process.env.PAYPAL_MODE || 'sandbox').toLowerCase();
 
+let cachedAccessToken = null;
+let cachedAccessTokenExpiresAt = 0;
+
 let cachedClient = null;
+
+function getApiBaseUrl() {
+  return PAYPAL_MODE === 'live'
+    ? 'https://api-m.paypal.com'
+    : 'https://api-m.sandbox.paypal.com';
+}
+
+async function getAccessToken() {
+  const now = Date.now();
+  if (cachedAccessToken && cachedAccessTokenExpiresAt && now < cachedAccessTokenExpiresAt - 60_000) {
+    return cachedAccessToken;
+  }
+
+  const clientId = process.env.PAYPAL_CLIENT_ID;
+  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('PayPal client credentials are not configured');
+  }
+
+  const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const body = new URLSearchParams({ grant_type: 'client_credentials' }).toString();
+
+  const response = await axios.post(`${getApiBaseUrl()}/v1/oauth2/token`, body, {
+    headers: {
+      Authorization: `Basic ${auth}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    timeout: 15_000
+  });
+
+  const token = response?.data?.access_token;
+  const expiresIn = Number(response?.data?.expires_in || 0);
+  if (!token) {
+    throw new Error('Failed to obtain PayPal access token');
+  }
+
+  cachedAccessToken = token;
+  cachedAccessTokenExpiresAt = now + (Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn * 1000 : 8 * 60 * 1000);
+  return token;
+}
 
 function getClient() {
   if (cachedClient) return cachedClient;
@@ -98,18 +142,27 @@ export async function verifyWebhookSignature(headers, body) {
     throw new Error('Missing PayPal webhook verification headers');
   }
 
-  const client = getClient();
-  const verifyRequest = new paypal.notifications.VerifyWebhookSignatureRequest();
-  verifyRequest.requestBody({
-    auth_algo: authAlgo,
-    cert_url: certUrl,
-    transmission_id: transmissionId,
-    transmission_sig: transmissionSig,
-    transmission_time: timestamp,
-    webhook_id: webhookId,
-    webhook_event: webhookEvent
-  });
+  const accessToken = await getAccessToken();
 
-  const response = await client.execute(verifyRequest);
-  return response?.result?.verification_status === 'SUCCESS';
+  const response = await axios.post(
+    `${getApiBaseUrl()}/v1/notifications/verify-webhook-signature`,
+    {
+      auth_algo: authAlgo,
+      cert_url: certUrl,
+      transmission_id: transmissionId,
+      transmission_sig: transmissionSig,
+      transmission_time: timestamp,
+      webhook_id: webhookId,
+      webhook_event: webhookEvent
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 15_000
+    }
+  );
+
+  return response?.data?.verification_status === 'SUCCESS';
 }

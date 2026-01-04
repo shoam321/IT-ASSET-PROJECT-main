@@ -2104,20 +2104,24 @@ export async function createPaymentRecord({
   metadata = {}
 }) {
   try {
+    const normalizedAmountCents = Number.isFinite(amountCents) ? amountCents : 0;
+    const amount = normalizedAmountCents / 100;
     const result = await pool.query(
       `INSERT INTO payments (
-         order_id, capture_id, user_id, amount_cents, currency,
+         order_id, capture_id, user_id, amount, amount_cents, currency,
          status, intent, payer_email, payer_name, description, metadata
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (order_id) DO UPDATE SET
          capture_id = COALESCE(EXCLUDED.capture_id, payments.capture_id),
          status = EXCLUDED.status,
+         amount = COALESCE(EXCLUDED.amount, payments.amount),
+         amount_cents = COALESCE(EXCLUDED.amount_cents, payments.amount_cents),
          payer_email = COALESCE(EXCLUDED.payer_email, payments.payer_email),
          payer_name = COALESCE(EXCLUDED.payer_name, payments.payer_name),
          metadata = COALESCE(EXCLUDED.metadata, payments.metadata),
          updated_at = NOW()
        RETURNING *` ,
-      [orderId, captureId, userId, amountCents, currency, status, intent, payerEmail, payerName, description, metadata]
+      [orderId, captureId, userId, amount, normalizedAmountCents, currency, status, intent, payerEmail, payerName, description, metadata]
     );
     return result.rows[0];
   } catch (error) {
